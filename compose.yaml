@@ -1,0 +1,16 @@
+﻿services:
+  db:
+    image: postgres:16-alpine
+    container_name: EduCore-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-EduCoreDB}
+      POSTGRES_USER: ${POSTGRES_USER:-educore}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-educore123}
+    ports:
+      - "5434:5432"
+    volumes:
+      - educore_pg_data:/var/lib/postgresql/data
+
+volumes:
+  educore_pg_data:
+
