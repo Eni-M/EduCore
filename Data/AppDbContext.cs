@@ -49,12 +49,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentSchool
         modelBuilder.Entity<User>().Property<uint>("Version").IsRowVersion();
 
         modelBuilder.Entity<Student>()
-            .HasOne<User>().WithOne()
+            .HasOne(s => s.User).WithOne()
             .HasForeignKey<Student>(s => s.UserId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Student>().HasIndex(s => s.UserId).IsUnique();
         modelBuilder.Entity<Student>()
-            .HasOne<School>().WithMany()
+            .HasOne(s => s.School).WithMany()
             .HasForeignKey(s => s.SchoolId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Student>().HasAlternateKey(s => new { s.Id, s.SchoolId });
@@ -75,12 +75,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentSchool
         modelBuilder.Entity<Parent>().HasQueryFilter(p => p.SchoolId == currentSchoolAccessor.CurrentSchoolId);
 
         modelBuilder.Entity<Teacher>()
-            .HasOne<User>().WithOne()
+            .HasOne(t => t.User).WithOne()
             .HasForeignKey<Teacher>(t => t.UserId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Teacher>().HasIndex(t => t.UserId).IsUnique();
         modelBuilder.Entity<Teacher>()
-            .HasOne<School>().WithMany()
+            .HasOne(t => t.School).WithMany()
             .HasForeignKey(t => t.SchoolId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Teacher>().HasAlternateKey(t => new { t.Id, t.SchoolId });
@@ -88,12 +88,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentSchool
         modelBuilder.Entity<Teacher>().HasQueryFilter(t => t.SchoolId == currentSchoolAccessor.CurrentSchoolId);
 
         modelBuilder.Entity<Admin>()
-            .HasOne<User>().WithOne()
+            .HasOne(a => a.User).WithOne()
             .HasForeignKey<Admin>(a => a.UserId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Admin>().HasIndex(a => a.UserId).IsUnique();
         modelBuilder.Entity<Admin>()
-            .HasOne<School>().WithMany()
+            .HasOne(a => a.School).WithMany()
             .HasForeignKey(a => a.SchoolId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Admin>().Property<uint>("Version").IsRowVersion();
@@ -305,7 +305,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentSchool
             .HasPrincipalKey(t => new { t.Id, t.SchoolId })
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<TeacherSubject>()
-            .HasOne<Subject>().WithMany()
+            .HasOne(ts => ts.Subject).WithMany()
             .HasForeignKey(ts => new { ts.SubjectId, ts.SchoolId })
             .HasPrincipalKey(s => new { s.Id, s.SchoolId })
             .OnDelete(DeleteBehavior.Restrict);

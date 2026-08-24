@@ -8,5 +8,7 @@ public class Teacher : ISchoolScoped
     public Guid UserId { get; set; }
     public Guid SchoolId { get; set; }
 
+    public User User { get; set; } = null!;
+    public School School { get; set; } = null!;
     public ICollection<TeacherSubject> TeacherSubjects { get; set; } = new List<TeacherSubject>();
 }

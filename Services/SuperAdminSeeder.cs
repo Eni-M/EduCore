@@ -1,6 +1,7 @@
 using EduCore.Data;
 using EduCore.Enums;
 using EduCore.Models;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace EduCore.Services;
@@ -24,15 +25,17 @@ public static class SuperAdminSeeder
             throw new InvalidOperationException(
                 "SuperAdmin:Email and SuperAdmin:Password must be configured to seed the initial super admin.");
 
-        db.Users.Add(new User
+        var user = new User
         {
             FirstName = "Super",
             LastName = "Admin",
             Email = email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
             MustChangePassword = true,
             Role = UserRole.SuperAdmin
-        });
+        };
+        user.PasswordHash = new PasswordHasher<User>().HashPassword(user, password);
+
+        db.Users.Add(user);
 
         await db.SaveChangesAsync();
     }
