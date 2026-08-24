@@ -1,15 +1,10 @@
+using EduCore.Data;
+
 namespace EduCore.Models;
 
-public class Subject
+public class Subject : ISchoolScoped
 {
-    public Guid Id { get; private set; }
-    public string Name { get; private set; }
-
-    public Subject(string name)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-
-        Id = Guid.NewGuid();
-        Name = name;
-    }
+    public Guid Id { get; set; }
+    public Guid SchoolId { get; set; }
+    public string Name { get; set; } = null!;
 }

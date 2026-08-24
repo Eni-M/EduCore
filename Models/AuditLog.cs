@@ -1,19 +1,12 @@
-﻿namespace EduCore.Models;
+namespace EduCore.Models;
 
 public class AuditLog
 {
-    public Guid Id { get; private set; }
-    public Guid? UserId { get; private set; }
-    public string Action { get; private set; }
-    public DateTime Timestamp { get; private set; }
+    public Guid Id { get; set; }
 
-    public AuditLog(Guid? userId, string action)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(action);
-
-        Id = Guid.NewGuid();
-        UserId = userId;
-        Action = action;
-        Timestamp = DateTime.UtcNow;
-    }
+    // No FK to User by design -- an audit trail can never be allowed to fail the write it's
+    // auditing just because the acting user's row is gone (revoked account, stale token, etc).
+    public Guid? UserId { get; set; }
+    public string Action { get; set; } = null!;
+    public DateTime Timestamp { get; set; }
 }

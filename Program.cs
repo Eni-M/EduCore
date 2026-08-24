@@ -1,5 +1,8 @@
 using System.Text;
 using EduCore.Data;
+using EduCore.Exceptions;
+using EduCore.Services;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -11,10 +14,20 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<AuditSaveChangesInterceptor>();
+builder.Services.AddScoped<SchoolIsolationSaveChangesInterceptor>();
+builder.Services.AddScoped<ICurrentSchoolAccessor, HttpContextCurrentSchoolAccessor>();
 
-builder.Services.AddDbContext<EduCoreDbContext>((sp, options) =>
+builder.Services.AddDbContext<AppDbContext>((sp, options) =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default"))
-        .AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>()));
+        .AddInterceptors(
+            sp.GetRequiredService<AuditSaveChangesInterceptor>(),
+            sp.GetRequiredService<SchoolIsolationSaveChangesInterceptor>()));
+
+builder.Services.AddAutoMapper(cfg => { }, typeof(Program).Assembly);
+builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
+
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -26,7 +39,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = false,
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)),
+            
+            
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1)
         };
     });
 
@@ -34,11 +51,15 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+await SuperAdminSeeder.SeedAsync(app.Services, app.Configuration);
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+app.UseExceptionHandler();
 
 app.UseHttpsRedirection();
 

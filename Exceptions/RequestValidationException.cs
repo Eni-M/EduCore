@@ -1,6 +1,6 @@
-using InventoryService.DTOs.Records.Errors;
+using EduCore.Dtos.Errors;
 
-namespace InventoryService.Exceptions;
+namespace EduCore.Exceptions;
 
 public class RequestValidationException : Exception
 {

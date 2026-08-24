@@ -1,15 +1,12 @@
+using EduCore.Data;
+
 namespace EduCore.Models;
 
-public class Teacher
+public class Teacher : ISchoolScoped
 {
-    public Guid Id { get; private set; }
-    public Guid UserId { get; private set; }
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public Guid SchoolId { get; set; }
 
-    public virtual ICollection<TeacherSubject> TeacherSubjects { get; set; } = new List<TeacherSubject>();
-
-    public Teacher(Guid userId)
-    {
-        Id = Guid.NewGuid();
-        UserId = userId;
-    }
+    public ICollection<TeacherSubject> TeacherSubjects { get; set; } = new List<TeacherSubject>();
 }

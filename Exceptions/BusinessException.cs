@@ -1,4 +1,4 @@
-﻿namespace InventoryService.Exceptions;
+﻿namespace EduCore.Exceptions;
 
 public class BusinessException : Exception
 {

@@ -1,17 +1,16 @@
-﻿namespace EduCore.Models;
+using EduCore.Data;
 
-public class Enrollment
+namespace EduCore.Models;
+
+public class Enrollment : ISchoolScoped
 {
-    public Guid Id { get; private set; }
-    public Guid StudentId { get; private set; }
-    public Guid ClassId { get; private set; }
-    public DateTime EnrolledAt { get; private set; }
+    public Guid Id { get; set; }
+    public Guid StudentId { get; set; }
+    public Guid ClassId { get; set; }
+    public Guid SchoolId { get; set; }
+    public DateOnly EnrolledAt { get; set; }
 
-    public Enrollment(Guid studentId, Guid classId)
-    {
-        Id = Guid.NewGuid();
-        StudentId = studentId;
-        ClassId = classId;
-        EnrolledAt = DateTime.UtcNow;
-    }
+    // Null while the enrollment is active. Set on transfer/withdrawal -- lets a student
+    // re-enroll in the same class later without violating the active-enrollment uniqueness.
+    public DateOnly? LeftAt { get; set; }
 }

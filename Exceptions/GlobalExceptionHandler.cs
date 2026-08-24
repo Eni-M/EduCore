@@ -1,13 +1,21 @@
-using InventoryService.DTOs.Records.Errors;
+using EduCore.Dtos.Errors;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
-namespace InventoryService.Exceptions;
+namespace EduCore.Exceptions;
 
 public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
         var traceId = httpContext.TraceIdentifier;
+
+        // Unwraps EF Core's DbUpdateException to find a raw Postgres unique-violation and
+        // reports it as a normal conflict instead of a raw 500 -- needed because several
+        // entities (e.g. Student.PersonalNumber) enforce uniqueness only at the DB level.
+        if (exception is DbUpdateException dbEx && dbEx.InnerException is PostgresException { SqlState: "23505" } pgEx)
+            exception = new ConflictException($"A record with the same {pgEx.ConstraintName} already exists.");
 
         var (statusCode, error, message) = exception switch
         {

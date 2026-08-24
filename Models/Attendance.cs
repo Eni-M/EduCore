@@ -1,17 +1,20 @@
-﻿namespace EduCore.Models;
+using EduCore.Data;
 
-public class Attendance
+namespace EduCore.Models;
+
+public class Attendance : ISchoolScoped
 {
-    public Guid Id { get; private set; }
-    public Guid EnrollmentId { get; private set; }
-    public DateTime Date { get; private set; }
-    public bool IsPresent { get; private set; }
+    public Guid Id { get; set; }
+    public Guid DiaryEntryId { get; set; }
+    public Guid EnrollmentId { get; set; }
 
-    public Attendance(Guid enrollmentId, DateTime date, bool isPresent)
-    {
-        Id = Guid.NewGuid();
-        EnrollmentId = enrollmentId;
-        Date = date;
-        IsPresent = isPresent;
-    }
+    // Denormalized from both DiaryEntry and Enrollment. Its only purpose is letting the DB
+    // enforce -- via composite foreign keys -- that the enrollment's class actually matches
+    // the diary entry's class, which two independent plain FKs can't express.
+    public Guid ClassId { get; set; }
+    public Guid SchoolId { get; set; }
+
+    public bool IsPresent { get; set; }
+    public string? Comment { get; set; }
+    public int? BehaviorMark { get; set; }
 }

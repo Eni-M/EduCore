@@ -1,4 +1,4 @@
-﻿namespace InventoryService.DTOs.Records.Errors;
+﻿namespace EduCore.Dtos.Errors;
 
 public record ErrorResponseDto(
     int StatusCode,

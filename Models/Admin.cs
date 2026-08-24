@@ -1,15 +1,10 @@
+using EduCore.Data;
+
 namespace EduCore.Models;
 
-public class Admin
+public class Admin : ISchoolScoped
 {
-    public Guid Id { get; private set; }
-    public Guid UserId { get; private set; }
-    public Guid SchoolId { get; private set; }
-
-    public Admin(Guid userId, Guid schoolId)
-    {
-        Id = Guid.NewGuid();
-        UserId = userId;
-        SchoolId = schoolId;
-    }
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public Guid SchoolId { get; set; }
 }

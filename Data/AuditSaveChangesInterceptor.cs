@@ -45,8 +45,11 @@ public class AuditSaveChangesInterceptor(IHttpContextAccessor httpContextAccesso
 
         foreach (var entry in entries)
         {
-            var action = $"{entry.State} {entry.Entity.GetType().Name}";
-            context.Add(new AuditLog(userId, action));
+            var keyValues = string.Join(",", entry.Properties
+                .Where(p => p.Metadata.IsPrimaryKey())
+                .Select(p => p.CurrentValue?.ToString() ?? "null"));
+            var action = $"{entry.State} {entry.Entity.GetType().Name} ({keyValues})";
+            context.Add(new AuditLog { UserId = userId, Action = action, Timestamp = DateTime.UtcNow });
         }
     }
 

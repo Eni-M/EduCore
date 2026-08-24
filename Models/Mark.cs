@@ -1,24 +1,29 @@
+using EduCore.Data;
+using EduCore.Enums;
+
 namespace EduCore.Models;
 
-public class Mark
+public class Mark : ISchoolScoped
 {
-    public Guid Id { get; private set; }
-    public Guid StudentId { get; private set; }
-    public Guid SubjectId { get; private set; }
-    public Guid TeacherId { get; private set; }
-    public int Value { get; private set; }
-    public DateOnly Date { get; private set; }
+    public Guid Id { get; set; }
+    public Guid EnrollmentId { get; set; }
 
-    public Mark(Guid studentId, Guid subjectId, Guid teacherId, int value, DateOnly date)
-    {
-        if (value is < 1 or > 5)
-            throw new ArgumentOutOfRangeException(nameof(value), "Mark value must be between 1 and 5.");
+    // Denormalized so the DB can enforce (via composite FKs) that this mark's class matches
+    // the enrollment it's tied to, and that its grading period belongs to the same academic
+    // year as the class.
+    public Guid ClassId { get; set; }
+    public Guid AcademicYearId { get; set; }
+    public Guid SchoolId { get; set; }
 
-        Id = Guid.NewGuid();
-        StudentId = studentId;
-        SubjectId = subjectId;
-        TeacherId = teacherId;
-        Value = value;
-        Date = date;
-    }
+    // Points at the specific ClassSubjectTeacher row active when the mark was given -- unlike
+    // DiaryEntry, Mark requires the teacher to be the one actually assigned to the class,
+    // enforced by a composite FK matching every denormalized field below against that row.
+    public Guid ClassSubjectTeacherId { get; set; }
+    public Guid SubjectId { get; set; }
+    public Guid TeacherId { get; set; }
+
+    public Guid GradingPeriodId { get; set; }
+    public MarkType Type { get; set; }
+    public int Value { get; set; }
+    public DateOnly Date { get; set; }
 }
