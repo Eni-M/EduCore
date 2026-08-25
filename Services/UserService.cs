@@ -63,10 +63,7 @@ public class UserService(
         userRepository.Update(user);
         await userRepository.SaveChangesAsync(ct);
 
-        // The must-change-password flag lives in the token, so the caller's current
-        // one is now stale and every request made with it would still be refused.
-        // Hand back a freshly minted token that reflects what just changed.
-        return await BuildAuthResponseAsync(user, ct);
+        return await BuildAuthResponseAsync(user, ct); 
     }
 
     public async Task<ResetPasswordResponseDto> AdminResetPasswordAsync(Guid userId, CancellationToken ct)
