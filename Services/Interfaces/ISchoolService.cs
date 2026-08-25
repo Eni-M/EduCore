@@ -9,5 +9,5 @@ public interface ISchoolService
     Task<SchoolListDto> CreateAsync(SchoolCreateDto dto, CancellationToken ct);
     Task<SchoolListDto> UpdateAsync(Guid schoolId, SchoolEditDto dto, CancellationToken ct);
 
-    Task<SchoolStatisticsDto> GetStatisticsAsync(CancellationToken ct);
+    Task<IEnumerable<SchoolStatisticsDto>> GetStatisticsAsync(CancellationToken ct);
 }
