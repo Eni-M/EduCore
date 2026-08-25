@@ -118,7 +118,8 @@ if (app.Environment.IsDevelopment())
 await SuperAdminSeeder.SeedAsync(app.Services, app.Configuration);
 
 app.UseExceptionHandler();
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
 app.UseCors(FrontendCors);
 app.UseAuthentication();
 app.UseAuthorization();

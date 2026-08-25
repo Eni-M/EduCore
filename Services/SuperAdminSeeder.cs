@@ -23,8 +23,7 @@ public static class SuperAdminSeeder
             throw new InvalidOperationException(
                 "SuperAdmin:Email and SuperAdmin:Password must be configured to seed the initial super admin.");
 
-        // Goes through the same path as every other account, so hashing and the
-        // must-change-password default cannot drift from the rest of the application.
+    
         await users.BuildLoginAsync("Super", "Admin", email, password, UserRole.SuperAdmin, CancellationToken.None);
 
         await db.SaveChangesAsync();
