@@ -19,10 +19,7 @@ public static class AuthEndpoints
 
         group.MapPost("/change-password",
                 async (ChangePasswordDto dto, IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
-                {
-                    await users.ChangePasswordAsync(currentUser.UserId, dto, ct);
-                    return Results.NoContent();
-                })
+                    Results.Ok(await users.ChangePasswordAsync(currentUser.UserId, dto, ct)))
             .RequireAuthorization();
 
         // The temporary password is returned once for the admin to hand over, never stored.
