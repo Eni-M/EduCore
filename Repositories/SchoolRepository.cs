@@ -1,6 +1,5 @@
 using EduCore.Data;
 using EduCore.Dtos.School;
-using EduCore.DTOs.School;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
