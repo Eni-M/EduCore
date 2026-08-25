@@ -23,7 +23,6 @@ public class UserService(
     ICurrentUser currentUser,
     IConfiguration config) : IUserService
 {
-
     public async Task<AuthResponseDto> LoginAsync(LoginUserDto dto, CancellationToken ct)
     {
         var user = await userRepository.GetByEmailAsync(dto.Email, ct);
@@ -40,7 +39,7 @@ public class UserService(
 
         if (result == PasswordVerificationResult.SuccessRehashNeeded)
         {
-            user.PasswordHash = passwordHasher.HashPassword(user, dto.Password);
+            user.SetPassword(dto.Password, passwordHasher);
             userRepository.Update(user);
             await userRepository.SaveChangesAsync(ct);
         }
@@ -58,7 +57,7 @@ public class UserService(
         if (result == PasswordVerificationResult.Failed)
             throw new UnauthorizedException("Current password is incorrect.");
 
-        user.PasswordHash = passwordHasher.HashPassword(user, dto.NewPassword);
+        user.SetPassword(dto.NewPassword, passwordHasher);
         user.MustChangePassword = false;
 
         userRepository.Update(user);
@@ -79,7 +78,7 @@ public class UserService(
             .IncludeSpecial()
             .Next();
 
-        user.PasswordHash = passwordHasher.HashPassword(user, temporaryPassword);
+        user.SetPassword(temporaryPassword, passwordHasher);
         user.MustChangePassword = true;
 
         userRepository.Update(user);
@@ -124,7 +123,7 @@ public class UserService(
             MustChangePassword = true
         };
 
-        user.PasswordHash = passwordHasher.HashPassword(user, password);
+        user.SetPassword(password, passwordHasher);
 
         await userRepository.AddAsync(user);
         return user;
