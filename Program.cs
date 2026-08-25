@@ -3,6 +3,7 @@ using AutoMapper;
 using EduCore.Data;
 using EduCore.Endpoints;
 using EduCore.Exceptions;
+using EduCore.Models;
 using EduCore.Repositories;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
@@ -10,6 +11,7 @@ using EduCore.Services;
 using EduCore.Services.Interfaces;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -49,6 +51,11 @@ builder.Services.AddScoped<IDiaryEntryRepository, DiaryEntryRepository>();
 builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
 builder.Services.AddScoped<IMarkRepository, MarkRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+
+// Stateless and thread-safe, so one instance serves the whole app. Registering it here
+// rather than newing it up inside UserService means hashing options are configured in one
+// place and every password in the system goes through the same settings.
+builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
 builder.Services.AddScoped<IAccessGuard, AccessGuard>();
 builder.Services.AddScoped<IUserService, UserService>();

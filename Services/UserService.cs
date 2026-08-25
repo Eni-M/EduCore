@@ -19,10 +19,10 @@ public class UserService(
     ITeacherRepository teacherRepository,
     IStudentRepository studentRepository,
     IAdminRepository adminRepository,
+    IPasswordHasher<User> passwordHasher,
     ICurrentUser currentUser,
     IConfiguration config) : IUserService
 {
-    private readonly PasswordHasher<User> _passwordHasher = new();
 
     public async Task<AuthResponseDto> LoginAsync(LoginUserDto dto, CancellationToken ct)
     {
@@ -31,7 +31,7 @@ public class UserService(
         if (user is null)
             throw new UnauthorizedException("Invalid email or password.");
 
-        var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.Password);
+        var result = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.Password);
         if (result == PasswordVerificationResult.Failed)
             throw new UnauthorizedException("Invalid email or password.");
 
@@ -40,7 +40,7 @@ public class UserService(
 
         if (result == PasswordVerificationResult.SuccessRehashNeeded)
         {
-            user.PasswordHash = _passwordHasher.HashPassword(user, dto.Password);
+            user.PasswordHash = passwordHasher.HashPassword(user, dto.Password);
             userRepository.Update(user);
             await userRepository.SaveChangesAsync(ct);
         }
@@ -53,12 +53,12 @@ public class UserService(
         var user = await userRepository.GetByIdAsync(userId, ct)
                    ?? throw new NotFoundException("User", userId);
 
-        var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.CurrentPassword);
+        var result = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.CurrentPassword);
 
         if (result == PasswordVerificationResult.Failed)
             throw new UnauthorizedException("Current password is incorrect.");
 
-        user.PasswordHash = _passwordHasher.HashPassword(user, dto.NewPassword);
+        user.PasswordHash = passwordHasher.HashPassword(user, dto.NewPassword);
         user.MustChangePassword = false;
 
         userRepository.Update(user);
@@ -79,7 +79,7 @@ public class UserService(
             .IncludeSpecial()
             .Next();
 
-        user.PasswordHash = _passwordHasher.HashPassword(user, temporaryPassword);
+        user.PasswordHash = passwordHasher.HashPassword(user, temporaryPassword);
         user.MustChangePassword = true;
 
         userRepository.Update(user);
@@ -124,7 +124,7 @@ public class UserService(
             MustChangePassword = true
         };
 
-        user.PasswordHash = _passwordHasher.HashPassword(user, password);
+        user.PasswordHash = passwordHasher.HashPassword(user, password);
 
         await userRepository.AddAsync(user);
         return user;

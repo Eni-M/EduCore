@@ -1,7 +1,6 @@
 using EduCore.Data;
 using EduCore.Enums;
-using EduCore.Models;
-using Microsoft.AspNetCore.Identity;
+using EduCore.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace EduCore.Services;
@@ -12,6 +11,7 @@ public static class SuperAdminSeeder
     {
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var users = scope.ServiceProvider.GetRequiredService<IUserService>();
 
         if (await db.Users.AnyAsync(u => u.Role == UserRole.SuperAdmin))
             return;
@@ -23,17 +23,9 @@ public static class SuperAdminSeeder
             throw new InvalidOperationException(
                 "SuperAdmin:Email and SuperAdmin:Password must be configured to seed the initial super admin.");
 
-        var user = new User
-        {
-            FirstName = "Super",
-            LastName = "Admin",
-            Email = email,
-            MustChangePassword = true,
-            Role = UserRole.SuperAdmin
-        };
-        user.PasswordHash = new PasswordHasher<User>().HashPassword(user, password);
-
-        db.Users.Add(user);
+        // Goes through the same path as every other account, so hashing and the
+        // must-change-password default cannot drift from the rest of the application.
+        await users.BuildLoginAsync("Super", "Admin", email, password, UserRole.SuperAdmin, CancellationToken.None);
 
         await db.SaveChangesAsync();
     }
