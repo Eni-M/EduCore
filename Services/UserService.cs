@@ -1,15 +1,14 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using EduCore.Data;
 using EduCore.Dtos.User;
 using EduCore.Enums;
 using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
+using EduCore.Security;
 using EduCore.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using PasswordGenerator;
 
@@ -19,7 +18,8 @@ public class UserService(
     IUserRepository userRepository,
     ITeacherRepository teacherRepository,
     IStudentRepository studentRepository,
-    AppDbContext dbContext,
+    IAdminRepository adminRepository,
+    ICurrentUser currentUser,
     IConfiguration config) : IUserService
 {
     private readonly PasswordHasher<User> _passwordHasher = new();
@@ -28,7 +28,6 @@ public class UserService(
     {
         var user = await userRepository.GetByEmailAsync(dto.Email, ct);
 
-        
         if (user is null)
             throw new UnauthorizedException("Invalid email or password.");
 
@@ -51,10 +50,8 @@ public class UserService(
 
     public async Task ChangePasswordAsync(Guid userId, ChangePasswordDto dto, CancellationToken ct)
     {
-        var user = await userRepository.GetByIdAsync(userId, ct);
-
-        if (user is null)
-            throw new NotFoundException("User", userId);
+        var user = await userRepository.GetByIdAsync(userId, ct)
+                   ?? throw new NotFoundException("User", userId);
 
         var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.CurrentPassword);
 
@@ -70,10 +67,10 @@ public class UserService(
 
     public async Task<ResetPasswordResponseDto> AdminResetPasswordAsync(Guid userId, CancellationToken ct)
     {
-        var user = await userRepository.GetByIdAsync(userId, ct);
+        var user = await userRepository.GetByIdAsync(userId, ct)
+                   ?? throw new NotFoundException("User", userId);
 
-        if (user is null)
-            throw new NotFoundException("User", userId);
+        await EnsureCanManageAsync(user, ct);
 
         var temporaryPassword = new Password(12)
             .IncludeLowercase()
@@ -91,6 +88,81 @@ public class UserService(
         return new ResetPasswordResponseDto("Password reset successfully.", temporaryPassword);
     }
 
+    public async Task SetActiveAsync(Guid userId, bool isActive, CancellationToken ct)
+    {
+        var user = await userRepository.GetByIdAsync(userId, ct)
+                   ?? throw new NotFoundException("User", userId);
+
+        await EnsureCanManageAsync(user, ct);
+
+        if (userId == currentUser.UserId)
+            throw new BusinessException("You cannot deactivate your own account.");
+
+        user.DeactivatedAt = isActive ? null : DateTime.UtcNow;
+
+        userRepository.Update(user);
+        await userRepository.SaveChangesAsync(ct);
+    }
+
+    public async Task<User> BuildLoginAsync(
+        string firstName,
+        string lastName,
+        string email,
+        string password,
+        UserRole role,
+        CancellationToken ct)
+    {
+        if (await userRepository.ExistsByEmailAsync(email, ct))
+            throw new ConflictException($"A user with the email {email} already exists.");
+
+        var user = new User
+        {
+            FirstName = firstName,
+            LastName = lastName,
+            Email = email,
+            Role = role,
+            MustChangePassword = true
+        };
+
+        user.PasswordHash = _passwordHasher.HashPassword(user, password);
+
+        await userRepository.AddAsync(user);
+        return user;
+    }
+
+    public async Task ApplyLoginEditAsync(
+        User user,
+        string firstName,
+        string lastName,
+        string email,
+        CancellationToken ct)
+    {
+        if (!string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase)
+            && await userRepository.ExistsByEmailAsync(email, ct))
+            throw new ConflictException($"A user with the email {email} already exists.");
+
+        user.FirstName = firstName;
+        user.LastName = lastName;
+        user.Email = email;
+    }
+
+    private async Task EnsureCanManageAsync(User target, CancellationToken ct)
+    {
+        if (currentUser.IsSuperAdmin)
+            return;
+
+        if (!currentUser.IsAdmin)
+            throw new ForbiddenException("You are not allowed to manage this account.");
+
+        if (target.Role is UserRole.Admin or UserRole.SuperAdmin)
+            throw new ForbiddenException("Administrator accounts are managed by the super administrator.");
+
+        var (targetSchoolId, _, _) = await ResolveProfileAsync(target, ct);
+
+        if (targetSchoolId is null || targetSchoolId != currentUser.SchoolId)
+            throw new ForbiddenException("You are not allowed to manage this account.");
+    }
+
     private async Task<AuthResponseDto> BuildAuthResponseAsync(User user, CancellationToken ct)
     {
         var (schoolId, teacherId, studentId) = await ResolveProfileAsync(user, ct);
@@ -102,15 +174,19 @@ public class UserService(
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email),
-
-         
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Role, user.Role.ToString())
+            new(ClaimTypes.Role, user.Role.ToString()),
+            new(ClaimNames.MustChangePassword, user.MustChangePassword ? "true" : "false")
         };
 
-     
         if (schoolId is not null)
-            claims.Add(new Claim("school_id", schoolId.Value.ToString()));
+            claims.Add(new Claim(ClaimNames.SchoolId, schoolId.Value.ToString()));
+
+        if (teacherId is not null)
+            claims.Add(new Claim(ClaimNames.TeacherId, teacherId.Value.ToString()));
+
+        if (studentId is not null)
+            claims.Add(new Claim(ClaimNames.StudentId, studentId.Value.ToString()));
 
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]!)),
@@ -137,7 +213,6 @@ public class UserService(
             MustChangePassword: user.MustChangePassword);
     }
 
-
     private async Task<(Guid? SchoolId, Guid? TeacherId, Guid? StudentId)> ResolveProfileAsync(
         User user,
         CancellationToken ct)
@@ -158,10 +233,7 @@ public class UserService(
 
             case UserRole.Admin:
             {
-                var admin = await dbContext.Admins
-                    .AsNoTracking()
-                    .IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(a => a.UserId == user.Id, ct);
+                var admin = await adminRepository.GetByUserIdAsync(user.Id, ct);
                 return (admin?.SchoolId, null, null);
             }
 

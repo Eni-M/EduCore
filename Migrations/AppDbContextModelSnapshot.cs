@@ -26,8 +26,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly>("EndDate")
                         .HasColumnType("date");
@@ -61,8 +60,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("SchoolId")
                         .HasColumnType("uuid");
@@ -90,8 +88,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<int?>("BehaviorMark")
                         .HasColumnType("integer");
@@ -139,8 +136,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Action")
                         .IsRequired()
@@ -162,8 +158,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("AcademicYearId")
                         .HasColumnType("uuid");
@@ -204,8 +199,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ClassId")
                         .HasColumnType("uuid");
@@ -245,8 +239,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ClassId")
                         .HasColumnType("uuid");
@@ -299,8 +292,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ClassId")
                         .HasColumnType("uuid");
@@ -340,8 +332,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("AcademicYearId")
                         .HasColumnType("uuid");
@@ -380,8 +371,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("AcademicYearId")
                         .HasColumnType("uuid");
@@ -441,8 +431,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -477,8 +466,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -503,8 +491,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly>("DateOfBirth")
                         .HasColumnType("date");
@@ -546,8 +533,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -575,8 +561,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("SchoolId")
                         .HasColumnType("uuid");
@@ -604,8 +589,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("SchoolId")
                         .HasColumnType("uuid");
@@ -635,8 +619,7 @@ namespace EduCore.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("DeactivatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -692,17 +675,21 @@ namespace EduCore.Migrations
 
             modelBuilder.Entity("EduCore.Models.Admin", b =>
                 {
-                    b.HasOne("EduCore.Models.School", null)
+                    b.HasOne("EduCore.Models.School", "School")
                         .WithMany()
                         .HasForeignKey("SchoolId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("EduCore.Models.User", null)
+                    b.HasOne("EduCore.Models.User", "User")
                         .WithOne()
                         .HasForeignKey("EduCore.Models.Admin", "UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("School");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("EduCore.Models.Attendance", b =>
@@ -868,17 +855,21 @@ namespace EduCore.Migrations
 
             modelBuilder.Entity("EduCore.Models.Student", b =>
                 {
-                    b.HasOne("EduCore.Models.School", null)
+                    b.HasOne("EduCore.Models.School", "School")
                         .WithMany()
                         .HasForeignKey("SchoolId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("EduCore.Models.User", null)
+                    b.HasOne("EduCore.Models.User", "User")
                         .WithOne()
                         .HasForeignKey("EduCore.Models.Student", "UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("School");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("EduCore.Models.Subject", b =>
@@ -892,22 +883,26 @@ namespace EduCore.Migrations
 
             modelBuilder.Entity("EduCore.Models.Teacher", b =>
                 {
-                    b.HasOne("EduCore.Models.School", null)
+                    b.HasOne("EduCore.Models.School", "School")
                         .WithMany()
                         .HasForeignKey("SchoolId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("EduCore.Models.User", null)
+                    b.HasOne("EduCore.Models.User", "User")
                         .WithOne()
                         .HasForeignKey("EduCore.Models.Teacher", "UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("School");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("EduCore.Models.TeacherSubject", b =>
                 {
-                    b.HasOne("EduCore.Models.Subject", null)
+                    b.HasOne("EduCore.Models.Subject", "Subject")
                         .WithMany()
                         .HasForeignKey("SubjectId", "SchoolId")
                         .HasPrincipalKey("Id", "SchoolId")
@@ -920,6 +915,8 @@ namespace EduCore.Migrations
                         .HasPrincipalKey("Id", "SchoolId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Subject");
                 });
 
             modelBuilder.Entity("EduCore.Models.Student", b =>

@@ -25,10 +25,4 @@
         <PackageReference Include="xunit.extensibility.core" Version="2.9.3" />
     </ItemGroup>
 
-    <ItemGroup>
-      <_ContentIncludedByDefault Remove="EduCore.Tests\obj\EduCore.Tests.csproj.nuget.dgspec.json" />
-      <_ContentIncludedByDefault Remove="EduCore.Tests\obj\project.assets.json" />
-      <_ContentIncludedByDefault Remove="EduCore.Tests\obj\project.packagespec.json" />
-    </ItemGroup>
-
 </Project>

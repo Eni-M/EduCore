@@ -6,8 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EduCore.Services;
 
-// Ensures exactly one SuperAdmin User exists. Runs once at startup -- idempotent, so it's
-// safe to call on every boot.
 public static class SuperAdminSeeder
 {
     public static async Task SeedAsync(IServiceProvider services, IConfiguration configuration)

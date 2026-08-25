@@ -11,11 +11,16 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
     {
         var traceId = httpContext.TraceIdentifier;
 
-        // Unwraps EF Core's DbUpdateException to find a raw Postgres unique-violation and
-        // reports it as a normal conflict instead of a raw 500 -- needed because several
-        // entities (e.g. Student.PersonalNumber) enforce uniqueness only at the DB level.
+        // Several uniqueness rules exist only as database indexes, so turn the raw Postgres
+        // violation into a normal conflict. The constraint name is logged, not returned --
+        // it would tell a caller about rows in other schools.
         if (exception is DbUpdateException dbEx && dbEx.InnerException is PostgresException { SqlState: "23505" } pgEx)
-            exception = new ConflictException($"A record with the same {pgEx.ConstraintName} already exists.");
+        {
+            logger.LogWarning(
+                "Unique violation on constraint {Constraint}. TraceId: {TraceId}", pgEx.ConstraintName, traceId);
+
+            exception = new ConflictException("A record with the same details already exists.");
+        }
 
         var (statusCode, error, message) = exception switch
         {
@@ -25,7 +30,6 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
             BusinessException => (StatusCodes.Status400BadRequest, "Business Error", exception.Message),
             ConflictException => (StatusCodes.Status409Conflict, "Conflict", exception.Message),
             ForbiddenException => (StatusCodes.Status403Forbidden, "Forbidden", exception.Message),
-            InvalidRequestException => (StatusCodes.Status406NotAcceptable, "Invalid Request", exception.Message),
             _ => (StatusCodes.Status500InternalServerError, "Internal Server Error", "An unexpected error occurred.")
         };
 

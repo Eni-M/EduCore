@@ -12,6 +12,6 @@ public class MarkCreateDtoValidator : AbstractValidator<MarkCreateDto>
         RuleFor(x => x.GradingPeriodId).NotEmpty();
         RuleFor(x => x.Type).IsInEnum();
         RuleFor(x => x.Value).InclusiveBetween(1, 5);
-        RuleFor(x => x.Date).LessThanOrEqualTo(DateOnly.FromDateTime(DateTime.UtcNow));
+        RuleFor(x => x.Date).LessThanOrEqualTo(_ => DateOnly.FromDateTime(DateTime.UtcNow));
     }
 }

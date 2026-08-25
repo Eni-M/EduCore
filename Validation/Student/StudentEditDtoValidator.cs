@@ -11,6 +11,6 @@ public class StudentEditDtoValidator : AbstractValidator<StudentEditDto>
         RuleFor(x => x.LastName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.Email).NotEmpty().EmailAddress().MaximumLength(320);
         RuleFor(x => x.PersonalNumber).NotEmpty().MaximumLength(50);
-        RuleFor(x => x.DateOfBirth).LessThan(DateOnly.FromDateTime(DateTime.UtcNow));
+        RuleFor(x => x.DateOfBirth).LessThan(_ => DateOnly.FromDateTime(DateTime.UtcNow));
     }
 }
