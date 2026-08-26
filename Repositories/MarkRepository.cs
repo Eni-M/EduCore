@@ -61,6 +61,15 @@ public class MarkRepository(
     // because averaging grades that have already been rounded biases the result.
     public IQueryable<ValuedMark> Value(IQueryable<Mark> marks) => Value(marks, _weights);
 
+    public IQueryable<double> WeightedValues(IQueryable<Mark> marks) =>
+        WeightedValues(marks, _weights);
+
+    public static IQueryable<double> WeightedValues(IQueryable<Mark> marks, GradingOptions weights) =>
+        marks
+            .Where(m => m.FirstMark != null && m.SecondMark != null)
+            .Select(m => m.FirstMark!.Value * weights.FirstMarkWeight
+                         + m.SecondMark!.Value * weights.SecondMarkWeight);
+
     // Static and taking its weights as an argument so a test can run this exact query over an
     // in-memory list. That matters: if the test re-typed the formula instead, it would only be
     // comparing one copy of the arithmetic against another and would pass even after the real

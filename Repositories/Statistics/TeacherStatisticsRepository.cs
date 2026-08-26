@@ -127,11 +127,16 @@ public class TeacherStatisticsRepository(
     {
         var pass = grading.PassValue;
 
-        // The formula itself lives in MarkRepository.Value -- this only groups what it gives.
-        var rows = await (from v in marks.Value(MarksInWindow(ctx).Where(m => m.TeacherId == teacherId))
-                          join c in ClassesInScope(ctx) on v.ClassId equals c.Id
-                          join s in Scope(_context.Subjects, ctx) on v.SubjectId equals s.Id
-                          group v.Value
+        // Inline for the same reason as AcademicStatisticsRepository: a constructed type
+        // cannot be joined or grouped on in a translatable query.
+        var first = grading.FirstMarkWeight;
+        var second = grading.SecondMarkWeight;
+
+        var rows = await (from m in MarksInWindow(ctx)
+                          where m.TeacherId == teacherId && m.FirstMark != null && m.SecondMark != null
+                          join c in ClassesInScope(ctx) on m.ClassId equals c.Id
+                          join s in Scope(_context.Subjects, ctx) on m.SubjectId equals s.Id
+                          group m.FirstMark!.Value * first + m.SecondMark!.Value * second
                               by new { ClassId = c.Id, ClassName = c.Name, c.Grade, SubjectId = s.Id, SubjectName = s.Name }
                           into g
                           orderby g.Key.ClassName, g.Key.SubjectName

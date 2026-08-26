@@ -8,6 +8,9 @@ public interface IGradingCalculator
 
     // Thresholds on the UNROUNDED weighted value. Queries compare against these instead of
     // rounding in SQL -- see GradingCalculator for why the two are equivalent.
+    double FirstMarkWeight { get; }
+    double SecondMarkWeight { get; }
+
     double PassValue { get; }
     double AtRiskLowerValue { get; }
     double AtRiskUpperValue { get; }

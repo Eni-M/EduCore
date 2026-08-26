@@ -46,6 +46,9 @@ public class GradingCalculator(IOptions<GradingOptions> options) : IGradingCalcu
     // Rounding is half-away-from-zero, so a rounded mark reaches PassMark exactly when the
     // unrounded value reaches PassMark - 0.5. Comparing the unrounded value keeps aggregation
     // to plain arithmetic the database can run, rather than depending on how ROUND translates.
+    public double FirstMarkWeight => _options.FirstMarkWeight;
+    public double SecondMarkWeight => _options.SecondMarkWeight;
+
     public double PassValue => _options.PassMark - 0.5;
     public double AtRiskLowerValue => _options.AtRiskMark - 0.5;
     public double AtRiskUpperValue => _options.AtRiskMark + 0.5;

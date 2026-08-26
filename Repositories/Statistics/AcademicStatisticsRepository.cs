@@ -1,31 +1,39 @@
-using EduCore.Dtos.Statistics;
-using EduCore.Grading;
 using EduCore.Data;
+using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Aggregate;
 using EduCore.Dtos.Statistics.Individual;
+using EduCore.Grading;
 using EduCore.Repositories.Interfaces;
 using EduCore.Repositories.Statistics.Interfaces;
-using EduCore.Services.Statistics;
 using Microsoft.EntityFrameworkCore;
 
 namespace EduCore.Repositories.Statistics;
 
-// Aggregates marks. It does not know how a final mark is calculated -- that rule belongs to
-// MarkRepository.Value, because a final mark is real data about a student rather than a
-// statistic. This class only groups and counts what that produces.
+// Aggregates marks into the academic figures.
+//
+// The weighting appears inline in the grouped queries below rather than coming from
+// MarkRepository, and that is a constraint rather than a preference: EF cannot see through a
+// constructed type, so composing over MarkRepository.Value fails to translate the moment the
+// query joins or groups on one of its properties. The scalar paths still go through
+// MarkRepository.WeightedValues, which does translate.
+//
+// GradingRuleAgreementTests pins every form of the rule against GradingCalculator, so the
+// repetition cannot silently drift.
 public class AcademicStatisticsRepository(
     AppDbContext context,
     IMarkRepository marks,
     IGradingCalculator grading) : StatisticsRepositoryBase(context), IAcademicStatisticsRepository
 {
+    private IQueryable<double> Values(StatisticsContext ctx) => marks.WeightedValues(MarksInWindow(ctx));
 
-    private IQueryable<ValuedMark> ValuedMarks(StatisticsContext ctx) => marks.Value(MarksInWindow(ctx));
+    private IQueryable<Models.Mark> GradedMarks(StatisticsContext ctx) =>
+        MarksInWindow(ctx).Where(m => m.FirstMark != null && m.SecondMark != null);
 
     public async Task<AcademicTotals> GetTotalsAsync(StatisticsContext ctx, CancellationToken ct)
     {
-        var valued = ValuedMarks(ctx);
+        var values = Values(ctx);
 
-        var graded = await valued.CountAsync(ct);
+        var graded = await values.CountAsync(ct);
         var incomplete = await MarksInWindow(ctx)
             .CountAsync(m => m.FirstMark == null || m.SecondMark == null, ct);
 
@@ -35,21 +43,22 @@ public class AcademicStatisticsRepository(
         return new AcademicTotals(
             graded,
             incomplete,
-            await valued.AverageAsync(v => v.Value, ct),
-            await valued.CountAsync(v => v.Value >= grading.PassValue, ct),
-            await valued.CountAsync(v => v.Value < grading.PassValue, ct),
-            await valued.CountAsync(
-                v => v.Value >= grading.AtRiskLowerValue && v.Value < grading.AtRiskUpperValue, ct));
+            await values.AverageAsync(ct),
+            await values.CountAsync(v => v >= grading.PassValue, ct),
+            await values.CountAsync(v => v < grading.PassValue, ct),
+            await values.CountAsync(
+                v => v >= grading.AtRiskLowerValue && v < grading.AtRiskUpperValue, ct));
     }
 
     public async Task<IReadOnlyList<AcademicGroup>> GetBySubjectAsync(
         StatisticsContext ctx, CancellationToken ct)
     {
-        var pass = grading.PassValue;
+        var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
 
-        return await (from v in ValuedMarks(ctx)
-                      join s in Scope(_context.Subjects, ctx) on v.SubjectId equals s.Id
-                      group v.Value by new { s.Id, s.Name }
+        return await (from m in GradedMarks(ctx)
+                      join s in Scope(_context.Subjects, ctx) on m.SubjectId equals s.Id
+                      group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+                          by new { s.Id, s.Name }
                       into g
                       orderby g.Key.Name
                       select new AcademicGroup(
@@ -64,11 +73,12 @@ public class AcademicStatisticsRepository(
     public async Task<IReadOnlyList<AcademicGroup>> GetByClassAsync(
         StatisticsContext ctx, CancellationToken ct)
     {
-        var pass = grading.PassValue;
+        var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
 
-        return await (from v in ValuedMarks(ctx)
-                      join c in ClassesInScope(ctx) on v.ClassId equals c.Id
-                      group v.Value by new { c.Id, c.Name }
+        return await (from m in GradedMarks(ctx)
+                      join c in ClassesInScope(ctx) on m.ClassId equals c.Id
+                      group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+                          by new { c.Id, c.Name }
                       into g
                       orderby g.Key.Name
                       select new AcademicGroup(
@@ -83,11 +93,11 @@ public class AcademicStatisticsRepository(
     public async Task<IReadOnlyList<AcademicGroup>> GetByGradeAsync(
         StatisticsContext ctx, CancellationToken ct)
     {
-        var pass = grading.PassValue;
+        var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
 
-        var rows = await (from v in ValuedMarks(ctx)
-                          join c in ClassesInScope(ctx) on v.ClassId equals c.Id
-                          group v.Value by c.Grade
+        var rows = await (from m in GradedMarks(ctx)
+                          join c in ClassesInScope(ctx) on m.ClassId equals c.Id
+                          group m.FirstMark!.Value * first + m.SecondMark!.Value * second by c.Grade
                           into g
                           orderby g.Key
                           select new
@@ -105,17 +115,18 @@ public class AcademicStatisticsRepository(
             .ToList();
     }
 
-    // The school-wide average for a subject at a grade level. This is the baseline every
-    // per-class and per-teacher figure is reported against, so a number is never shown bare.
+    // The school-wide average for a subject at a grade level: the baseline every per-class and
+    // per-teacher figure is reported against, so no number is ever shown bare.
     public async Task<IReadOnlyList<AcademicGroup>> GetSubjectGradeBaselinesAsync(
         StatisticsContext ctx, CancellationToken ct)
     {
-        var pass = grading.PassValue;
+        var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
 
-        var rows = await (from v in ValuedMarks(ctx)
-                          join c in ClassesInScope(ctx) on v.ClassId equals c.Id
-                          join s in Scope(_context.Subjects, ctx) on v.SubjectId equals s.Id
-                          group v.Value by new { v.SubjectId, s.Name, c.Grade }
+        var rows = await (from m in GradedMarks(ctx)
+                          join c in ClassesInScope(ctx) on m.ClassId equals c.Id
+                          join s in Scope(_context.Subjects, ctx) on m.SubjectId equals s.Id
+                          group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+                              by new { m.SubjectId, s.Name, c.Grade }
                           into g
                           select new
                           {
@@ -138,20 +149,15 @@ public class AcademicStatisticsRepository(
             .ToList();
     }
 
-    // Pairs subject with grade level so a caller can look up an exact baseline without
-    // scanning the list.
     public static string BaselineKey(Guid subjectId, int grade) => subjectId + ":" + grade;
 
-    // Returns the raw buckets. Whether they are safe to show is the service's call, since it
-    // is the one holding the suppressor.
     public async Task<GradeDistributionResultDto> GetDistributionAsync(
         StatisticsContext ctx, CancellationToken ct)
     {
-        var values = await ValuedMarks(ctx).Select(v => v.Value).ToListAsync(ct);
+        var values = await Values(ctx).ToListAsync(ct);
         var total = values.Count;
 
-        // Rounded in memory over an already-reduced list, so it rounds identically to
-        // GradingCalculator rather than depending on how the database rounds.
+        // Rounded here rather than in SQL so it rounds identically to GradingCalculator.
         var counts = values
             .GroupBy(value => (int)Math.Round(value, MidpointRounding.AwayFromZero))
             .ToDictionary(g => g.Key, g => g.Count());
@@ -171,30 +177,27 @@ public class AcademicStatisticsRepository(
     public async Task<IReadOnlyList<AtRiskStudentDto>> GetAtRiskAsync(
         StatisticsContext ctx, CancellationToken ct)
     {
-        var pass = grading.PassValue;
-        var atRiskUpper = grading.AtRiskUpperValue;
+        var (first, second) = (grading.FirstMarkWeight, grading.SecondMarkWeight);
+        var (pass, atRiskUpper) = (grading.PassValue, grading.AtRiskUpperValue);
 
         // Grouped per student across their subjects, so "at risk" reflects the whole record
         // rather than a single weak subject.
-        var rows = await (from v in ValuedMarks(ctx)
-                          join e in Scope(_context.Enrollments, ctx) on v.EnrollmentId equals e.Id
+        var rows = await (from m in GradedMarks(ctx)
+                          join e in Scope(_context.Enrollments, ctx) on m.EnrollmentId equals e.Id
                           join st in Scope(_context.Students, ctx) on e.StudentId equals st.Id
                           join u in _context.Users on st.UserId equals u.Id
-                          join c in ClassesInScope(ctx) on v.ClassId equals c.Id
-                          group v.Value by new
-                          {
-                              st.Id,
-                              u.FirstName,
-                              u.LastName,
-                              ClassId = c.Id,
-                              ClassName = c.Name,
-                              c.Grade
-                          }
+                          join c in ClassesInScope(ctx) on m.ClassId equals c.Id
+                          group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+                              by new
+                              {
+                                  st.Id,
+                                  u.FirstName,
+                                  u.LastName,
+                                  ClassId = c.Id,
+                                  ClassName = c.Name,
+                                  c.Grade
+                              }
                           into g
-                          // Same rule as IGradingCalculator.IsStudentAtRisk, written as the
-                          // threshold comparison it is defined by -- a method call here would
-                          // not translate to SQL. Both read AtRiskUpperValue, and a test pins
-                          // them together.
                           where g.Average() < atRiskUpper
                           select new
                           {
