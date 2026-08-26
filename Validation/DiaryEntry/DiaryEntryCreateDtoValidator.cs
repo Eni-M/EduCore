@@ -10,7 +10,9 @@ public class DiaryEntryCreateDtoValidator : AbstractValidator<DiaryEntryCreateDt
         RuleFor(x => x.ClassId).NotEmpty();
         RuleFor(x => x.SubjectId).NotEmpty();
         RuleFor(x => x.TeacherId).NotEmpty();
-        RuleFor(x => x.Period).GreaterThanOrEqualTo(1);
+        // A school day has a bounded number of lesson slots; without an upper bound this
+        // silently accepted values like 100 that no timetable could ever have.
+        RuleFor(x => x.Period).InclusiveBetween(1, 10);
         RuleFor(x => x.Topic).NotEmpty().MaximumLength(500);
         RuleFor(x => x.Notes).MaximumLength(4000);
     }
