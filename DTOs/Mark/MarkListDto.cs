@@ -1,7 +1,7 @@
-using EduCore.Enums;
-
 namespace EduCore.Dtos.Mark;
 
+// FinalMark is computed from the two marks, never stored -- it is null until both are set,
+// which is how a half-graded period reads as incomplete rather than as a low grade.
 public record MarkListDto(
     Guid Id,
     Guid EnrollmentId,
@@ -13,6 +13,6 @@ public record MarkListDto(
     string TeacherName,
     Guid GradingPeriodId,
     string GradingPeriodName,
-    MarkType Type,
-    int Value,
-    DateOnly Date);
+    int? FirstMark,
+    int? SecondMark,
+    int? FinalMark);

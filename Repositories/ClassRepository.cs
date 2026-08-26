@@ -25,7 +25,8 @@ public class ClassRepository(AppDbContext context) : Repository<Class>(context),
             c.AcademicYearId,
             y.Name,
             c.HomeroomTeacherId,
-            u == null ? null : u.FirstName + " " + u.LastName);
+            u == null ? null : u.FirstName + " " + u.LastName,
+            c.Capacity);
 
     public async Task<IEnumerable<ClassListDto>> GetAllAsync(Guid? academicYearId, CancellationToken ct)
     {

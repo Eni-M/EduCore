@@ -24,7 +24,8 @@ public class EnrollmentRepository(AppDbContext context)
             e.ClassId,
             c.Name,
             e.EnrolledAt,
-            e.LeftAt);
+            e.LeftAt,
+            e.ExitReason);
 
     public async Task<EnrollmentListDto?> GetDtoAsync(Guid enrollmentId, CancellationToken ct) =>
         await Project(_context.Enrollments.AsNoTracking().Where(e => e.Id == enrollmentId))

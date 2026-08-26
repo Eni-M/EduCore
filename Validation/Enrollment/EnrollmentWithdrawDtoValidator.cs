@@ -8,5 +8,6 @@ public class EnrollmentWithdrawDtoValidator : AbstractValidator<EnrollmentWithdr
     public EnrollmentWithdrawDtoValidator()
     {
         RuleFor(x => x.LeftAt).LessThanOrEqualTo(_ => DateOnly.FromDateTime(DateTime.UtcNow));
+        RuleFor(x => x.ExitReason).IsInEnum();
     }
 }

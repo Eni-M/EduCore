@@ -70,7 +70,7 @@ public class DiaryEntryRepository(AppDbContext context)
                     select new AttendanceListDto(
                         a.Id, a.DiaryEntryId, d.Date, s.Name, c.Name,
                         a.EnrollmentId, su.FirstName + " " + su.LastName,
-                        a.IsPresent, a.Comment, a.BehaviorMark))
+                        a.IsPresent, a.IsExcused, a.Comment, a.BehaviorMark))
                    .ToList()))
             .FirstOrDefaultAsync(ct);
 

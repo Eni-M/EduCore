@@ -10,5 +10,5 @@ public interface IMarkService
     Task<IEnumerable<MarkListDto>> GetByClassAsync(
         Guid classId, Guid? subjectId, Guid? gradingPeriodId, CancellationToken ct);
 
-    Task<MarkListDto> CreateAsync(MarkCreateDto dto, CancellationToken ct);
+    Task<MarkListDto> UpsertAsync(MarkUpsertDto dto, CancellationToken ct);
 }

@@ -9,4 +9,5 @@ public record ClassListDto(
     Guid AcademicYearId,
     string AcademicYearName,
     Guid? HomeroomTeacherId,
-    string? HomeroomTeacherName);
+    string? HomeroomTeacherName,
+    int? Capacity);

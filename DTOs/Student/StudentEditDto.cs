@@ -1,3 +1,5 @@
+using EduCore.Enums;
+
 namespace EduCore.Dtos.Student;
 
 public record StudentEditDto(
@@ -5,4 +7,5 @@ public record StudentEditDto(
     string LastName,
     string Email,
     DateOnly DateOfBirth,
-    string PersonalNumber);
+    string PersonalNumber,
+    Gender Gender);

@@ -1,6 +1,7 @@
 using EduCore.Dtos.Attendance;
 using EduCore.Dtos.Mark;
 using EduCore.Dtos.Parent;
+using EduCore.Enums;
 
 namespace EduCore.Dtos.Student;
 
@@ -14,6 +15,7 @@ public record StudentProfileDto(
     DateOnly DateOfBirth,
     string PersonalNumber,
     DateOnly? GraduationDate,
+    Gender? Gender,
     IReadOnlyList<ParentListDto> Parents,
     Guid? CurrentClassId,
     string? CurrentClassName,

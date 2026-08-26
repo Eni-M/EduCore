@@ -19,4 +19,21 @@ public class AcademicYearRepository(AppDbContext context)
 
     public async Task<bool> OverlapsAsync(DateOnly startDate, DateOnly endDate, CancellationToken ct) =>
         await _context.AcademicYears.AnyAsync(a => a.StartDate <= endDate && startDate <= a.EndDate, ct);
+
+    public async Task<AcademicYear?> GetByIdAcrossSchoolsAsync(Guid academicYearId, CancellationToken ct) =>
+        await _context.AcademicYears
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(a => a.Id == academicYearId, ct);
+
+    // Falls back to the most recent year when today sits in a gap between two of them (a
+    // summer break), so statistics still have a sensible default window.
+    public async Task<AcademicYear?> GetCurrentAsync(Guid schoolId, DateOnly onDate, CancellationToken ct) =>
+        await _context.AcademicYears
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(a => a.SchoolId == schoolId)
+            .OrderByDescending(a => a.StartDate <= onDate && onDate <= a.EndDate)
+            .ThenByDescending(a => a.StartDate)
+            .FirstOrDefaultAsync(ct);
 }

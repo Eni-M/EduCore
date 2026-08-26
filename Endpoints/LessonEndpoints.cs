@@ -67,8 +67,10 @@ public static class LessonEndpoints
             .RequireAuthorization(Policies.AdminOrTeacher)
             .WithTags("Marks");
 
-        marks.MapPost("/", async (MarkCreateDto dto, IMarkService service, CancellationToken ct) =>
-            Results.Ok(await service.CreateAsync(dto, ct)));
+        // Create-or-update: there is one mark per subject per grading period, so a teacher
+        // setting the second mark later updates that row rather than adding another.
+        marks.MapPost("/", async (MarkUpsertDto dto, IMarkService service, CancellationToken ct) =>
+            Results.Ok(await service.UpsertAsync(dto, ct)));
 
         api.MapGet("/audit-logs", async (int? page, int? pageSize, Guid? userId, DateTime? from, DateTime? to,
                     IAuditLogService service, CancellationToken ct) =>

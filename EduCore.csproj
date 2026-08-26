@@ -7,6 +7,14 @@
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
       <UserSecretsId>9966b3c3-9c9c-4cc9-a036-bbc760d4ad5e</UserSecretsId>
   </PropertyGroup>
+    <ItemGroup>
+        <!-- The test project lives inside this project's folder, so the default **/*.cs glob
+             would otherwise compile its files into the app itself. -->
+        <Compile Remove="EduCore.Tests/**" />
+        <Content Remove="EduCore.Tests/**" />
+        <None Remove="EduCore.Tests/**" />
+    </ItemGroup>
+
 
     <ItemGroup>
         <PackageReference Include="AutoMapper" Version="16.2.0" />
@@ -22,7 +30,6 @@
         </PackageReference>
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
         <PackageReference Include="PasswordGenerator" Version="3.0.0" />
-        <PackageReference Include="xunit.extensibility.core" Version="2.9.3" />
     </ItemGroup>
 
 </Project>

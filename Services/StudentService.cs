@@ -74,6 +74,7 @@ public class StudentService(
             student.DateOfBirth,
             student.PersonalNumber,
             student.GraduationDate,
+            student.Gender,
             mapper.Map<List<ParentListDto>>(student.Parents),
             currentClass?.Id,
             currentClass?.Name,

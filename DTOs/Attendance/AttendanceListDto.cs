@@ -12,5 +12,6 @@ public record AttendanceListDto(
     Guid EnrollmentId,
     string StudentName,
     bool IsPresent,
+    bool IsExcused,
     string? Comment,
     int? BehaviorMark);

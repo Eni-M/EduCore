@@ -9,5 +9,6 @@ public class ClassEditDtoValidator : AbstractValidator<ClassEditDto>
     {
         RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
         RuleFor(x => x.Grade).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.Capacity).GreaterThan(0).When(x => x.Capacity.HasValue);
     }
 }

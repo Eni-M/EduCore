@@ -23,4 +23,20 @@ public class GradingPeriodRepository(AppDbContext context)
         await _context.GradingPeriods.AnyAsync(
             g => g.AcademicYearId == academicYearId && g.Name.ToLower() == name.ToLower(),
             ct);
+
+    public async Task<GradingPeriod?> GetByIdAcrossSchoolsAsync(Guid gradingPeriodId, CancellationToken ct) =>
+        await _context.GradingPeriods
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(g => g.Id == gradingPeriodId, ct);
+
+    public async Task<IEnumerable<GradingPeriod>> GetByAcademicYearAcrossSchoolsAsync(
+        Guid academicYearId,
+        CancellationToken ct) =>
+        await _context.GradingPeriods
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(g => g.AcademicYearId == academicYearId)
+            .OrderBy(g => g.StartDate)
+            .ToListAsync(ct);
 }

@@ -130,7 +130,10 @@ public class MappingProfile : Profile
     {
         CreateWriteMap<Dtos.DiaryEntry.DiaryEntryCreateDto, DiaryEntry>();
         CreateWriteMap<Dtos.DiaryEntry.DiaryEntryEditDto, DiaryEntry>();
-        CreateWriteMap<Dtos.Attendance.AttendanceEditDto, Attendance>();
-        CreateWriteMap<Dtos.Mark.MarkCreateDto, Mark>();
+        // Presence is set through Attendance.Record, not by the mapper -- see AttendanceService.
+        CreateWriteMap<Dtos.Attendance.AttendanceEditDto, Attendance>()
+            .ForMember(a => a.IsPresent, o => o.Ignore())
+            .ForMember(a => a.IsExcused, o => o.Ignore());
+        CreateWriteMap<Dtos.Mark.MarkUpsertDto, Mark>();
     }
 }

@@ -71,6 +71,9 @@ public class EnrollmentService(
             throw new BusinessException("A student cannot leave a class before they joined it.");
 
         enrollment.LeftAt = dto.LeftAt;
+        // Recorded alongside the date -- it is what lets statistics tell a transfer apart
+        // from a withdrawal, which the date alone cannot say.
+        enrollment.ExitReason = dto.ExitReason;
 
         enrollments.Update(enrollment);
         await enrollments.SaveChangesAsync(ct);

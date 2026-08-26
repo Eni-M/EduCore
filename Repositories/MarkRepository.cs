@@ -2,14 +2,23 @@ using EduCore.Data;
 using EduCore.Dtos.Mark;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
+using EduCore.Services.Statistics;
+using EduCore.Services.Statistics.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace EduCore.Repositories;
 
-public class MarkRepository(AppDbContext context) : Repository<Mark>(context), IMarkRepository
+public class MarkRepository(
+    AppDbContext context,
+    IGradingCalculator grading,
+    IOptions<GradingOptions> weights) : Repository<Mark>(context), IMarkRepository
 {
-    // Sort on the source query or in memory -- EF cannot sort on a property of an
-    // already-projected record.
+    private readonly GradingOptions _weights = weights.Value;
+
+    // FinalMark is left null here and filled in by WithFinalMarks below, so the weighting rule
+    // stays in GradingCalculator instead of being written out a second time in LINQ. These
+    // lists are a class or a student at a time, so doing it in memory costs nothing.
     private IQueryable<MarkListDto> Project(IQueryable<Mark> marks) =>
         from m in marks
         join e in _context.Enrollments on m.EnrollmentId equals e.Id
@@ -31,9 +40,40 @@ public class MarkRepository(AppDbContext context) : Repository<Mark>(context), I
             tu.FirstName + " " + tu.LastName,
             m.GradingPeriodId,
             g.Name,
-            m.Type,
-            m.Value,
-            m.Date);
+            m.FirstMark,
+            m.SecondMark,
+            null);
+
+    private IEnumerable<MarkListDto> WithFinalMarks(IEnumerable<MarkListDto> marks) =>
+        marks.Select(m => m with { FinalMark = grading.FinalMark(m.FirstMark, m.SecondMark) });
+
+    public int? FinalMark(int? firstMark, int? secondMark) => grading.FinalMark(firstMark, secondMark);
+
+    // The grading formula, written once, here with the marks it belongs to.
+    //
+    // It cannot simply call GradingCalculator.FinalMark: a method call does not translate to
+    // SQL, and statistics must aggregate in the database rather than load a decade of marks
+    // into memory. So the same arithmetic is expressed as a query, and a unit test asserts the
+    // two forms agree for every possible pair of marks.
+    //
+    // The value is deliberately left unrounded. Averages must be taken over unrounded values,
+    // because averaging grades that have already been rounded biases the result.
+    public IQueryable<ValuedMark> Value(IQueryable<Mark> marks)
+    {
+        var firstWeight = _weights.FirstMarkWeight;
+        var secondWeight = _weights.SecondMarkWeight;
+
+        return marks
+            .Where(m => m.FirstMark != null && m.SecondMark != null)
+            .Select(m => new ValuedMark(
+                m.Id,
+                m.EnrollmentId,
+                m.ClassId,
+                m.SubjectId,
+                m.TeacherId,
+                m.GradingPeriodId,
+                m.FirstMark!.Value * firstWeight + m.SecondMark!.Value * secondWeight));
+    }
 
     private static IQueryable<Mark> Filter(IQueryable<Mark> marks, Guid? subjectId, Guid? gradingPeriodId)
     {
@@ -46,8 +86,23 @@ public class MarkRepository(AppDbContext context) : Repository<Mark>(context), I
         return marks;
     }
 
-    public async Task<MarkListDto?> GetDtoAsync(Guid markId, CancellationToken ct) =>
-        await Project(_context.Marks.AsNoTracking().Where(m => m.Id == markId)).FirstOrDefaultAsync(ct);
+    public async Task<MarkListDto?> GetDtoAsync(Guid markId, CancellationToken ct)
+    {
+        var mark = await Project(_context.Marks.AsNoTracking().Where(m => m.Id == markId))
+            .FirstOrDefaultAsync(ct);
+
+        return mark is null ? null : WithFinalMarks([mark]).First();
+    }
+
+    // The upsert path: one mark exists per (enrollment, subject, grading period), enforced by
+    // a unique index, so this is how MarkService decides between insert and update.
+    public async Task<Mark?> GetForUpsertAsync(
+        Guid enrollmentId, Guid subjectId, Guid gradingPeriodId, CancellationToken ct) =>
+        await _context.Marks.FirstOrDefaultAsync(
+            m => m.EnrollmentId == enrollmentId
+                 && m.SubjectId == subjectId
+                 && m.GradingPeriodId == gradingPeriodId,
+            ct);
 
     public async Task<IEnumerable<MarkListDto>> GetByStudentAsync(
         Guid studentId,
@@ -64,7 +119,9 @@ public class MarkRepository(AppDbContext context) : Repository<Mark>(context), I
             subjectId,
             gradingPeriodId);
 
-        return await Project(marks.OrderByDescending(m => m.Date)).ToListAsync(ct);
+        var results = await Project(marks).ToListAsync(ct);
+
+        return WithFinalMarks(results);
     }
 
     // Sorted in memory: the student name lives on a joined user, and a class is small.
@@ -81,6 +138,6 @@ public class MarkRepository(AppDbContext context) : Repository<Mark>(context), I
 
         var results = await Project(marks).ToListAsync(ct);
 
-        return results.OrderBy(m => m.StudentName).ThenByDescending(m => m.Date);
+        return WithFinalMarks(results).OrderBy(m => m.StudentName).ThenBy(m => m.SubjectName);
     }
 }

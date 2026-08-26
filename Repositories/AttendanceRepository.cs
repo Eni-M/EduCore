@@ -36,6 +36,7 @@ public class AttendanceRepository(AppDbContext context)
                 a.EnrollmentId,
                 u.FirstName + " " + u.LastName,
                 a.IsPresent,
+                a.IsExcused,
                 a.Comment,
                 a.BehaviorMark);
 

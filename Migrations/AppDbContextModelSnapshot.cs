@@ -106,6 +106,9 @@ namespace EduCore.Migrations
                     b.Property<Guid>("EnrollmentId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsExcused")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsPresent")
                         .HasColumnType("boolean");
 
@@ -119,6 +122,8 @@ namespace EduCore.Migrations
                         .HasColumnName("xmin");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EnrollmentId");
 
                     b.HasIndex("ClassId", "SchoolId");
 
@@ -162,6 +167,9 @@ namespace EduCore.Migrations
 
                     b.Property<Guid>("AcademicYearId")
                         .HasColumnType("uuid");
+
+                    b.Property<int?>("Capacity")
+                        .HasColumnType("integer");
 
                     b.Property<int>("Grade")
                         .HasColumnType("integer");
@@ -278,6 +286,8 @@ namespace EduCore.Migrations
 
                     b.HasIndex("ClassId", "SchoolId");
 
+                    b.HasIndex("SchoolId", "Date");
+
                     b.HasIndex("SubjectId", "SchoolId");
 
                     b.HasIndex("ClassId", "Date", "Period")
@@ -299,6 +309,9 @@ namespace EduCore.Migrations
 
                     b.Property<DateOnly>("EnrolledAt")
                         .HasColumnType("date");
+
+                    b.Property<int?>("ExitReason")
+                        .HasColumnType("integer");
 
                     b.Property<DateOnly?>("LeftAt")
                         .HasColumnType("date");
@@ -324,6 +337,8 @@ namespace EduCore.Migrations
                         .HasFilter("\"LeftAt\" IS NULL");
 
                     b.HasIndex("StudentId", "SchoolId");
+
+                    b.HasIndex("SchoolId", "ClassId", "LeftAt");
 
                     b.ToTable("Enrollments");
                 });
@@ -382,11 +397,11 @@ namespace EduCore.Migrations
                     b.Property<Guid>("ClassSubjectTeacherId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateOnly>("Date")
-                        .HasColumnType("date");
-
                     b.Property<Guid>("EnrollmentId")
                         .HasColumnType("uuid");
+
+                    b.Property<int?>("FirstMark")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("GradingPeriodId")
                         .HasColumnType("uuid");
@@ -394,17 +409,14 @@ namespace EduCore.Migrations
                     b.Property<Guid>("SchoolId")
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("SecondMark")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("SubjectId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TeacherId")
                         .HasColumnType("uuid");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Value")
-                        .HasColumnType("integer");
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
@@ -420,7 +432,14 @@ namespace EduCore.Migrations
 
                     b.HasIndex("EnrollmentId", "ClassId");
 
+                    b.HasIndex("TeacherId", "GradingPeriodId");
+
+                    b.HasIndex("EnrollmentId", "SubjectId", "GradingPeriodId")
+                        .IsUnique();
+
                     b.HasIndex("GradingPeriodId", "AcademicYearId", "SchoolId");
+
+                    b.HasIndex("SchoolId", "GradingPeriodId", "SubjectId");
 
                     b.HasIndex("ClassSubjectTeacherId", "ClassId", "SubjectId", "TeacherId", "SchoolId");
 
@@ -468,6 +487,10 @@ namespace EduCore.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("City")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -482,7 +505,13 @@ namespace EduCore.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<string>("Zone")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("City", "Zone");
 
                     b.ToTable("Schools");
                 });
@@ -495,6 +524,9 @@ namespace EduCore.Migrations
 
                     b.Property<DateOnly>("DateOfBirth")
                         .HasColumnType("date");
+
+                    b.Property<int?>("Gender")
+                        .HasColumnType("integer");
 
                     b.Property<DateOnly?>("GraduationDate")
                         .HasColumnType("date");

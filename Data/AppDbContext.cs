@@ -106,6 +106,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     private void ConfigureSchoolCalendar(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<School>().Property(s => s.Name).HasMaxLength(200);
+        modelBuilder.Entity<School>().Property(s => s.City).HasMaxLength(120);
+        modelBuilder.Entity<School>().Property(s => s.Zone).HasMaxLength(120);
+        // Demographic statistics group by city, and by zone within a city.
+        modelBuilder.Entity<School>().HasIndex(s => new { s.City, s.Zone });
         modelBuilder.Entity<School>().Property<uint>("Version").IsRowVersion();
 
         // Years and terms are per school -- their dates genuinely differ between schools.
@@ -182,6 +186,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .IsUnique()
             .HasFilter("\"LeftAt\" IS NULL");
         modelBuilder.Entity<Enrollment>().Property<uint>("Version").IsRowVersion();
+        // Statistics count active/left enrollments per class constantly.
+        modelBuilder.Entity<Enrollment>().HasIndex(e => new { e.SchoolId, e.ClassId, e.LeftAt });
         ScopeToSchool<Enrollment>(modelBuilder);
 
         // The alternate key includes SchoolId so anything referencing a qualification has to
@@ -246,6 +252,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<DiaryEntry>().HasAlternateKey(d => new { d.Id, d.ClassId });
         modelBuilder.Entity<DiaryEntry>().HasIndex(d => new { d.ClassId, d.Date, d.Period }).IsUnique();
+        // Attendance has no date of its own, so every calendar-windowed attendance query
+        // joins through here.
+        modelBuilder.Entity<DiaryEntry>().HasIndex(d => new { d.SchoolId, d.Date });
         modelBuilder.Entity<DiaryEntry>().Property(d => d.Topic).HasMaxLength(500);
         modelBuilder.Entity<DiaryEntry>().Property(d => d.Notes).HasMaxLength(4000);
         modelBuilder.Entity<DiaryEntry>().Property<uint>("Version").IsRowVersion();
@@ -271,6 +280,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         modelBuilder.Entity<Attendance>().HasIndex(a => new { a.DiaryEntryId, a.EnrollmentId }).IsUnique();
         modelBuilder.Entity<Attendance>().Property(a => a.Comment).HasMaxLength(2000);
         modelBuilder.Entity<Attendance>().Property<uint>("Version").IsRowVersion();
+        // Statistics join attendance from both directions.
+        modelBuilder.Entity<Attendance>().HasIndex(a => a.EnrollmentId);
         ScopeToSchool<Attendance>(modelBuilder);
 
         // Stricter than a lesson: the mark points at the exact assignment that was active,
@@ -302,6 +313,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .HasPrincipalKey(g => new { g.Id, g.AcademicYearId, g.SchoolId })
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Mark>().Property<uint>("Version").IsRowVersion();
+        // One mark per subject per grading period. This is what makes FinalMark a per-row
+        // value rather than something that has to be reduced from many rows.
+        modelBuilder.Entity<Mark>()
+            .HasIndex(m => new { m.EnrollmentId, m.SubjectId, m.GradingPeriodId })
+            .IsUnique();
+        // Statistics aggregate marks by period/subject and by teacher.
+        modelBuilder.Entity<Mark>().HasIndex(m => new { m.SchoolId, m.GradingPeriodId, m.SubjectId });
+        modelBuilder.Entity<Mark>().HasIndex(m => new { m.TeacherId, m.GradingPeriodId });
         ScopeToSchool<Mark>(modelBuilder);
     }
 }

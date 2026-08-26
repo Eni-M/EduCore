@@ -1,3 +1,5 @@
+using EduCore.Enums;
+
 namespace EduCore.Dtos.Enrollment;
 
 public record EnrollmentListDto(
@@ -7,4 +9,5 @@ public record EnrollmentListDto(
     Guid ClassId,
     string ClassName,
     DateOnly EnrolledAt,
-    DateOnly? LeftAt);
+    DateOnly? LeftAt,
+    EnrollmentExitReason? ExitReason);

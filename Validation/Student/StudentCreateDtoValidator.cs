@@ -14,5 +14,6 @@ public class StudentCreateDtoValidator : AbstractValidator<StudentCreateDto>
         RuleFor(x => x.Password).Password();
         RuleFor(x => x.PersonalNumber).NotEmpty().MaximumLength(50);
         RuleFor(x => x.DateOfBirth).LessThan(_ => DateOnly.FromDateTime(DateTime.UtcNow));
+        RuleFor(x => x.Gender).IsInEnum();
     }
 }

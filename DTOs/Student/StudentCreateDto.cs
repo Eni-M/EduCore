@@ -1,3 +1,5 @@
+using EduCore.Enums;
+
 namespace EduCore.Dtos.Student;
 
 // Creates the underlying User together with the Student profile in one call.
@@ -7,4 +9,5 @@ public record StudentCreateDto(
     string Email,
     string Password,
     DateOnly DateOfBirth,
-    string PersonalNumber);
+    string PersonalNumber,
+    Gender Gender);

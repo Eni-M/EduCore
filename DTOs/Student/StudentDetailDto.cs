@@ -1,4 +1,5 @@
 using EduCore.Dtos.Parent;
+using EduCore.Enums;
 
 namespace EduCore.Dtos.Student;
 
@@ -10,4 +11,5 @@ public record StudentDetailDto(
     DateOnly DateOfBirth,
     string PersonalNumber,
     DateOnly? GraduationDate,
+    Gender? Gender,
     IReadOnlyList<ParentListDto> Parents);

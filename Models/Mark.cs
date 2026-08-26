@@ -1,8 +1,8 @@
 using EduCore.Data;
-using EduCore.Enums;
 
 namespace EduCore.Models;
 
+// One row per (enrollment, subject, grading period) -- see the unique index in AppDbContext.
 public class Mark : ISchoolScoped
 {
     public Guid Id { get; set; }
@@ -23,7 +23,10 @@ public class Mark : ISchoolScoped
     public Guid TeacherId { get; set; }
 
     public Guid GradingPeriodId { get; set; }
-    public MarkType Type { get; set; }
-    public int Value { get; set; }
-    public DateOnly Date { get; set; }
+
+    // The two marks a teacher gives for this subject this period. What each one measures is
+    // the teacher's own decision and is deliberately not recorded anywhere. Either may be null
+    // while the period is still running -- the final mark stays null until both are set.
+    public int? FirstMark { get; set; }
+    public int? SecondMark { get; set; }
 }

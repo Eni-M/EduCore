@@ -36,7 +36,12 @@ public class MarkService(
         return await marks.GetByClassAsync(classId, subjectId, gradingPeriodId, ct);
     }
 
-    public async Task<MarkListDto> CreateAsync(MarkCreateDto dto, CancellationToken ct)
+    // Create-or-update. A teacher normally sets FirstMark part-way through the period and
+    // SecondMark at the end, so the second call updates the row the first one created.
+    //
+    // A mark the caller leaves null is left as it was, rather than being cleared -- otherwise
+    // sending only SecondMark would wipe a FirstMark that was already given.
+    public async Task<MarkListDto> UpsertAsync(MarkUpsertDto dto, CancellationToken ct)
     {
         var enrollment = await enrollments.GetByIdAsync(dto.EnrollmentId, ct)
                          ?? throw new NotFoundException("Enrollment", dto.EnrollmentId);
@@ -57,26 +62,34 @@ public class MarkService(
         if (gradingPeriod.AcademicYearId != @class.AcademicYearId)
             throw new BusinessException("That grading period belongs to a different academic year than this class.");
 
-        if (dto.Date < gradingPeriod.StartDate || dto.Date > gradingPeriod.EndDate)
-            throw new BusinessException(
-                $"The mark date must fall inside the grading period ({gradingPeriod.StartDate} - {gradingPeriod.EndDate}).");
+        var mark = await marks.GetForUpsertAsync(
+            enrollment.Id, dto.SubjectId, gradingPeriod.Id, ct);
 
-        var mark = new Mark
+        if (mark is null)
         {
-            EnrollmentId = enrollment.Id,
-            ClassId = @class.Id,
-            AcademicYearId = @class.AcademicYearId,
-            SchoolId = currentUser.RequireSchoolId(),
-            ClassSubjectTeacherId = assignment.Id,
-            SubjectId = assignment.SubjectId,
-            TeacherId = assignment.TeacherId,
-            GradingPeriodId = gradingPeriod.Id,
-            Type = dto.Type,
-            Value = dto.Value,
-            Date = dto.Date
-        };
+            mark = new Mark
+            {
+                EnrollmentId = enrollment.Id,
+                ClassId = @class.Id,
+                AcademicYearId = @class.AcademicYearId,
+                SchoolId = currentUser.RequireSchoolId(),
+                ClassSubjectTeacherId = assignment.Id,
+                SubjectId = assignment.SubjectId,
+                TeacherId = assignment.TeacherId,
+                GradingPeriodId = gradingPeriod.Id,
+                FirstMark = dto.FirstMark,
+                SecondMark = dto.SecondMark
+            };
 
-        await marks.AddAsync(mark);
+            await marks.AddAsync(mark);
+        }
+        else
+        {
+            mark.FirstMark = dto.FirstMark ?? mark.FirstMark;
+            mark.SecondMark = dto.SecondMark ?? mark.SecondMark;
+            marks.Update(mark);
+        }
+
         await marks.SaveChangesAsync(ct);
 
         return await marks.GetDtoAsync(mark.Id, ct)

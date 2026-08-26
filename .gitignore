@@ -4,3 +4,8 @@ obj/
 riderModule.iml
 /_ReSharper.Caches/
 .idea/
+# IDE/editor local state
+.vs/
+.idea/
+*.user
+*.DotSettings.user

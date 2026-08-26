@@ -93,13 +93,13 @@ public class DiaryEntryService(
 
         foreach (var enrollment in await enrollments.GetActiveByClassAsync(dto.ClassId, ct))
         {
+            // Everyone starts present; the teacher then marks the exceptions.
             await attendances.AddAsync(new Attendance
             {
                 DiaryEntryId = entry.Id,
                 EnrollmentId = enrollment.Id,
                 ClassId = @class.Id,
-                SchoolId = entry.SchoolId,
-                IsPresent = true
+                SchoolId = entry.SchoolId
             });
         }
 

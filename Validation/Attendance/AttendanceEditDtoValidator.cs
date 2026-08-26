@@ -3,6 +3,8 @@ using FluentValidation;
 
 namespace EduCore.Validation.Attendance;
 
+// No rule pairing IsPresent and IsExcused: Attendance.Record owns that invariant, so it holds
+// however the entity is reached rather than only on this one path.
 public class AttendanceEditDtoValidator : AbstractValidator<AttendanceEditDto>
 {
     public AttendanceEditDtoValidator()

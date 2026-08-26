@@ -2,17 +2,23 @@ using System.Text;
 using AutoMapper;
 using EduCore.Data;
 using EduCore.Endpoints;
+using EduCore.Endpoints.Statistics;
 using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories;
 using EduCore.Repositories.Interfaces;
+using EduCore.Repositories.Statistics;
+using EduCore.Repositories.Statistics.Interfaces;
 using EduCore.Security;
 using EduCore.Services;
 using EduCore.Services.Interfaces;
+using EduCore.Services.Statistics;
+using EduCore.Services.Statistics.Interfaces;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -56,6 +62,34 @@ builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 // rather than newing it up inside UserService means hashing options are configured in one
 // place and every password in the system goes through the same settings.
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+
+// The state's grading rules. The rules for what counts as a valid configuration live in
+// GradingOptionsValidator, not here.
+builder.Services.AddOptions<GradingOptions>()
+    .Bind(builder.Configuration.GetSection(GradingOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<GradingOptions>, GradingOptionsValidator>();
+
+builder.Services.AddScoped<IGradingCalculator, GradingCalculator>();
+builder.Services.AddScoped<ICellSuppressor, CellSuppressor>();
+builder.Services.AddScoped<IStatisticsPeriodResolver, StatisticsPeriodResolver>();
+builder.Services.AddScoped<IStatisticsScopeResolver, StatisticsScopeResolver>();
+
+builder.Services.AddScoped<IStudentStatisticsRepository, StudentStatisticsRepository>();
+builder.Services.AddScoped<IEnrollmentStatisticsRepository, EnrollmentStatisticsRepository>();
+builder.Services.AddScoped<IAttendanceStatisticsRepository, AttendanceStatisticsRepository>();
+builder.Services.AddScoped<IAcademicStatisticsRepository, AcademicStatisticsRepository>();
+builder.Services.AddScoped<ITeacherStatisticsRepository, TeacherStatisticsRepository>();
+builder.Services.AddScoped<IDemographicsStatisticsRepository, DemographicsStatisticsRepository>();
+
+builder.Services.AddScoped<IStudentStatisticsService, StudentStatisticsService>();
+builder.Services.AddScoped<IEnrollmentStatisticsService, EnrollmentStatisticsService>();
+builder.Services.AddScoped<IAttendanceStatisticsService, AttendanceStatisticsService>();
+builder.Services.AddScoped<IAcademicStatisticsService, AcademicStatisticsService>();
+builder.Services.AddScoped<ITeacherStatisticsService, TeacherStatisticsService>();
+builder.Services.AddScoped<IClassStatisticsService, ClassStatisticsService>();
+builder.Services.AddScoped<IDemographicsStatisticsService, DemographicsStatisticsService>();
+builder.Services.AddScoped<IStatisticsOverviewService, StatisticsOverviewService>();
 
 builder.Services.AddScoped<IAccessGuard, AccessGuard>();
 builder.Services.AddScoped<IUserService, UserService>();
@@ -139,5 +173,6 @@ api.MapClassEndpoints();
 api.MapStudentEndpoints();
 api.MapTeacherEndpoints();
 api.MapLessonEndpoints();
+api.MapStatisticsEndpoints();
 
 app.Run();
