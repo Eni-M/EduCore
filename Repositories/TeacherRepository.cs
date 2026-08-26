@@ -27,6 +27,7 @@ public class TeacherRepository(AppDbContext context) : Repository<Teacher>(conte
         await _context.Teachers
             .AsNoTracking()
             .Include(t => t.User)
+            .Include(t => t.TeacherSubjects).ThenInclude(ts => ts.Subject)
             .OrderBy(t => t.User.LastName).ThenBy(t => t.User.FirstName)
             .ToListAsync(ct);
 

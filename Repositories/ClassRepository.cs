@@ -65,4 +65,10 @@ public class ClassRepository(AppDbContext context) : Repository<Class>(context),
                  && c.Name.ToLower() == name.ToLower()
                  && (excludeClassId == null || c.Id != excludeClassId),
             ct);
+
+    public async Task<IEnumerable<Class>> GetAllWithHomeroomTeacherAsync(CancellationToken ct) =>
+        await _context.Classes
+            .AsNoTracking()
+            .Where(c => c.HomeroomTeacherId != null)
+            .ToListAsync(ct);
 }

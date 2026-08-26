@@ -4,11 +4,16 @@ using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
+using EduCore.Services.Assignment;
 using EduCore.Services.Interfaces;
 
 namespace EduCore.Services;
 
-public class SubjectService(ISubjectRepository subjects, ICurrentUser currentUser, IMapper mapper) : ISubjectService
+public class SubjectService(
+    ISubjectRepository subjects,
+    IElementaryAssignmentSync elementarySync,
+    ICurrentUser currentUser,
+    IMapper mapper) : ISubjectService
 {
     public async Task<IEnumerable<SubjectListDto>> GetAllAsync(CancellationToken ct) =>
         mapper.Map<IEnumerable<SubjectListDto>>(await subjects.GetAllOrderedAsync(ct));
@@ -25,6 +30,11 @@ public class SubjectService(ISubjectRepository subjects, ICurrentUser currentUse
         subject.SchoolId = currentUser.RequireSchoolId();
 
         await subjects.AddAsync(subject);
+
+        // Elementary: every class that already has a homeroom teacher gets this subject
+        // assigned to them immediately. A no-op for any other school type.
+        await elementarySync.SyncNewSubjectAsync(subject.SchoolId, subject.Id, ct);
+
         await subjects.SaveChangesAsync(ct);
 
         return mapper.Map<SubjectListDto>(subject);

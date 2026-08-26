@@ -20,6 +20,8 @@ public static class AcademicYearEndpoints
                     Results.Ok(await service.GetByIdAsync(academicYearId, ct)))
             .RequireAuthorization(Policies.AnySchoolUser);
 
+        // Also creates the year's two grading periods -- an academic year always has exactly
+        // two, so there is no separate "add a period" call.
         group.MapPost("/", async (AcademicYearCreateDto dto, IAcademicYearService service, CancellationToken ct) =>
             {
                 var year = await service.CreateAsync(dto, ct);
@@ -33,9 +35,11 @@ public static class AcademicYearEndpoints
                     Results.Ok(await service.GetGradingPeriodsAsync(academicYearId, ct)))
             .RequireAuthorization(Policies.AnySchoolUser);
 
-        group.MapPost("/grading-periods",
-                async (GradingPeriodCreateDto dto, IAcademicYearService service, CancellationToken ct) =>
-                    Results.Ok(await service.CreateGradingPeriodAsync(dto, ct)))
+        // The only edit a grading period ever gets: moving its own dates. There is no add or
+        // remove, since a year always has exactly two.
+        group.MapPut("/grading-periods/{gradingPeriodId:guid}",
+                async (Guid gradingPeriodId, GradingPeriodEditDto dto, IAcademicYearService service, CancellationToken ct) =>
+                    Results.Ok(await service.EditGradingPeriodAsync(gradingPeriodId, dto, ct)))
             .RequireAuthorization(Policies.Admin);
     }
 }

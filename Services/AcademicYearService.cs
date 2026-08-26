@@ -5,6 +5,7 @@ using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
+using EduCore.Services.Calendar;
 using EduCore.Services.Interfaces;
 
 namespace EduCore.Services;
@@ -12,6 +13,7 @@ namespace EduCore.Services;
 public class AcademicYearService(
     IAcademicYearRepository academicYears,
     IGradingPeriodRepository gradingPeriods,
+    IAcademicCalendar calendar,
     ICurrentUser currentUser,
     IMapper mapper) : IAcademicYearService
 {
@@ -33,6 +35,28 @@ public class AcademicYearService(
         academicYear.SchoolId = currentUser.RequireSchoolId();
 
         await academicYears.AddAsync(academicYear);
+
+        var (firstStart, firstEnd) = calendar.FirstPeriod(dto.StartDate, dto.EndDate);
+        var (secondStart, secondEnd) = calendar.SecondPeriod(dto.StartDate, dto.EndDate);
+
+        await gradingPeriods.AddAsync(new GradingPeriod
+        {
+            AcademicYearId = academicYear.Id,
+            SchoolId = academicYear.SchoolId,
+            Name = "First term",
+            StartDate = firstStart,
+            EndDate = firstEnd
+        });
+
+        await gradingPeriods.AddAsync(new GradingPeriod
+        {
+            AcademicYearId = academicYear.Id,
+            SchoolId = academicYear.SchoolId,
+            Name = "Second term",
+            StartDate = secondStart,
+            EndDate = secondEnd
+        });
+
         await academicYears.SaveChangesAsync(ct);
 
         return mapper.Map<AcademicYearListDto>(academicYear);
@@ -46,23 +70,30 @@ public class AcademicYearService(
         return await gradingPeriods.GetByAcademicYearAsync(academicYearId, ct);
     }
 
-    public async Task<GradingPeriodListDto> CreateGradingPeriodAsync(
-        GradingPeriodCreateDto dto,
+    public async Task<GradingPeriodListDto> EditGradingPeriodAsync(
+        Guid gradingPeriodId,
+        GradingPeriodEditDto dto,
         CancellationToken ct)
     {
-        var academicYear = await GetOwnedYearAsync(dto.AcademicYearId, ct);
+        var gradingPeriod = await gradingPeriods.GetByIdAsync(gradingPeriodId, ct)
+                            ?? throw new NotFoundException("Grading period", gradingPeriodId);
+
+        var academicYear = await GetOwnedYearAsync(gradingPeriod.AcademicYearId, ct);
 
         if (dto.StartDate < academicYear.StartDate || dto.EndDate > academicYear.EndDate)
             throw new BusinessException(
                 $"A grading period must fall inside its academic year ({academicYear.StartDate} - {academicYear.EndDate}).");
 
-        if (await gradingPeriods.NameExistsInYearAsync(dto.AcademicYearId, dto.Name, ct))
-            throw new ConflictException($"A grading period named {dto.Name} already exists in this academic year.");
+        var otherPeriod = (await gradingPeriods.GetByAcademicYearAsync(academicYear.Id, ct))
+            .FirstOrDefault(p => p.Id != gradingPeriodId);
 
-        var gradingPeriod = mapper.Map<GradingPeriod>(dto);
-        gradingPeriod.SchoolId = currentUser.RequireSchoolId();
+        if (otherPeriod is not null && dto.StartDate <= otherPeriod.EndDate && otherPeriod.StartDate <= dto.EndDate)
+            throw new ConflictException("This would overlap the academic year's other grading period.");
 
-        await gradingPeriods.AddAsync(gradingPeriod);
+        gradingPeriod.StartDate = dto.StartDate;
+        gradingPeriod.EndDate = dto.EndDate;
+
+        gradingPeriods.Update(gradingPeriod);
         await gradingPeriods.SaveChangesAsync(ct);
 
         return new GradingPeriodListDto(

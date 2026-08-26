@@ -1,4 +1,6 @@
 using EduCore.Grading;
+using EduCore.Services.Assignment;
+using EduCore.Services.Calendar;
 using System.Text;
 using AutoMapper;
 using EduCore.Data;
@@ -75,6 +77,21 @@ builder.Services.AddOptions<PrivacyOptions>()
     .Bind(builder.Configuration.GetSection(PrivacyOptions.SectionName))
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<PrivacyOptions>, PrivacyOptionsValidator>();
+
+// How many subjects a junior-high/high-school teacher may hold, and the default split of a
+// new academic year into its two grading periods.
+builder.Services.AddOptions<AssignmentOptions>()
+    .Bind(builder.Configuration.GetSection(AssignmentOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<AssignmentOptions>, AssignmentOptionsValidator>();
+
+builder.Services.AddOptions<AcademicCalendarOptions>()
+    .Bind(builder.Configuration.GetSection(AcademicCalendarOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<AcademicCalendarOptions>, AcademicCalendarOptionsValidator>();
+
+builder.Services.AddScoped<IElementaryAssignmentSync, ElementaryAssignmentSync>();
+builder.Services.AddScoped<IAcademicCalendar, AcademicCalendar>();
 
 builder.Services.AddScoped<IGradingCalculator, GradingCalculator>();
 builder.Services.AddScoped<ICellSuppressor, CellSuppressor>();

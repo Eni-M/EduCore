@@ -67,7 +67,8 @@ public class MappingProfile : Profile
     {
         CreateMap<AcademicYear, Dtos.AcademicYear.AcademicYearListDto>();
         CreateWriteMap<Dtos.AcademicYear.AcademicYearCreateDto, AcademicYear>();
-        CreateWriteMap<Dtos.GradingPeriod.GradingPeriodCreateDto, GradingPeriod>();
+        // GradingPeriod is built manually in AcademicYearService (auto-created with the year)
+        // and edited in place, so it has no write map.
     }
 
     private void MapUsers()
@@ -107,7 +108,8 @@ public class MappingProfile : Profile
         CreateMap<Teacher, Dtos.Teacher.TeacherListDto>()
             .ForCtorParam("FirstName", o => o.MapFrom(t => t.User.FirstName))
             .ForCtorParam("LastName", o => o.MapFrom(t => t.User.LastName))
-            .ForCtorParam("Email", o => o.MapFrom(t => t.User.Email));
+            .ForCtorParam("Email", o => o.MapFrom(t => t.User.Email))
+            .ForCtorParam("Subjects", o => o.MapFrom(t => t.TeacherSubjects.Select(ts => ts.Subject.Name)));
 
         CreateMap<Teacher, Dtos.Teacher.TeacherDetailDto>()
             .ForCtorParam("FirstName", o => o.MapFrom(t => t.User.FirstName))

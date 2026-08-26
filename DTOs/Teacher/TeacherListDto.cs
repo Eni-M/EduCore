@@ -4,4 +4,5 @@ public record TeacherListDto(
     Guid Id,
     string FirstName,
     string LastName,
-    string Email);
+    string Email,
+    IReadOnlyList<string> Subjects);

@@ -6,7 +6,9 @@ using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
+using EduCore.Services.Assignment;
 using EduCore.Services.Interfaces;
+using Microsoft.Extensions.Options;
 
 namespace EduCore.Services;
 
@@ -14,9 +16,11 @@ public class TeacherService(
     ITeacherRepository teachers,
     ITeacherSubjectRepository teacherSubjects,
     ISubjectRepository subjects,
+    ISchoolRepository schools,
     IUserRepository userRepository,
     IUserService users,
     ICurrentUser currentUser,
+    IOptions<AssignmentOptions> assignmentOptions,
     IMapper mapper) : ITeacherService
 {
     public async Task<IEnumerable<TeacherListDto>> GetAllAsync(CancellationToken ct) =>
@@ -75,7 +79,7 @@ public class TeacherService(
 
     public async Task<TeacherSubjectListDto> AddSubjectAsync(TeacherSubjectCreateDto dto, CancellationToken ct)
     {
-        _ = await teachers.GetByIdAsync(dto.TeacherId, ct)
+        var teacher = await teachers.GetByIdAsync(dto.TeacherId, ct)
             ?? throw new NotFoundException("Teacher", dto.TeacherId);
 
         var subject = await subjects.GetByIdAsync(dto.SubjectId, ct)
@@ -83,6 +87,20 @@ public class TeacherService(
 
         if (await teacherSubjects.ExistsAsync(dto.TeacherId, dto.SubjectId, ct))
             throw new ConflictException("This teacher is already qualified for that subject.");
+
+        // Elementary is exempt: a homeroom teacher is expected to cover every subject the
+        // school has, and is assigned that way automatically rather than through this
+        // manual grant -- see ElementaryAssignmentSync.
+        var school = await schools.GetByIdAsync(teacher.SchoolId, ct);
+
+        if (school?.Type != SchoolType.Elementary)
+        {
+            var currentCount = (await teacherSubjects.GetByTeacherAsync(dto.TeacherId, ct)).Count();
+
+            if (currentCount >= assignmentOptions.Value.MaxSubjectsPerTeacher)
+                throw new BusinessException(
+                    $"A teacher may be qualified for at most {assignmentOptions.Value.MaxSubjectsPerTeacher} subjects.");
+        }
 
         var qualification = mapper.Map<TeacherSubject>(dto);
         qualification.SchoolId = currentUser.RequireSchoolId();

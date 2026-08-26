@@ -4,6 +4,7 @@ using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
+using EduCore.Services.Assignment;
 using EduCore.Services.Interfaces;
 
 namespace EduCore.Services;
@@ -13,6 +14,7 @@ public class ClassService(
     IAcademicYearRepository academicYears,
     IAccessGuard access,
     ITeacherRepository teachers,
+    IElementaryAssignmentSync elementarySync,
     ICurrentUser currentUser,
     IMapper mapper) : IClassService
 {
@@ -70,14 +72,20 @@ public class ClassService(
         CancellationToken ct)
     {
         var entity = await GetOwnedAsync(classId, ct);
+        var oldTeacherId = entity.HomeroomTeacherId;
 
         if (dto.TeacherId is not null)
             _ = await teachers.GetByIdAsync(dto.TeacherId.Value, ct)
                 ?? throw new NotFoundException("Teacher", dto.TeacherId.Value);
 
         entity.HomeroomTeacherId = dto.TeacherId;
-
         classes.Update(entity);
+
+        // For an elementary school, homeroom IS the subject assignment -- this grants (or
+        // moves) every subject the school has. A no-op for any other school type.
+        await elementarySync.SyncHomeroomChangeAsync(
+            entity.SchoolId, classId, oldTeacherId, dto.TeacherId, ct);
+
         await classes.SaveChangesAsync(ct);
 
         return await ReadAsync(classId, ct);
