@@ -5,18 +5,18 @@ using EduCore.Services.Statistics.Interfaces;
 
 namespace EduCore.Services.Statistics;
 
-// Every statistics service takes a StatisticsContext, never a raw StatisticsFilter, so a
+// Every statistics service takes a StatisticsQuery, never a raw StatisticsFilter, so a
 // query cannot be run against input that has not been through here first.
 public class StatisticsScopeResolver(
     ICurrentUser currentUser,
     IStatisticsPeriodResolver periods) : IStatisticsScopeResolver
 {
-    public async Task<StatisticsContext> ResolveAsync(StatisticsFilter filter, CancellationToken ct)
+    public async Task<StatisticsQuery> ResolveAsync(StatisticsFilter filter, CancellationToken ct)
     {
         var (schoolId, crossSchool) = ResolveSchool(filter);
         var (from, to) = await periods.ResolveAsync(filter, schoolId, ct);
 
-        return new StatisticsContext(
+        return new StatisticsQuery(
             schoolId,
             crossSchool,
             from,

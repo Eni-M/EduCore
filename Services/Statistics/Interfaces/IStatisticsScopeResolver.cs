@@ -4,5 +4,5 @@ namespace EduCore.Services.Statistics.Interfaces;
 
 public interface IStatisticsScopeResolver
 {
-    Task<StatisticsContext> ResolveAsync(StatisticsFilter filter, CancellationToken ct);
+    Task<StatisticsQuery> ResolveAsync(StatisticsFilter filter, CancellationToken ct);
 }

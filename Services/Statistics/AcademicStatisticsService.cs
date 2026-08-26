@@ -1,4 +1,5 @@
 using EduCore.Dtos.Statistics;
+using EduCore.Dtos.Statistics.Rows;
 using EduCore.Dtos.Statistics.Aggregate;
 using EduCore.Dtos.Statistics.Individual;
 using EduCore.Repositories.Statistics;

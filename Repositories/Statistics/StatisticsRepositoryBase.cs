@@ -16,7 +16,7 @@ public abstract class StatisticsRepositoryBase(AppDbContext context)
 {
     protected readonly AppDbContext _context = context;
 
-    protected IQueryable<T> Scope<T>(IQueryable<T> query, StatisticsContext ctx)
+    protected IQueryable<T> Scope<T>(IQueryable<T> query, StatisticsQuery ctx)
         where T : class, ISchoolScoped
     {
         if (ctx.SchoolId is null && !ctx.CrossSchool)
@@ -33,7 +33,7 @@ public abstract class StatisticsRepositoryBase(AppDbContext context)
 
     // Attendance and diary entries are dated by the lesson, so a calendar window is applied
     // to the diary entry rather than to the attendance row.
-    protected IQueryable<Models.DiaryEntry> LessonsInWindow(StatisticsContext ctx)
+    protected IQueryable<Models.DiaryEntry> LessonsInWindow(StatisticsQuery ctx)
     {
         var lessons = Scope(_context.DiaryEntries, ctx)
             .Where(d => d.Date >= ctx.From && d.Date <= ctx.To);
@@ -52,7 +52,7 @@ public abstract class StatisticsRepositoryBase(AppDbContext context)
 
     // Marks belong to a grading period rather than to a date, so they are windowed by the
     // periods that overlap the requested range.
-    protected IQueryable<Models.Mark> MarksInWindow(StatisticsContext ctx)
+    protected IQueryable<Models.Mark> MarksInWindow(StatisticsQuery ctx)
     {
         var periodIds = Scope(_context.GradingPeriods, ctx)
             .Where(g => g.StartDate <= ctx.To && ctx.From <= g.EndDate)
@@ -78,7 +78,7 @@ public abstract class StatisticsRepositoryBase(AppDbContext context)
         return marks;
     }
 
-    protected IQueryable<Models.Class> ClassesInScope(StatisticsContext ctx)
+    protected IQueryable<Models.Class> ClassesInScope(StatisticsQuery ctx)
     {
         var classes = Scope(_context.Classes, ctx);
 
@@ -95,7 +95,7 @@ public abstract class StatisticsRepositoryBase(AppDbContext context)
     }
 
     // Enrollments that were live at any point in the window.
-    protected IQueryable<Models.Enrollment> EnrollmentsInWindow(StatisticsContext ctx)
+    protected IQueryable<Models.Enrollment> EnrollmentsInWindow(StatisticsQuery ctx)
     {
         var classIds = ClassesInScope(ctx).Select(c => c.Id);
 

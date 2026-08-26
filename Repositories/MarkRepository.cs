@@ -1,3 +1,4 @@
+using EduCore.Dtos.Statistics.Rows;
 using EduCore.Grading;
 using EduCore.Data;
 using EduCore.Dtos.Mark;
@@ -17,9 +18,8 @@ public class MarkRepository(
 {
     private readonly GradingOptions _weights = weights.Value;
 
-    // FinalMark is left null here and filled in by WithFinalMarks below, so the weighting rule
-    // stays in GradingCalculator instead of being written out a second time in LINQ. These
-    // lists are a class or a student at a time, so doing it in memory costs nothing.
+    // FinalMark is filled in by WithFinalMarks rather than in SQL, so the weighting rule stays
+    // in GradingCalculator. These lists are one class or one student at a time.
     private IQueryable<MarkListDto> Project(IQueryable<Mark> marks) =>
         from m in marks
         join e in _context.Enrollments on m.EnrollmentId equals e.Id
@@ -50,15 +50,6 @@ public class MarkRepository(
 
     public int? FinalMark(int? firstMark, int? secondMark) => grading.FinalMark(firstMark, secondMark);
 
-    // The grading formula, written once, here with the marks it belongs to.
-    //
-    // It cannot simply call GradingCalculator.FinalMark: a method call does not translate to
-    // SQL, and statistics must aggregate in the database rather than load a decade of marks
-    // into memory. So the same arithmetic is expressed as a query, and a unit test asserts the
-    // two forms agree for every possible pair of marks.
-    //
-    // The value is deliberately left unrounded. Averages must be taken over unrounded values,
-    // because averaging grades that have already been rounded biases the result.
     public IQueryable<ValuedMark> Value(IQueryable<Mark> marks) => Value(marks, _weights);
 
     public IQueryable<double> WeightedValues(IQueryable<Mark> marks) =>

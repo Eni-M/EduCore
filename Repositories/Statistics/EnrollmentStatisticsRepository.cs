@@ -1,4 +1,5 @@
 using EduCore.Dtos.Statistics;
+using EduCore.Dtos.Statistics.Rows;
 using EduCore.Data;
 using EduCore.Repositories.Statistics.Interfaces;
 using EduCore.Services.Statistics;
@@ -9,19 +10,19 @@ namespace EduCore.Repositories.Statistics;
 public class EnrollmentStatisticsRepository(AppDbContext context)
     : StatisticsRepositoryBase(context), IEnrollmentStatisticsRepository
 {
-    public async Task<int> CountActiveAsync(StatisticsContext ctx, CancellationToken ct) =>
+    public async Task<int> CountActiveAsync(StatisticsQuery ctx, CancellationToken ct) =>
         await EnrollmentsInWindow(ctx).CountAsync(e => e.LeftAt == null, ct);
 
     // Enrollments that began inside the window, whether or not they have since ended.
-    public async Task<int> CountStartedAsync(StatisticsContext ctx, CancellationToken ct) =>
+    public async Task<int> CountStartedAsync(StatisticsQuery ctx, CancellationToken ct) =>
         await EnrollmentsInWindow(ctx)
             .CountAsync(e => e.EnrolledAt >= ctx.From && e.EnrolledAt <= ctx.To, ct);
 
-    public async Task<int> CountExitedAsync(StatisticsContext ctx, CancellationToken ct) =>
+    public async Task<int> CountExitedAsync(StatisticsQuery ctx, CancellationToken ct) =>
         await EnrollmentsInWindow(ctx)
             .CountAsync(e => e.LeftAt != null && e.LeftAt >= ctx.From && e.LeftAt <= ctx.To, ct);
 
-    public async Task<int> CountActiveOnAsync(StatisticsContext ctx, DateOnly on, CancellationToken ct)
+    public async Task<int> CountActiveOnAsync(StatisticsQuery ctx, DateOnly on, CancellationToken ct)
     {
         var classIds = ClassesInScope(ctx).Select(c => c.Id);
 
@@ -31,7 +32,7 @@ public class EnrollmentStatisticsRepository(AppDbContext context)
     }
 
     public async Task<IReadOnlyList<CountRow>> GetExitsByReasonAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         var rows = await EnrollmentsInWindow(ctx)
             .Where(e => e.LeftAt != null && e.LeftAt >= ctx.From && e.LeftAt <= ctx.To)
@@ -51,7 +52,7 @@ public class EnrollmentStatisticsRepository(AppDbContext context)
     }
 
     public async Task<IReadOnlyList<CountRow>> GetByAcademicYearAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         var rows = await (from e in Scope(_context.Enrollments, ctx)
                           join c in Scope(_context.Classes, ctx) on e.ClassId equals c.Id
@@ -71,7 +72,7 @@ public class EnrollmentStatisticsRepository(AppDbContext context)
     }
 
     public async Task<IReadOnlyList<(Guid ClassId, string ClassName, int Grade, int? Capacity, int Enrolled)>>
-        GetCapacityAsync(StatisticsContext ctx, CancellationToken ct)
+        GetCapacityAsync(StatisticsQuery ctx, CancellationToken ct)
     {
         var enrollments = EnrollmentsInWindow(ctx).Where(e => e.LeftAt == null);
 

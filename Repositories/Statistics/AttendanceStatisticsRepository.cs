@@ -1,4 +1,5 @@
 using EduCore.Dtos.Statistics;
+using EduCore.Dtos.Statistics.Rows;
 using EduCore.Data;
 using EduCore.Dtos.Statistics.Individual;
 using EduCore.Repositories.Statistics.Interfaces;
@@ -13,14 +14,14 @@ namespace EduCore.Repositories.Statistics;
 public class AttendanceStatisticsRepository(AppDbContext context)
     : StatisticsRepositoryBase(context), IAttendanceStatisticsRepository
 {
-    private IQueryable<Models.Attendance> AttendanceInWindow(StatisticsContext ctx)
+    private IQueryable<Models.Attendance> AttendanceInWindow(StatisticsQuery ctx)
     {
         var lessonIds = LessonsInWindow(ctx).Select(d => d.Id);
 
         return Scope(_context.Attendances, ctx).Where(a => lessonIds.Contains(a.DiaryEntryId));
     }
 
-    public async Task<AttendanceTotals> GetTotalsAsync(StatisticsContext ctx, CancellationToken ct)
+    public async Task<AttendanceTotals> GetTotalsAsync(StatisticsQuery ctx, CancellationToken ct)
     {
         var attendance = AttendanceInWindow(ctx);
         var records = await attendance.CountAsync(ct);
@@ -43,7 +44,7 @@ public class AttendanceStatisticsRepository(AppDbContext context)
     }
 
     public async Task<IReadOnlyList<AttendanceGroup>> GetByClassAsync(
-        StatisticsContext ctx, CancellationToken ct) =>
+        StatisticsQuery ctx, CancellationToken ct) =>
         await (from a in AttendanceInWindow(ctx)
                join c in ClassesInScope(ctx) on a.ClassId equals c.Id
                group a by new { c.Id, c.Name }
@@ -58,7 +59,7 @@ public class AttendanceStatisticsRepository(AppDbContext context)
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<AttendanceGroup>> GetByGradeAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         var rows = await (from a in AttendanceInWindow(ctx)
                           join c in ClassesInScope(ctx) on a.ClassId equals c.Id
@@ -81,7 +82,7 @@ public class AttendanceStatisticsRepository(AppDbContext context)
     }
 
     public async Task<IReadOnlyList<AttendanceGroup>> GetBySubjectAsync(
-        StatisticsContext ctx, CancellationToken ct) =>
+        StatisticsQuery ctx, CancellationToken ct) =>
         await (from a in AttendanceInWindow(ctx)
                join d in LessonsInWindow(ctx) on a.DiaryEntryId equals d.Id
                join s in Scope(_context.Subjects, ctx) on d.SubjectId equals s.Id
@@ -97,7 +98,7 @@ public class AttendanceStatisticsRepository(AppDbContext context)
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<(DateOnly Day, int Records, int Present)>> GetDailyTrendAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         var rows = await (from a in AttendanceInWindow(ctx)
                           join d in LessonsInWindow(ctx) on a.DiaryEntryId equals d.Id
@@ -116,9 +117,9 @@ public class AttendanceStatisticsRepository(AppDbContext context)
     }
 
     public async Task<IReadOnlyList<StudentAttendanceSummaryDto>> GetByStudentAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
-        var rows = await StudentRowsAsync(ctx, ct);
+        var rows = await StudentAttendanceRowsAsync(ctx, ct);
 
         return rows
             .OrderBy(r => r.Name)
@@ -136,9 +137,9 @@ public class AttendanceStatisticsRepository(AppDbContext context)
     }
 
     public async Task<IReadOnlyList<ExcessiveAbsenceStudentDto>> GetExcessiveAbsencesAsync(
-        StatisticsContext ctx, double absenceRateThreshold, CancellationToken ct)
+        StatisticsQuery ctx, double absenceRateThreshold, CancellationToken ct)
     {
-        var rows = await StudentRowsAsync(ctx, ct);
+        var rows = await StudentAttendanceRowsAsync(ctx, ct);
 
         // Excused absences are counted in the total but the threshold is applied to unexcused
         // ones -- a student with a term of doctor's notes is not the same problem as a student
@@ -163,11 +164,7 @@ public class AttendanceStatisticsRepository(AppDbContext context)
             .ToList();
     }
 
-    private record StudentRow(
-        Guid StudentId, string Name, Guid ClassId, string ClassName,
-        int Records, int Present, int Excused);
-
-    private async Task<List<StudentRow>> StudentRowsAsync(StatisticsContext ctx, CancellationToken ct)
+    private async Task<List<StudentAttendanceRow>> StudentAttendanceRowsAsync(StatisticsQuery ctx, CancellationToken ct)
     {
         var rows = await (from a in AttendanceInWindow(ctx)
                           join e in Scope(_context.Enrollments, ctx) on a.EnrollmentId equals e.Id
@@ -197,7 +194,7 @@ public class AttendanceStatisticsRepository(AppDbContext context)
             .ToListAsync(ct);
 
         return rows
-            .Select(r => new StudentRow(
+            .Select(r => new StudentAttendanceRow(
                 r.Id,
                 r.FirstName + " " + r.LastName,
                 r.ClassId,

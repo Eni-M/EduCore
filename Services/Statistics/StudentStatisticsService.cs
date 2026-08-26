@@ -1,4 +1,5 @@
 using EduCore.Dtos.Statistics;
+using EduCore.Dtos.Statistics.Rows;
 using EduCore.Dtos.Statistics.Aggregate;
 using EduCore.Repositories.Statistics.Interfaces;
 using EduCore.Services.Statistics.Interfaces;
@@ -57,6 +58,6 @@ public class StudentStatisticsService(
 
     // Headcounts stay exact and unsuppressed. They carry no baseline because there is nothing
     // meaningful to compare a raw count against -- see CellSuppressor for where the line sits.
-    private static IReadOnlyList<CountByKeyDto> Map(IEnumerable<Repositories.Statistics.CountRow> rows) =>
+    private static IReadOnlyList<CountByKeyDto> Map(IEnumerable<Dtos.Statistics.Rows.CountRow> rows) =>
         rows.Select(r => new CountByKeyDto(r.Key, r.Label, r.Count)).ToList();
 }

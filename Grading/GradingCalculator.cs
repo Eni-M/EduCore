@@ -4,25 +4,22 @@ namespace EduCore.Grading;
 
 // Every grading rule in the system, in one class.
 //
-// The weighting itself also exists as a LINQ query in MarkRepository.Value, because a method
-// call cannot be translated to SQL and statistics have to aggregate in the database rather
-// than load a decade of marks into memory. That query is built from
-// MarkRepository.WeightedValueOf, and GradingRuleAgreementTests compiles that very expression
-// and checks it against this class for every possible pair of marks -- so the two cannot drift
-// without a test failing.
+// The weighting also exists as a query in MarkRepository, because a method call cannot be
+// translated to SQL and statistics must aggregate in the database. GradingRuleAgreementTests
+// runs that query and checks it against this class for every pair of marks, so the two cannot
+// drift without a test failing.
 public class GradingCalculator(IOptions<GradingOptions> options) : IGradingCalculator
 {
     private readonly GradingOptions _options = options.Value;
 
-    // The weighted mark before rounding. Averages use this: averaging already-rounded grades
-    // throws away precision and biases class averages.
+    // Unrounded. Averages use this: averaging already-rounded grades biases the result.
     public double? WeightedValue(int? first, int? second) =>
         first.HasValue && second.HasValue
             ? first.Value * _options.FirstMarkWeight + second.Value * _options.SecondMarkWeight
             : null;
 
-    // The student's actual grade -- an integer on the 1-5 scale. Null until both marks exist,
-    // so a half-graded period reads as incomplete rather than as a low grade.
+    // Null until both marks exist, so a half-graded period reads as incomplete, not as a low
+    // grade.
     public int? FinalMark(int? first, int? second)
     {
         var weighted = WeightedValue(first, second);
@@ -32,8 +29,7 @@ public class GradingCalculator(IOptions<GradingOptions> options) : IGradingCalcu
             : (int)Math.Round(weighted.Value, MidpointRounding.AwayFromZero);
     }
 
-    // A year's grade for a subject is the mean of its grading periods' final marks. Periods
-    // still missing a final mark are skipped rather than counted as zero.
+    // Mean of the periods that have a final mark; the rest are skipped, not counted as zero.
     public int? AnnualMark(IEnumerable<int?> periodFinalMarks)
     {
         var graded = periodFinalMarks.Where(m => m.HasValue).Select(m => m!.Value).ToList();
@@ -57,9 +53,8 @@ public class GradingCalculator(IOptions<GradingOptions> options) : IGradingCalcu
     public bool IsFail(int finalMark) => finalMark < _options.PassMark;
     public bool IsAtRisk(int finalMark) => finalMark == _options.AtRiskMark;
 
-    // Judges a whole student rather than one mark: their mean across every subject, unrounded.
-    // A student scraping through several subjects is at risk even if no single final mark is
-    // exactly the at-risk grade, which is why this is not IsAtRisk applied to an average.
+    // A whole student, not one mark: someone scraping through several subjects is at risk even
+    // when no single final mark is exactly the at-risk grade.
     public bool IsStudentAtRisk(double averageOfUnroundedMarks) =>
         averageOfUnroundedMarks < AtRiskUpperValue;
 }

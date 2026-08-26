@@ -1,4 +1,5 @@
 using EduCore.Dtos.Statistics;
+using EduCore.Dtos.Statistics.Rows;
 using EduCore.Data;
 using EduCore.Dtos.Statistics.Aggregate;
 using EduCore.Enums;
@@ -13,7 +14,7 @@ public class StudentStatisticsRepository(AppDbContext context)
 {
     // Students reachable in this context: everyone in scope, narrowed to the classes the
     // filter selects when it selects any.
-    private IQueryable<Models.Student> StudentsInScope(StatisticsContext ctx)
+    private IQueryable<Models.Student> StudentsInScope(StatisticsQuery ctx)
     {
         var students = Scope(_context.Students, ctx);
 
@@ -25,7 +26,7 @@ public class StudentStatisticsRepository(AppDbContext context)
         return students.Where(s => studentIds.Contains(s.Id));
     }
 
-    public async Task<StudentStatisticsDto> GetTotalsAsync(StatisticsContext ctx, CancellationToken ct)
+    public async Task<StudentStatisticsDto> GetTotalsAsync(StatisticsQuery ctx, CancellationToken ct)
     {
         var students = StudentsInScope(ctx);
 
@@ -58,7 +59,7 @@ public class StudentStatisticsRepository(AppDbContext context)
     }
 
     public async Task<IReadOnlyList<CountRow>> GetByGradeAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         var rows = await (from e in EnrollmentsInWindow(ctx)
                           where e.LeftAt == null
@@ -75,7 +76,7 @@ public class StudentStatisticsRepository(AppDbContext context)
     }
 
     public async Task<IReadOnlyList<ClassCountRow>> GetByClassAsync(
-        StatisticsContext ctx, CancellationToken ct) =>
+        StatisticsQuery ctx, CancellationToken ct) =>
         await (from e in EnrollmentsInWindow(ctx)
                where e.LeftAt == null
                join c in ClassesInScope(ctx) on e.ClassId equals c.Id
@@ -90,7 +91,7 @@ public class StudentStatisticsRepository(AppDbContext context)
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<CountRow>> GetByAgeAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         // Age is derived from the end of the window rather than from today, so a report run
         // for a past period gives the ages the students were at the time.
@@ -120,7 +121,7 @@ public class StudentStatisticsRepository(AppDbContext context)
     }
 
     public async Task<IReadOnlyList<(DateOnly Month, int Count)>> GetEnrollmentTrendAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         var enrollments = await EnrollmentsInWindow(ctx)
             .Select(e => new { e.StudentId, e.EnrolledAt, e.LeftAt })

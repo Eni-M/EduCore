@@ -15,18 +15,18 @@ public class TeacherStatisticsRepository(
     IGradingCalculator grading) : StatisticsRepositoryBase(context), ITeacherStatisticsRepository
 {
 
-    private IQueryable<Models.Teacher> TeachersInScope(StatisticsContext ctx)
+    private IQueryable<Models.Teacher> TeachersInScope(StatisticsQuery ctx)
     {
         var teachers = Scope(_context.Teachers, ctx);
 
         return ctx.TeacherId is null ? teachers : teachers.Where(t => t.Id == ctx.TeacherId);
     }
 
-    public async Task<int> CountTeachersAsync(StatisticsContext ctx, CancellationToken ct) =>
+    public async Task<int> CountTeachersAsync(StatisticsQuery ctx, CancellationToken ct) =>
         await TeachersInScope(ctx).CountAsync(ct);
 
     public async Task<string?> GetTeacherNameAsync(
-        StatisticsContext ctx, Guid teacherId, CancellationToken ct) =>
+        StatisticsQuery ctx, Guid teacherId, CancellationToken ct) =>
         await (from t in Scope(_context.Teachers, ctx)
                where t.Id == teacherId
                join u in _context.Users on t.UserId equals u.Id
@@ -34,7 +34,7 @@ public class TeacherStatisticsRepository(
             .FirstOrDefaultAsync(ct);
 
     public async Task<IReadOnlyList<TeacherWorkloadDto>> GetWorkloadAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         var assignments = Scope(_context.ClassSubjectTeachers, ctx).Where(a => a.EndedOn == null);
         var lessons = LessonsInWindow(ctx);
@@ -77,7 +77,7 @@ public class TeacherStatisticsRepository(
     }
 
     public async Task<IReadOnlyList<TeacherCoverageDto>> GetCoverageAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         var lessons = LessonsInWindow(ctx);
         var attendances = Scope(_context.Attendances, ctx);
@@ -123,7 +123,7 @@ public class TeacherStatisticsRepository(
 
     public async Task<IReadOnlyList<(Guid ClassId, string ClassName, int Grade, Guid SubjectId,
         string SubjectName, int GradedMarks, double? Average, int Passed)>> GetPerformanceAsync(
-        StatisticsContext ctx, Guid teacherId, CancellationToken ct)
+        StatisticsQuery ctx, Guid teacherId, CancellationToken ct)
     {
         var pass = grading.PassValue;
 

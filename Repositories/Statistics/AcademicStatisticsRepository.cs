@@ -1,3 +1,4 @@
+using EduCore.Dtos.Statistics.Rows;
 using EduCore.Data;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Aggregate;
@@ -24,12 +25,12 @@ public class AcademicStatisticsRepository(
     IMarkRepository marks,
     IGradingCalculator grading) : StatisticsRepositoryBase(context), IAcademicStatisticsRepository
 {
-    private IQueryable<double> Values(StatisticsContext ctx) => marks.WeightedValues(MarksInWindow(ctx));
+    private IQueryable<double> Values(StatisticsQuery ctx) => marks.WeightedValues(MarksInWindow(ctx));
 
-    private IQueryable<Models.Mark> GradedMarks(StatisticsContext ctx) =>
+    private IQueryable<Models.Mark> GradedMarks(StatisticsQuery ctx) =>
         MarksInWindow(ctx).Where(m => m.FirstMark != null && m.SecondMark != null);
 
-    public async Task<AcademicTotals> GetTotalsAsync(StatisticsContext ctx, CancellationToken ct)
+    public async Task<AcademicTotals> GetTotalsAsync(StatisticsQuery ctx, CancellationToken ct)
     {
         var values = Values(ctx);
 
@@ -51,7 +52,7 @@ public class AcademicStatisticsRepository(
     }
 
     public async Task<IReadOnlyList<AcademicGroup>> GetBySubjectAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
 
@@ -71,7 +72,7 @@ public class AcademicStatisticsRepository(
     }
 
     public async Task<IReadOnlyList<AcademicGroup>> GetByClassAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
 
@@ -91,7 +92,7 @@ public class AcademicStatisticsRepository(
     }
 
     public async Task<IReadOnlyList<AcademicGroup>> GetByGradeAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
 
@@ -118,7 +119,7 @@ public class AcademicStatisticsRepository(
     // The school-wide average for a subject at a grade level: the baseline every per-class and
     // per-teacher figure is reported against, so no number is ever shown bare.
     public async Task<IReadOnlyList<AcademicGroup>> GetSubjectGradeBaselinesAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
 
@@ -152,7 +153,7 @@ public class AcademicStatisticsRepository(
     public static string BaselineKey(Guid subjectId, int grade) => subjectId + ":" + grade;
 
     public async Task<GradeDistributionResultDto> GetDistributionAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         var values = await Values(ctx).ToListAsync(ct);
         var total = values.Count;
@@ -175,7 +176,7 @@ public class AcademicStatisticsRepository(
     }
 
     public async Task<IReadOnlyList<AtRiskStudentDto>> GetAtRiskAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         var (first, second) = (grading.FirstMarkWeight, grading.SecondMarkWeight);
         var (pass, atRiskUpper) = (grading.PassValue, grading.AtRiskUpperValue);

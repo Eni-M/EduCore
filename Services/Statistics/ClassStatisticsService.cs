@@ -78,7 +78,7 @@ public class ClassStatisticsService(
             : distribution;
 
     private async Task<IReadOnlyList<ClassSummaryDto>> BuildSummariesAsync(
-        StatisticsContext ctx, CancellationToken ct)
+        StatisticsQuery ctx, CancellationToken ct)
     {
         var academicByClass = (await academic.GetByClassAsync(ctx, ct)).ToDictionary(a => a.Key);
         var attendanceByClass = (await attendance.GetByClassAsync(ctx, ct)).ToDictionary(a => a.Key);
