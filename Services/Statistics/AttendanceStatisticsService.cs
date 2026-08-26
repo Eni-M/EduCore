@@ -27,7 +27,10 @@ public class AttendanceStatisticsService(
             suppressor.Apply(Measures.Rate(totals.Present, totals.Records)),
             suppressor.Apply(Measures.Rate(totals.Absent, totals.Records)),
             suppressor.Apply(Measures.Rate(totals.ExcusedAbsences, totals.Records)),
-            suppressor.Apply(Measures.Average(totals.AverageBehaviorMark, totals.Records)));
+            // Sample size is the number of behaviour marks, not the number of attendance rows
+            // -- otherwise one child's behaviour mark would sail past suppression looking like
+            // a whole class's average.
+            suppressor.Apply(Measures.Average(totals.AverageBehaviorMark, totals.BehaviorMarkCount)));
     }
 
     public async Task<IReadOnlyList<AttendanceByKeyDto>> GetByClassAsync(

@@ -60,9 +60,16 @@ public class AcademicStatisticsService(
             "school average across all grades");
     }
 
-    public async Task<IReadOnlyList<GradeDistributionDto>> GetDistributionAsync(
+    public async Task<GradeDistributionResultDto> GetDistributionAsync(
         StatisticsFilter filter, CancellationToken ct) =>
-        await academic.GetDistributionAsync(await scope.ResolveAsync(filter, ct), ct);
+        Suppress(await academic.GetDistributionAsync(await scope.ResolveAsync(filter, ct), ct));
+
+    // Withheld whole rather than bucket by bucket: a partly-suppressed distribution still
+    // gives the missing bucket away by subtraction from the total.
+    private GradeDistributionResultDto Suppress(GradeDistributionResultDto distribution) =>
+        suppressor.ShouldSuppress(distribution.TotalMarks)
+            ? distribution with { Suppressed = true, Buckets = [] }
+            : distribution;
 
     // Individual-level: names students, so it is never suppressed and never public.
     public async Task<IReadOnlyList<AtRiskStudentDto>> GetAtRiskAsync(

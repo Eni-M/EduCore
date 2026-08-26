@@ -1,3 +1,4 @@
+using EduCore.Grading;
 using EduCore.Services.Statistics;
 using Microsoft.Extensions.Options;
 using Xunit;

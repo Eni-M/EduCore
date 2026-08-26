@@ -67,8 +67,15 @@ public class ClassStatisticsService(
             summary,
             subjects,
             attendanceBySubject,
-            await academic.GetDistributionAsync(ctx, ct));
+            SuppressDistribution(await academic.GetDistributionAsync(ctx, ct)));
     }
+
+    // Same rule as AcademicStatisticsService: a distribution over too few marks names the
+    // pupils in it, so it is withheld whole rather than bucket by bucket.
+    private GradeDistributionResultDto SuppressDistribution(GradeDistributionResultDto distribution) =>
+        suppressor.ShouldSuppress(distribution.TotalMarks)
+            ? distribution with { Suppressed = true, Buckets = [] }
+            : distribution;
 
     private async Task<IReadOnlyList<ClassSummaryDto>> BuildSummariesAsync(
         StatisticsContext ctx, CancellationToken ct)
@@ -96,13 +103,13 @@ public class ClassStatisticsService(
         return studentsByClass
             .Select(sc =>
             {
-                academicByClass.TryGetValue(sc.Key, out var a);
-                attendanceByClass.TryGetValue(sc.Key, out var att);
+                academicByClass.TryGetValue(sc.ClassId.ToString(), out var a);
+                attendanceByClass.TryGetValue(sc.ClassId.ToString(), out var att);
 
                 return new ClassSummaryDto(
-                    Guid.TryParse(sc.Key, out var id) ? id : Guid.Empty,
-                    sc.Label,
-                    0,
+                    sc.ClassId,
+                    sc.ClassName,
+                    sc.Grade,
                     sc.Count,
                     att is null
                         ? Measure.None()
@@ -117,7 +124,7 @@ public class ClassStatisticsService(
                     a is null
                         ? Measure.None()
                         : suppressor.Apply(Measures.Rate(a.Passed, a.GradedMarks)),
-                    atRisk.GetValueOrDefault(sc.Key));
+                    atRisk.GetValueOrDefault(sc.ClassId.ToString()));
             })
             .ToList();
     }

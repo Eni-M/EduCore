@@ -1,3 +1,4 @@
+using EduCore.Grading;
 using System.Text;
 using AutoMapper;
 using EduCore.Data;
@@ -63,12 +64,17 @@ builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 // place and every password in the system goes through the same settings.
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
-// The state's grading rules. The rules for what counts as a valid configuration live in
-// GradingOptionsValidator, not here.
+// The state's grading rules, and how small an aggregate may be before it is withheld. What
+// counts as a valid configuration lives in the two validator classes, not here.
 builder.Services.AddOptions<GradingOptions>()
     .Bind(builder.Configuration.GetSection(GradingOptions.SectionName))
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<GradingOptions>, GradingOptionsValidator>();
+
+builder.Services.AddOptions<PrivacyOptions>()
+    .Bind(builder.Configuration.GetSection(PrivacyOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<PrivacyOptions>, PrivacyOptionsValidator>();
 
 builder.Services.AddScoped<IGradingCalculator, GradingCalculator>();
 builder.Services.AddScoped<ICellSuppressor, CellSuppressor>();

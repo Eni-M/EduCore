@@ -15,6 +15,10 @@ public class StatisticsPeriodResolver(
     IAcademicYearRepository academicYears,
     IGradingPeriodRepository gradingPeriods) : IStatisticsPeriodResolver
 {
+    // The longest span a report may cover. Ten years is the widest the government reporting
+    // in spec 3 asks for, so anything beyond it is a mistake rather than a request.
+    private const int MaximumWindowYears = 10;
+
     public async Task<(DateOnly From, DateOnly To)> ResolveAsync(
         StatisticsFilter filter, Guid? schoolId, CancellationToken ct)
     {
@@ -32,7 +36,7 @@ public class StatisticsPeriodResolver(
             var period = await gradingPeriods.GetByIdAcrossSchoolsAsync(filter.GradingPeriodId.Value, ct)
                          ?? throw new NotFoundException("Grading period", filter.GradingPeriodId.Value);
 
-            EnsureSameSchool(period.SchoolId, schoolId);
+            EnsureSameSchool(period.SchoolId, schoolId, "Grading period", filter.GradingPeriodId.Value);
 
             return (period.StartDate, period.EndDate);
         }
@@ -42,18 +46,28 @@ public class StatisticsPeriodResolver(
             var year = await academicYears.GetByIdAcrossSchoolsAsync(filter.AcademicYearId.Value, ct)
                        ?? throw new NotFoundException("Academic year", filter.AcademicYearId.Value);
 
-            EnsureSameSchool(year.SchoolId, schoolId);
+            EnsureSameSchool(year.SchoolId, schoolId, "Academic year", filter.AcademicYearId.Value);
 
             return (year.StartDate, year.EndDate);
         }
 
         if (hasRawRange)
         {
-            var from = filter.From ?? DateOnly.MinValue;
             var to = filter.To ?? DateOnly.FromDateTime(DateTime.UtcNow);
+
+            // A year back, not DateOnly.MinValue. An open-ended start would make the monthly
+            // enrollment trend walk two thousand years of months, one scan per month.
+            var from = filter.From ?? to.AddYears(-1);
 
             if (from > to)
                 throw new BusinessException("The start of the range cannot be after its end.");
+
+            // Ten years is the longest report the system is meant to produce. Beyond that the
+            // request is almost certainly a mistake, and the trend endpoints would return a
+            // point per month for the whole span.
+            if (from < to.AddYears(-MaximumWindowYears))
+                throw new BusinessException(
+                    $"A statistics window cannot be longer than {MaximumWindowYears} years.");
 
             return (from, to);
         }
@@ -79,10 +93,17 @@ public class StatisticsPeriodResolver(
         return (new DateOnly(today.Year, 1, 1), new DateOnly(today.Year, 12, 31));
     }
 
-    private static void EnsureSameSchool(Guid ownerSchoolId, Guid? schoolId)
+    // Not found rather than forbidden, on purpose, and unlike the SchoolId check in
+    // StatisticsScopeResolver.
+    //
+    // There, refusing loudly is right: the caller named a school they know exists, and the
+    // attempt belongs in the audit log. Here, answering "forbidden" for a period that exists
+    // elsewhere and "not found" for one that exists nowhere would tell an admin which ids are
+    // real in other schools. Both answers are the same, so nothing is learned.
+    private static void EnsureSameSchool(Guid ownerSchoolId, Guid? schoolId, string what, Guid id)
     {
         // A SuperAdmin querying across schools (schoolId null) may reference any period.
         if (schoolId is not null && ownerSchoolId != schoolId)
-            throw new ForbiddenException("That period belongs to a different school.");
+            throw new NotFoundException(what, id);
     }
 }

@@ -1,3 +1,4 @@
+using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Aggregate;
 using EduCore.Dtos.Statistics.Individual;
 using EduCore.Services.Statistics;
@@ -10,7 +11,7 @@ public interface IAcademicStatisticsRepository
     Task<IReadOnlyList<AcademicGroup>> GetBySubjectAsync(StatisticsContext ctx, CancellationToken ct);
     Task<IReadOnlyList<AcademicGroup>> GetByClassAsync(StatisticsContext ctx, CancellationToken ct);
     Task<IReadOnlyList<AcademicGroup>> GetByGradeAsync(StatisticsContext ctx, CancellationToken ct);
-    Task<IReadOnlyList<GradeDistributionDto>> GetDistributionAsync(StatisticsContext ctx, CancellationToken ct);
+    Task<GradeDistributionResultDto> GetDistributionAsync(StatisticsContext ctx, CancellationToken ct);
     Task<IReadOnlyList<AtRiskStudentDto>> GetAtRiskAsync(StatisticsContext ctx, CancellationToken ct);
 
     // The school-wide average for a subject at a grade level -- the baseline every per-class

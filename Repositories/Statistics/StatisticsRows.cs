@@ -23,7 +23,11 @@ public record AttendanceTotals(
     int Present,
     int Absent,
     int ExcusedAbsences,
-    double? AverageBehaviorMark);
+    double? AverageBehaviorMark,
+    // Behaviour marks are optional, so far fewer rows carry one than exist in Records. This is
+    // the count the average was actually taken over, and using anything else as its sample
+    // size would let a single child's behaviour mark pass through suppression untouched.
+    int BehaviorMarkCount);
 
 public record AttendanceGroup(
     string Key,
@@ -33,3 +37,7 @@ public record AttendanceGroup(
     int ExcusedAbsences);
 
 public record CountRow(string Key, string Label, int Count);
+
+// A per-class count. Separate from CountRow because a class breakdown needs the real id and
+// grade -- stringifying the id and parsing it back on the other side loses both.
+public record ClassCountRow(Guid ClassId, string ClassName, int Grade, int Count);

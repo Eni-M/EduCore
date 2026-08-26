@@ -1,3 +1,4 @@
+using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Individual;
 using EduCore.Services.Statistics;
 

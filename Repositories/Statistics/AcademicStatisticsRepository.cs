@@ -1,3 +1,5 @@
+using EduCore.Dtos.Statistics;
+using EduCore.Grading;
 using EduCore.Data;
 using EduCore.Dtos.Statistics.Aggregate;
 using EduCore.Dtos.Statistics.Individual;
@@ -5,7 +7,6 @@ using EduCore.Repositories.Interfaces;
 using EduCore.Repositories.Statistics.Interfaces;
 using EduCore.Services.Statistics;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace EduCore.Repositories.Statistics;
 
@@ -15,9 +16,8 @@ namespace EduCore.Repositories.Statistics;
 public class AcademicStatisticsRepository(
     AppDbContext context,
     IMarkRepository marks,
-    IOptions<GradingOptions> options) : StatisticsRepositoryBase(context), IAcademicStatisticsRepository
+    IGradingCalculator grading) : StatisticsRepositoryBase(context), IAcademicStatisticsRepository
 {
-    private readonly GradingOptions _grading = options.Value;
 
     private IQueryable<ValuedMark> ValuedMarks(StatisticsContext ctx) => marks.Value(MarksInWindow(ctx));
 
@@ -36,16 +36,16 @@ public class AcademicStatisticsRepository(
             graded,
             incomplete,
             await valued.AverageAsync(v => v.Value, ct),
-            await valued.CountAsync(v => v.Value >= _grading.PassValue, ct),
-            await valued.CountAsync(v => v.Value < _grading.PassValue, ct),
+            await valued.CountAsync(v => v.Value >= grading.PassValue, ct),
+            await valued.CountAsync(v => v.Value < grading.PassValue, ct),
             await valued.CountAsync(
-                v => v.Value >= _grading.AtRiskLowerValue && v.Value < _grading.AtRiskUpperValue, ct));
+                v => v.Value >= grading.AtRiskLowerValue && v.Value < grading.AtRiskUpperValue, ct));
     }
 
     public async Task<IReadOnlyList<AcademicGroup>> GetBySubjectAsync(
         StatisticsContext ctx, CancellationToken ct)
     {
-        var pass = _grading.PassValue;
+        var pass = grading.PassValue;
 
         return await (from v in ValuedMarks(ctx)
                       join s in Scope(_context.Subjects, ctx) on v.SubjectId equals s.Id
@@ -64,7 +64,7 @@ public class AcademicStatisticsRepository(
     public async Task<IReadOnlyList<AcademicGroup>> GetByClassAsync(
         StatisticsContext ctx, CancellationToken ct)
     {
-        var pass = _grading.PassValue;
+        var pass = grading.PassValue;
 
         return await (from v in ValuedMarks(ctx)
                       join c in ClassesInScope(ctx) on v.ClassId equals c.Id
@@ -83,7 +83,7 @@ public class AcademicStatisticsRepository(
     public async Task<IReadOnlyList<AcademicGroup>> GetByGradeAsync(
         StatisticsContext ctx, CancellationToken ct)
     {
-        var pass = _grading.PassValue;
+        var pass = grading.PassValue;
 
         var rows = await (from v in ValuedMarks(ctx)
                           join c in ClassesInScope(ctx) on v.ClassId equals c.Id
@@ -110,7 +110,7 @@ public class AcademicStatisticsRepository(
     public async Task<IReadOnlyList<AcademicGroup>> GetSubjectGradeBaselinesAsync(
         StatisticsContext ctx, CancellationToken ct)
     {
-        var pass = _grading.PassValue;
+        var pass = grading.PassValue;
 
         var rows = await (from v in ValuedMarks(ctx)
                           join c in ClassesInScope(ctx) on v.ClassId equals c.Id
@@ -142,7 +142,9 @@ public class AcademicStatisticsRepository(
     // scanning the list.
     public static string BaselineKey(Guid subjectId, int grade) => subjectId + ":" + grade;
 
-    public async Task<IReadOnlyList<GradeDistributionDto>> GetDistributionAsync(
+    // Returns the raw buckets. Whether they are safe to show is the service's call, since it
+    // is the one holding the suppressor.
+    public async Task<GradeDistributionResultDto> GetDistributionAsync(
         StatisticsContext ctx, CancellationToken ct)
     {
         var values = await ValuedMarks(ctx).Select(v => v.Value).ToListAsync(ct);
@@ -154,7 +156,7 @@ public class AcademicStatisticsRepository(
             .GroupBy(value => (int)Math.Round(value, MidpointRounding.AwayFromZero))
             .ToDictionary(g => g.Key, g => g.Count());
 
-        return Enumerable.Range(1, 5)
+        var buckets = Enumerable.Range(1, 5)
             .Select(mark =>
             {
                 var count = counts.GetValueOrDefault(mark);
@@ -162,13 +164,15 @@ public class AcademicStatisticsRepository(
                     mark, count, total == 0 ? 0 : Math.Round(count * 100.0 / total, 2));
             })
             .ToList();
+
+        return new GradeDistributionResultDto(total, false, buckets);
     }
 
     public async Task<IReadOnlyList<AtRiskStudentDto>> GetAtRiskAsync(
         StatisticsContext ctx, CancellationToken ct)
     {
-        var pass = _grading.PassValue;
-        var atRiskUpper = _grading.AtRiskUpperValue;
+        var pass = grading.PassValue;
+        var atRiskUpper = grading.AtRiskUpperValue;
 
         // Grouped per student across their subjects, so "at risk" reflects the whole record
         // rather than a single weak subject.
@@ -187,6 +191,10 @@ public class AcademicStatisticsRepository(
                               c.Grade
                           }
                           into g
+                          // Same rule as IGradingCalculator.IsStudentAtRisk, written as the
+                          // threshold comparison it is defined by -- a method call here would
+                          // not translate to SQL. Both read AtRiskUpperValue, and a test pins
+                          // them together.
                           where g.Average() < atRiskUpper
                           select new
                           {

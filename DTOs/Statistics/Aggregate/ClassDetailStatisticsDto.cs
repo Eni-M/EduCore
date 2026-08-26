@@ -4,4 +4,4 @@ public record ClassDetailStatisticsDto(
     ClassSummaryDto Summary,
     IReadOnlyList<AcademicByKeyDto> Subjects,
     IReadOnlyList<AttendanceByKeyDto> AttendanceBySubject,
-    IReadOnlyList<GradeDistributionDto> GradeDistribution);
+    GradeDistributionResultDto GradeDistribution);

@@ -21,6 +21,11 @@ public class MappingProfile : Profile
     // An inbound DTO may only set the fields it actually carries. Anything else on the entity
     // -- Id, SchoolId, row version, navigations -- is ignored by name, so adding a property to
     // a DTO can never quietly make a new column client-writable.
+    //
+    // A property with a non-public setter is ignored too, even when a DTO field shares its
+    // name. Reflection's CanWrite is true for a private setter, so without this the mapper
+    // would write straight past a domain method like Attendance.Record and break the very
+    // invariant that method exists to guarantee.
     private IMappingExpression<TSource, TDestination> CreateWriteMap<TSource, TDestination>()
     {
         var sourceMembers = typeof(TSource)
@@ -31,7 +36,9 @@ public class MappingProfile : Profile
         var map = CreateMap<TSource, TDestination>();
 
         foreach (var member in typeof(TDestination).GetProperties()
-                     .Where(p => p.CanWrite && !sourceMembers.Contains(p.Name)))
+                     .Where(p => p.CanWrite
+                                 && (!sourceMembers.Contains(p.Name)
+                                     || p.SetMethod is not { IsPublic: true })))
             map.ForMember(member.Name, o => o.Ignore());
 
         return map;
@@ -130,10 +137,10 @@ public class MappingProfile : Profile
     {
         CreateWriteMap<Dtos.DiaryEntry.DiaryEntryCreateDto, DiaryEntry>();
         CreateWriteMap<Dtos.DiaryEntry.DiaryEntryEditDto, DiaryEntry>();
-        // Presence is set through Attendance.Record, not by the mapper -- see AttendanceService.
-        CreateWriteMap<Dtos.Attendance.AttendanceEditDto, Attendance>()
-            .ForMember(a => a.IsPresent, o => o.Ignore())
-            .ForMember(a => a.IsExcused, o => o.Ignore());
+        // IsPresent and IsExcused need no ForMember(Ignore) here: they have private setters, so
+        // CreateWriteMap skips them on its own. They are set through Attendance.Record, which
+        // is what keeps "excused presence" from ever being stored. See AttendanceService.
+        CreateWriteMap<Dtos.Attendance.AttendanceEditDto, Attendance>();
         CreateWriteMap<Dtos.Mark.MarkUpsertDto, Mark>();
     }
 }

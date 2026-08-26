@@ -1,3 +1,4 @@
+using EduCore.Dtos.Statistics;
 using EduCore.Services.Statistics;
 
 namespace EduCore.Repositories.Statistics.Interfaces;

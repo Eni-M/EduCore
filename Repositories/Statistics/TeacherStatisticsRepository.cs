@@ -1,19 +1,19 @@
+using EduCore.Dtos.Statistics;
+using EduCore.Grading;
 using EduCore.Data;
 using EduCore.Dtos.Statistics.Individual;
 using EduCore.Repositories.Interfaces;
 using EduCore.Repositories.Statistics.Interfaces;
 using EduCore.Services.Statistics;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace EduCore.Repositories.Statistics;
 
 public class TeacherStatisticsRepository(
     AppDbContext context,
     IMarkRepository marks,
-    IOptions<GradingOptions> options) : StatisticsRepositoryBase(context), ITeacherStatisticsRepository
+    IGradingCalculator grading) : StatisticsRepositoryBase(context), ITeacherStatisticsRepository
 {
-    private readonly GradingOptions _grading = options.Value;
 
     private IQueryable<Models.Teacher> TeachersInScope(StatisticsContext ctx)
     {
@@ -125,7 +125,7 @@ public class TeacherStatisticsRepository(
         string SubjectName, int GradedMarks, double? Average, int Passed)>> GetPerformanceAsync(
         StatisticsContext ctx, Guid teacherId, CancellationToken ct)
     {
-        var pass = _grading.PassValue;
+        var pass = grading.PassValue;
 
         // The formula itself lives in MarkRepository.Value -- this only groups what it gives.
         var rows = await (from v in marks.Value(MarksInWindow(ctx).Where(m => m.TeacherId == teacherId))

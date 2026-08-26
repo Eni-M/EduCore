@@ -1,4 +1,4 @@
-namespace EduCore.Services.Statistics;
+namespace EduCore.Dtos.Statistics;
 
 // A StatisticsFilter after it has been checked and resolved: the caller's access has been
 // verified and the period has become a concrete calendar window. Services receive this, never

@@ -49,7 +49,5 @@ public class SchoolService(ISchoolRepository schools, IMapper mapper) : ISchoolS
         return mapper.Map<SchoolListDto>(school);
     }
 
-    public async Task<IEnumerable<SchoolStatisticsDto>> GetStatisticsAsync(CancellationToken ct) =>
-    await schools.GetStatisticsAsync(ct);
 
 }

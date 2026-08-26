@@ -11,10 +11,11 @@ namespace EduCore.Services.Statistics;
 // question about the whole network, and a single school answering it about itself would be
 // meaningless. Guarded here as well as at the endpoint, so the rule holds even if the route
 // is later remapped.
+// Every figure here is an exact headcount, or a share sitting beside the counts it was
+// derived from, so there is nothing for CellSuppressor to protect -- see its header.
 public class DemographicsStatisticsService(
     IDemographicsStatisticsRepository demographics,
-    ICurrentUser currentUser,
-    ICellSuppressor suppressor) : IDemographicsStatisticsService
+    ICurrentUser currentUser) : IDemographicsStatisticsService
 {
     public async Task<DemographicsOverviewDto> GetOverviewAsync(CancellationToken ct)
     {
@@ -32,7 +33,7 @@ public class DemographicsStatisticsService(
                 c.Students,
                 c.Teachers,
                 c.Classes,
-                suppressor.Apply(Measures.Rate(c.Students, totalStudents))))
+                Measures.Rate(c.Students, totalStudents)))
             .ToList();
 
         return new DemographicsOverviewDto(
@@ -62,7 +63,7 @@ public class DemographicsStatisticsService(
                 z.Zone,
                 z.Schools,
                 z.Students,
-                suppressor.Apply(Measures.Rate(z.Students, cityTotals.GetValueOrDefault(z.City)))))
+                Measures.Rate(z.Students, cityTotals.GetValueOrDefault(z.City))))
             .ToList();
     }
 

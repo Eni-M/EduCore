@@ -1,3 +1,4 @@
+using EduCore.Grading;
 using EduCore.Data;
 using EduCore.Dtos.Mark;
 using EduCore.Models;
@@ -58,12 +59,14 @@ public class MarkRepository(
     //
     // The value is deliberately left unrounded. Averages must be taken over unrounded values,
     // because averaging grades that have already been rounded biases the result.
-    public IQueryable<ValuedMark> Value(IQueryable<Mark> marks)
-    {
-        var firstWeight = _weights.FirstMarkWeight;
-        var secondWeight = _weights.SecondMarkWeight;
+    public IQueryable<ValuedMark> Value(IQueryable<Mark> marks) => Value(marks, _weights);
 
-        return marks
+    // Static and taking its weights as an argument so a test can run this exact query over an
+    // in-memory list. That matters: if the test re-typed the formula instead, it would only be
+    // comparing one copy of the arithmetic against another and would pass even after the real
+    // query drifted. See GradingRuleAgreementTests.
+    public static IQueryable<ValuedMark> Value(IQueryable<Mark> marks, GradingOptions weights) =>
+        marks
             .Where(m => m.FirstMark != null && m.SecondMark != null)
             .Select(m => new ValuedMark(
                 m.Id,
@@ -72,8 +75,8 @@ public class MarkRepository(
                 m.SubjectId,
                 m.TeacherId,
                 m.GradingPeriodId,
-                m.FirstMark!.Value * firstWeight + m.SecondMark!.Value * secondWeight));
-    }
+                m.FirstMark!.Value * weights.FirstMarkWeight
+                + m.SecondMark!.Value * weights.SecondMarkWeight));
 
     private static IQueryable<Mark> Filter(IQueryable<Mark> marks, Guid? subjectId, Guid? gradingPeriodId)
     {

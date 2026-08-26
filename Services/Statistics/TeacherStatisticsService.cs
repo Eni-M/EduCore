@@ -24,14 +24,18 @@ public class TeacherStatisticsService(
         var studentTotals = await students.GetTotalsAsync(ctx, ct);
         var workload = await teachers.GetWorkloadAsync(ctx, ct);
 
+        // Suppressed like any other aggregate: at a school with a handful of teachers -- or
+        // with a teacherId filter applied -- these describe one identifiable person.
         return new TeacherStatisticsDto(
             teacherCount,
             teacherCount == 0
                 ? Measure.None()
-                : Measures.Average((double)studentTotals.Active / teacherCount, teacherCount),
+                : suppressor.Apply(
+                    Measures.Average((double)studentTotals.Active / teacherCount, teacherCount)),
             workload.Count == 0
                 ? Measure.None()
-                : Measures.Average(workload.Average(w => (double)w.Classes), workload.Count));
+                : suppressor.Apply(
+                    Measures.Average(workload.Average(w => (double)w.Classes), workload.Count)));
     }
 
     public async Task<IReadOnlyList<TeacherWorkloadDto>> GetWorkloadAsync(
@@ -49,6 +53,8 @@ public class TeacherStatisticsService(
     {
         var ctx = await scope.ResolveAsync(filter, ct);
 
+        // Confirms the teacher exists and is inside the caller's school before anything else
+        // is queried -- GetTeacherNameAsync is scoped, so a foreign teacher reads as missing.
         _ = await teachers.GetTeacherNameAsync(ctx, teacherId, ct)
             ?? throw new NotFoundException("Teacher", teacherId);
 

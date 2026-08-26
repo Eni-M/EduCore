@@ -29,14 +29,4 @@ public class GradingPeriodRepository(AppDbContext context)
             .AsNoTracking()
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(g => g.Id == gradingPeriodId, ct);
-
-    public async Task<IEnumerable<GradingPeriod>> GetByAcademicYearAcrossSchoolsAsync(
-        Guid academicYearId,
-        CancellationToken ct) =>
-        await _context.GradingPeriods
-            .AsNoTracking()
-            .IgnoreQueryFilters()
-            .Where(g => g.AcademicYearId == academicYearId)
-            .OrderBy(g => g.StartDate)
-            .ToListAsync(ct);
 }

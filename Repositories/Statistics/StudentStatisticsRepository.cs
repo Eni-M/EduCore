@@ -1,3 +1,4 @@
+using EduCore.Dtos.Statistics;
 using EduCore.Data;
 using EduCore.Dtos.Statistics.Aggregate;
 using EduCore.Enums;
@@ -73,17 +74,18 @@ public class StudentStatisticsRepository(AppDbContext context)
             .ToList();
     }
 
-    public async Task<IReadOnlyList<CountRow>> GetByClassAsync(
+    public async Task<IReadOnlyList<ClassCountRow>> GetByClassAsync(
         StatisticsContext ctx, CancellationToken ct) =>
         await (from e in EnrollmentsInWindow(ctx)
                where e.LeftAt == null
                join c in ClassesInScope(ctx) on e.ClassId equals c.Id
-               group e by new { c.Id, c.Name }
+               group e by new { c.Id, c.Name, c.Grade }
                into g
                orderby g.Key.Name
-               select new CountRow(
-                   g.Key.Id.ToString(),
+               select new ClassCountRow(
+                   g.Key.Id,
                    g.Key.Name,
+                   g.Key.Grade,
                    g.Select(x => x.StudentId).Distinct().Count()))
             .ToListAsync(ct);
 

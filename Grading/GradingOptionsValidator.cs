@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 
-namespace EduCore.Services.Statistics;
+namespace EduCore.Grading;
 
 // Keeps the grading rules' own validity next to the grading rules, instead of as a fluent
 // chain buried in Program.cs. Runs at startup (ValidateOnStart), so a misconfigured weighting
@@ -21,9 +21,6 @@ public class GradingOptionsValidator : IValidateOptions<GradingOptions>
 
         if (options.AtRiskMark is < 1 or > 5)
             failures.Add($"AtRiskMark ({options.AtRiskMark}) must be between 1 and 5.");
-
-        if (options.MinimumCellSize < 1)
-            failures.Add($"MinimumCellSize ({options.MinimumCellSize}) must be at least 1.");
 
         return failures.Count > 0
             ? ValidateOptionsResult.Fail(failures)

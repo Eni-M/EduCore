@@ -1,4 +1,6 @@
-using EduCore.Services.Statistics;
+using EduCore.Grading;
+using EduCore.Models;
+using EduCore.Repositories;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -6,21 +8,21 @@ namespace EduCore.Tests;
 
 // The most valuable test in the suite.
 //
-// The grading rule exists in two forms: GradingCalculator in C#, and a LINQ query in
+// The grading rule exists in two forms: GradingCalculator in C#, and the query in
 // MarkRepository.Value that Postgres runs, so aggregation does not pull every mark into
 // memory. If those two drift, the database and the application disagree about a student's
 // grade and NOTHING fails -- the numbers simply become wrong.
 //
-// The query cannot call GradingCalculator (a method call does not translate to SQL), so it
-// relies on one identity instead: rounding half-away-from-zero means a rounded mark reaches
-// PassMark exactly when the unrounded value reaches GradingOptions.PassValue. These tests pin
-// that identity across every possible pair of marks.
+// This test runs the REAL query. MarkRepository.Value is executed here over an in-memory list,
+// which evaluates the same expression tree EF would translate to SQL. Re-typing the formula
+// into the test instead would compare one copy of the arithmetic against another and would
+// keep passing after the real query changed.
 public class GradingRuleAgreementTests
 {
     private static readonly GradingOptions Options = new();
 
-    private static GradingCalculator Calculator() =>
-        new(Microsoft.Extensions.Options.Options.Create(Options));
+    private static GradingCalculator Calculator(GradingOptions? options = null) =>
+        new(Microsoft.Extensions.Options.Options.Create(options ?? Options));
 
     public static TheoryData<int, int> AllMarkPairs()
     {
@@ -33,51 +35,86 @@ public class GradingRuleAgreementTests
         return data;
     }
 
-    // What the repository computes in SQL.
-    private static double RepositoryWeightedValue(int first, int second) =>
-        first * Options.FirstMarkWeight + second * Options.SecondMarkWeight;
-
-    [Theory]
-    [MemberData(nameof(AllMarkPairs))]
-    public void RepositoryWeighting_MatchesCalculatorWeighting(int first, int second) =>
-        Assert.Equal(
-            Calculator().WeightedValue(first, second)!.Value,
-            RepositoryWeightedValue(first, second),
-            10);
-
-    // The identity the repository's pass/fail counting depends on.
-    [Theory]
-    [MemberData(nameof(AllMarkPairs))]
-    public void RepositoryPassThreshold_AgreesWithRoundedClassification(int first, int second)
+    // Runs the production query rather than a copy of it.
+    private static double QueryValue(int? first, int? second, GradingOptions? options = null)
     {
-        var calculator = Calculator();
+        var mark = new Mark { Id = Guid.NewGuid(), FirstMark = first, SecondMark = second };
 
-        var passesByRoundedMark = calculator.IsPass(calculator.FinalMark(first, second)!.Value);
-        var passesByThreshold = RepositoryWeightedValue(first, second) >= Options.PassValue;
-
-        Assert.Equal(passesByRoundedMark, passesByThreshold);
+        return MarkRepository
+            .Value(new[] { mark }.AsQueryable(), options ?? Options)
+            .Single()
+            .Value;
     }
 
     [Theory]
     [MemberData(nameof(AllMarkPairs))]
-    public void RepositoryAtRiskBand_AgreesWithRoundedClassification(int first, int second)
+    public void TheQuery_ComputesTheSameValueAsTheCalculator(int first, int second) =>
+        Assert.Equal(Calculator().WeightedValue(first, second)!.Value, QueryValue(first, second), 10);
+
+    // The query must drop half-graded marks, exactly as FinalMark returns null for them --
+    // otherwise a missing second mark would silently count as a zero and drag averages down.
+    [Theory]
+    [InlineData(4, null)]
+    [InlineData(null, 4)]
+    [InlineData(null, null)]
+    public void TheQuery_SkipsMarksTheCalculatorCannotGrade(int? first, int? second)
     {
-        var calculator = Calculator();
-        var value = RepositoryWeightedValue(first, second);
+        var mark = new Mark { Id = Guid.NewGuid(), FirstMark = first, SecondMark = second };
 
-        var atRiskByRoundedMark = calculator.IsAtRisk(calculator.FinalMark(first, second)!.Value);
-        var atRiskByBand = value >= Options.AtRiskLowerValue && value < Options.AtRiskUpperValue;
-
-        Assert.Equal(atRiskByRoundedMark, atRiskByBand);
+        Assert.Empty(MarkRepository.Value(new[] { mark }.AsQueryable(), Options));
+        Assert.Null(Calculator().FinalMark(first, second));
     }
 
-    // The identity has to survive the weights being reconfigured, since that is the whole
-    // reason they live in configuration.
+    // The identity the aggregation's pass/fail counting depends on: comparing the unrounded
+    // value against PassValue must give the same answer as rounding and comparing to PassMark.
+    [Theory]
+    [MemberData(nameof(AllMarkPairs))]
+    public void PassValueThreshold_AgreesWithRoundedClassification(int first, int second)
+    {
+        var calculator = Calculator();
+
+        var byRoundedMark = calculator.IsPass(calculator.FinalMark(first, second)!.Value);
+        var byThreshold = QueryValue(first, second) >= calculator.PassValue;
+
+        Assert.Equal(byRoundedMark, byThreshold);
+    }
+
+    [Theory]
+    [MemberData(nameof(AllMarkPairs))]
+    public void AtRiskBand_AgreesWithRoundedClassification(int first, int second)
+    {
+        var calculator = Calculator();
+        var value = QueryValue(first, second);
+
+        var byRoundedMark = calculator.IsAtRisk(calculator.FinalMark(first, second)!.Value);
+        var byBand = value >= calculator.AtRiskLowerValue && value < calculator.AtRiskUpperValue;
+
+        Assert.Equal(byRoundedMark, byBand);
+    }
+
+    // GetAtRiskAsync cannot call IsStudentAtRisk inside its query -- a method call does not
+    // translate to SQL -- so it compares against AtRiskUpperValue directly. These must mean the
+    // same thing, or the at-risk list and the rule disagree about who is at risk.
+    [Theory]
+    [InlineData(1.0, true)]
+    [InlineData(2.49, true)]
+    [InlineData(2.5, false)]
+    [InlineData(4.0, false)]
+    public void StudentAtRiskRule_MatchesTheThresholdTheQueryUses(double average, bool expected)
+    {
+        var calculator = Calculator();
+
+        Assert.Equal(expected, calculator.IsStudentAtRisk(average));
+        Assert.Equal(expected, average < calculator.AtRiskUpperValue);
+    }
+
+    // All of the above has to survive the weights being reconfigured, since that is the whole
+    // reason they are configuration in the first place.
     [Theory]
     [InlineData(0.50, 0.50, 3)]
     [InlineData(0.30, 0.70, 2)]
     [InlineData(0.40, 0.60, 4)]
-    public void ThresholdIdentity_HoldsForOtherConfigurations(
+    public void EverythingHolds_ForOtherConfigurations(
         double firstWeight, double secondWeight, int passMark)
     {
         var options = new GradingOptions
@@ -88,16 +125,17 @@ public class GradingRuleAgreementTests
             AtRiskMark = passMark
         };
 
-        var calculator = new GradingCalculator(Microsoft.Extensions.Options.Options.Create(options));
+        var calculator = Calculator(options);
 
         foreach (var first in Enumerable.Range(1, 5))
         foreach (var second in Enumerable.Range(1, 5))
         {
-            var value = first * firstWeight + second * secondWeight;
+            var value = QueryValue(first, second, options);
 
+            Assert.Equal(calculator.WeightedValue(first, second)!.Value, value, 10);
             Assert.Equal(
                 calculator.IsPass(calculator.FinalMark(first, second)!.Value),
-                value >= options.PassValue);
+                value >= calculator.PassValue);
         }
     }
 }

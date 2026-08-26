@@ -1,3 +1,4 @@
+using EduCore.Dtos.Statistics;
 using EduCore.Data;
 using EduCore.Dtos.Statistics.Individual;
 using EduCore.Repositories.Statistics.Interfaces;
@@ -25,18 +26,20 @@ public class AttendanceStatisticsRepository(AppDbContext context)
         var records = await attendance.CountAsync(ct);
 
         if (records == 0)
-            return new AttendanceTotals(0, 0, 0, 0, null);
+            return new AttendanceTotals(0, 0, 0, 0, null, 0);
 
         var behaviorMarks = attendance.Where(a => a.BehaviorMark != null);
+        var behaviorMarkCount = await behaviorMarks.CountAsync(ct);
 
         return new AttendanceTotals(
             records,
             await attendance.CountAsync(a => a.IsPresent, ct),
             await attendance.CountAsync(a => !a.IsPresent, ct),
             await attendance.CountAsync(a => !a.IsPresent && a.IsExcused, ct),
-            await behaviorMarks.AnyAsync(ct)
-                ? await behaviorMarks.AverageAsync(a => a.BehaviorMark!.Value, ct)
-                : null);
+            behaviorMarkCount == 0
+                ? null
+                : await behaviorMarks.AverageAsync(a => a.BehaviorMark!.Value, ct),
+            behaviorMarkCount);
     }
 
     public async Task<IReadOnlyList<AttendanceGroup>> GetByClassAsync(

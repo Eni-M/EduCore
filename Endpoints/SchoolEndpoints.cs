@@ -17,7 +17,6 @@ public static class SchoolEndpoints
         schools.MapGet("/", async (ISchoolService service, CancellationToken ct) =>
             Results.Ok(await service.GetAllAsync(ct)));
 
-        schools.MapGet("/statistics", async(ISchoolService service, CancellationToken ct) => Results.Ok(await service.GetStatisticsAsync(ct)));
     
 
         schools.MapGet("/{schoolId:guid}", async (Guid schoolId, ISchoolService service, CancellationToken ct) =>

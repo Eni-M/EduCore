@@ -5,10 +5,12 @@ using EduCore.Services.Statistics.Interfaces;
 
 namespace EduCore.Services.Statistics;
 
+// No ICellSuppressor here, deliberately. Everything this service returns is either an exact
+// headcount or a figure sitting next to the raw count it was derived from, so suppressing the
+// percentage would hide nothing that is not already on the same response.
 public class EnrollmentStatisticsService(
     IEnrollmentStatisticsRepository enrollments,
-    IStatisticsScopeResolver scope,
-    ICellSuppressor suppressor) : IEnrollmentStatisticsService
+    IStatisticsScopeResolver scope) : IEnrollmentStatisticsService
 {
     public async Task<EnrollmentStatisticsDto> GetSummaryAsync(
         StatisticsFilter filter, CancellationToken ct)

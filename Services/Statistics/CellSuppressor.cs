@@ -10,14 +10,30 @@ namespace EduCore.Services.Statistics;
 // runs in the aggregation layer rather than at the endpoints, so it holds no matter which
 // slice of the statistics is exposed later -- retrofitting it once numbers are already public
 // is not a fix, because they are already out.
-public class CellSuppressor(IOptions<GradingOptions> options) : ICellSuppressor
+//
+// What it does and does not cover, deliberately:
+//
+//   Suppressed -- averages and rates DERIVED from a small group. These are the disclosive
+//   ones: with one student in the bucket, the "average" is that student's own value.
+//
+//   Not suppressed -- exact headcounts ("grade 12: 3 students"). An admin genuinely needs
+//   these, they reveal no individual's marks or attendance, and hiding a percentage while
+//   publishing the numerator and denominator beside it would protect nothing anyway. Where a
+//   service skips this class for that reason, it says so in a comment.
+//
+// The line therefore is: a count of people is fine, a measurement of them is not.
+public class CellSuppressor(IOptions<PrivacyOptions> options) : ICellSuppressor
 {
     private readonly int _minimum = options.Value.MinimumCellSize;
 
+    // A sample of zero is "no data", which is not the same thing as a figure withheld to
+    // protect someone.
+    public bool ShouldSuppress(int sampleSize) => sampleSize > 0 && sampleSize < _minimum;
+
     public Measure Apply(Measure measure) =>
-        // A sample of zero is "no data", which is not the same thing as a figure withheld to
-        // protect someone -- callers may want to say so differently.
-        measure.SampleSize > 0 && measure.SampleSize < _minimum
+        ShouldSuppress(measure.SampleSize)
+            // Baseline and Previous go too: either would leak the same information the value
+            // was hidden to protect.
             ? measure with { Value = null, Baseline = null, Previous = null, Suppressed = true }
             : measure;
 

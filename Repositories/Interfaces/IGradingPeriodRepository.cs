@@ -12,7 +12,4 @@ public interface IGradingPeriodRepository : IRepository<GradingPeriod>
     // otherwise match nothing. Deliberately narrow: it returns the row so the caller can check
     // which school owns it, and StatisticsPeriodResolver is the only caller that does.
     Task<GradingPeriod?> GetByIdAcrossSchoolsAsync(Guid gradingPeriodId, CancellationToken ct);
-
-    Task<IEnumerable<GradingPeriod>> GetByAcademicYearAcrossSchoolsAsync(
-        Guid academicYearId, CancellationToken ct);
 }

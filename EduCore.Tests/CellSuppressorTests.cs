@@ -1,3 +1,4 @@
+using EduCore.Grading;
 using EduCore.Dtos.Statistics;
 using EduCore.Services.Statistics;
 using Microsoft.Extensions.Options;
@@ -11,7 +12,7 @@ namespace EduCore.Tests;
 public class CellSuppressorTests
 {
     private static CellSuppressor Suppressor(int minimum = 5) =>
-        new(Options.Create(new GradingOptions { MinimumCellSize = minimum }));
+        new(Options.Create(new PrivacyOptions { MinimumCellSize = minimum }));
 
     [Theory]
     [InlineData(1)]
@@ -60,6 +61,22 @@ public class CellSuppressorTests
 
         // The label survives, so the frontend can still explain what is missing and why.
         Assert.Equal("school average", result.BaselineLabel);
+    }
+
+    // ShouldSuppress is what results that are not a single Measure -- a grade distribution --
+    // are withheld by, so it has to agree with Apply exactly.
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, true)]
+    [InlineData(4, true)]
+    [InlineData(5, false)]
+    [InlineData(99, false)]
+    public void ShouldSuppress_MatchesApply(int sampleSize, bool expected)
+    {
+        var suppressor = Suppressor();
+
+        Assert.Equal(expected, suppressor.ShouldSuppress(sampleSize));
+        Assert.Equal(expected, suppressor.Apply(Measure.Of(3.5, sampleSize)).Suppressed);
     }
 
     [Fact]
