@@ -9,7 +9,8 @@ public class MarkUpsertDtoValidator : AbstractValidator<MarkUpsertDto>
     {
         RuleFor(x => x.EnrollmentId).NotEmpty();
         RuleFor(x => x.SubjectId).NotEmpty();
-        RuleFor(x => x.GradingPeriodId).NotEmpty();
+        // Optional, but an explicitly supplied empty guid is a caller bug, not "derive it".
+        RuleFor(x => x.GradingPeriodId).NotEmpty().When(x => x.GradingPeriodId.HasValue);
 
         // Either may be absent while the period is still running, but a supplied mark has to
         // be on the 1-5 scale.

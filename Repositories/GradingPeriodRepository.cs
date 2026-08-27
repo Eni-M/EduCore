@@ -19,6 +19,16 @@ public class GradingPeriodRepository(AppDbContext context)
                select new GradingPeriodListDto(g.Id, g.AcademicYearId, y.Name, g.Name, g.StartDate, g.EndDate))
             .ToListAsync(ct);
 
+    public async Task<GradingPeriod?> GetContainingAsync(
+        Guid academicYearId, DateOnly date, CancellationToken ct) =>
+        await _context.GradingPeriods
+            .AsNoTracking()
+            .Where(g => g.AcademicYearId == academicYearId
+                        && g.StartDate <= date
+                        && date <= g.EndDate)
+            .OrderBy(g => g.StartDate)
+            .FirstOrDefaultAsync(ct);
+
     public async Task<bool> NameExistsInYearAsync(Guid academicYearId, string name, CancellationToken ct) =>
         await _context.GradingPeriods.AnyAsync(
             g => g.AcademicYearId == academicYearId && g.Name.ToLower() == name.ToLower(),

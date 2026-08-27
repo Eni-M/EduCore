@@ -56,8 +56,18 @@ public class MarkService(
         if (currentUser.IsTeacher && assignment.TeacherId != currentUser.TeacherId)
             throw new ForbiddenException("Only the teacher assigned to this class-subject can give marks for it.");
 
-        var gradingPeriod = await gradingPeriods.GetByIdAsync(dto.GradingPeriodId, ct)
-                            ?? throw new NotFoundException("Grading period", dto.GradingPeriodId);
+        // The class fixes the academic year, so an omitted term means "the one we are in
+        // today". Resolving it here rather than asking the caller keeps a teacher from
+        // picking a term belonging to a different year -- a mistake the check below can only
+        // catch after the fact.
+        var gradingPeriod = dto.GradingPeriodId is { } explicitPeriodId
+            ? await gradingPeriods.GetByIdAsync(explicitPeriodId, ct)
+              ?? throw new NotFoundException("Grading period", explicitPeriodId)
+            : await gradingPeriods.GetContainingAsync(
+                  @class.AcademicYearId, DateOnly.FromDateTime(DateTime.UtcNow), ct)
+              ?? throw new BusinessException(
+                  "Today does not fall inside any term of this class's academic year. "
+                  + "Name the term explicitly, or add one covering today.");
 
         if (gradingPeriod.AcademicYearId != @class.AcademicYearId)
             throw new BusinessException("That grading period belongs to a different academic year than this class.");
