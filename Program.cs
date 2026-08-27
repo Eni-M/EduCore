@@ -172,6 +172,20 @@ if (app.Environment.IsDevelopment())
 {
     app.Services.GetRequiredService<IMapper>().ConfigurationProvider.AssertConfigurationIsValid();
     app.MapOpenApi();
+
+    // Bring the database up to the current model on start-up.
+    //
+    // Development only, and deliberately so: applying migrations automatically is unsafe
+    // where more than one instance can start at once, or where a migration is destructive
+    // and wants a human looking at it. Deployments run "dotnet ef database update" as their
+    // own step.
+    //
+    // The failure this prevents is a quiet one. A pulled branch that adds a column leaves
+    // the model and the database disagreeing, and EF then names the new column in every
+    // query it writes -- so an untouched screen starts answering 500 with "An unexpected
+    // error occurred", and nothing points at the migration as the cause.
+    await using (var scope = app.Services.CreateAsyncScope())
+        await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
 }
 
 await SuperAdminSeeder.SeedAsync(app.Services, app.Configuration);
