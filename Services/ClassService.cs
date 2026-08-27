@@ -18,8 +18,21 @@ public class ClassService(
     ICurrentUser currentUser,
     IMapper mapper) : IClassService
 {
-    public async Task<IEnumerable<ClassListDto>> GetAllAsync(Guid? academicYearId, CancellationToken ct) =>
-        await classes.GetAllAsync(academicYearId, ct);
+    // The endpoint policy admits an administrator and a teacher alike, so the narrowing has
+    // to happen here: an administrator manages the whole school, while a teacher may only see
+    // the classes they actually teach or are homeroom for.
+    public async Task<IEnumerable<ClassListDto>> GetAllAsync(Guid? academicYearId, CancellationToken ct)
+    {
+        if (currentUser.IsAdmin || currentUser.IsSuperAdmin)
+            return await classes.GetAllAsync(academicYearId, ct);
+
+        var mine = await classes.GetByTeacherAsync(currentUser.RequireTeacherId(), ct);
+
+        // Filtered in memory: a teacher has a handful of classes, not a school's worth.
+        return academicYearId is null
+            ? mine
+            : mine.Where(c => c.AcademicYearId == academicYearId);
+    }
 
     public async Task<ClassListDto> GetByIdAsync(Guid classId, CancellationToken ct)
     {

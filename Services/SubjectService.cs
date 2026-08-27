@@ -1,4 +1,5 @@
 using AutoMapper;
+using EduCore.Dtos.ClassSubjectTeacher;
 using EduCore.Dtos.Subject;
 using EduCore.Exceptions;
 using EduCore.Models;
@@ -11,12 +12,40 @@ namespace EduCore.Services;
 
 public class SubjectService(
     ISubjectRepository subjects,
+    IClassSubjectTeacherRepository assignments,
+    IEnrollmentRepository enrollments,
     IElementaryAssignmentSync elementarySync,
     ICurrentUser currentUser,
     IMapper mapper) : ISubjectService
 {
-    public async Task<IEnumerable<SubjectListDto>> GetAllAsync(CancellationToken ct) =>
-        mapper.Map<IEnumerable<SubjectListDto>>(await subjects.GetAllOrderedAsync(ct));
+    // "The subjects" means something different per role, and the endpoint policy cannot say
+    // so on its own. An administrator maintains the school's catalogue and needs all of it;
+    // a teacher and a student are entitled only to the subjects they are actually part of.
+    public async Task<IEnumerable<SubjectListDto>> GetAllAsync(CancellationToken ct)
+    {
+        if (currentUser.IsAdmin || currentUser.IsSuperAdmin)
+            return mapper.Map<IEnumerable<SubjectListDto>>(await subjects.GetAllOrderedAsync(ct));
+
+        if (currentUser.IsTeacher)
+            return Distinct(
+                await assignments.GetByTeacherAsync(currentUser.RequireTeacherId(), false, ct));
+
+        // A student's subjects are whatever is taught to the class they are enrolled in. Not
+        // being enrolled is an empty list, not an error: an unplaced student has no subjects.
+        var enrollment = await enrollments.GetActiveForStudentAsync(currentUser.RequireStudentId(), ct);
+
+        return enrollment is null
+            ? []
+            : Distinct(await assignments.GetByClassAsync(enrollment.ClassId, false, ct));
+    }
+
+    // One assignment row exists per (class, subject), so a teacher across several classes --
+    // or a class with a subject split between teachers -- would otherwise repeat the subject.
+    private static IEnumerable<SubjectListDto> Distinct(
+        IEnumerable<ClassSubjectTeacherListDto> rows) =>
+        rows.GroupBy(a => a.SubjectId)
+            .Select(g => new SubjectListDto(g.Key, g.First().SubjectName))
+            .OrderBy(s => s.Name);
 
     public async Task<SubjectListDto> GetByIdAsync(Guid subjectId, CancellationToken ct) =>
         mapper.Map<SubjectListDto>(await GetOwnedAsync(subjectId, ct));
