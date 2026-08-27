@@ -15,11 +15,35 @@ public class TeacherStatisticsRepository(
     IGradingCalculator grading) : StatisticsRepositoryBase(context), ITeacherStatisticsRepository
 {
 
+    // Assignments to classes that are in scope, active at some point in the window. Teacher
+    // has no employment dates and no academic year of its own, so this is what ties a teacher
+    // to a period: the class they are assigned to belongs to one academic year, and
+    // ClassesInScope applies the year/class/grade filters.
+    private IQueryable<Models.ClassSubjectTeacher> AssignmentsInWindow(StatisticsQuery ctx)
+    {
+        var classIds = ClassesInScope(ctx).Select(c => c.Id);
+
+        return Scope(_context.ClassSubjectTeachers, ctx)
+            .Where(a => classIds.Contains(a.ClassId))
+            .Where(a => a.EndedOn == null || a.EndedOn >= ctx.From);
+    }
+
     private IQueryable<Models.Teacher> TeachersInScope(StatisticsQuery ctx)
     {
         var teachers = Scope(_context.Teachers, ctx);
 
-        return ctx.TeacherId is null ? teachers : teachers.Where(t => t.Id == ctx.TeacherId);
+        // Asking about one named teacher is a different question from "who taught here this
+        // year": their detail view must still render for a period they did not teach in,
+        // showing zeros rather than a missing row.
+        if (ctx.TeacherId is not null)
+            return teachers.Where(t => t.Id == ctx.TeacherId);
+
+        // Otherwise "teachers" means the ones actually teaching in this period. Counting every
+        // teacher row in the school instead would report the same figure for every academic
+        // year, and would credit a newly hired teacher to years they were never here for.
+        var assignedTeacherIds = AssignmentsInWindow(ctx).Select(a => a.TeacherId);
+
+        return teachers.Where(t => assignedTeacherIds.Contains(t.Id));
     }
 
     public async Task<int> CountTeachersAsync(StatisticsQuery ctx, CancellationToken ct) =>
@@ -36,7 +60,7 @@ public class TeacherStatisticsRepository(
     public async Task<IReadOnlyList<TeacherWorkloadDto>> GetWorkloadAsync(
         StatisticsQuery ctx, CancellationToken ct)
     {
-        var assignments = Scope(_context.ClassSubjectTeachers, ctx).Where(a => a.EndedOn == null);
+        var assignments = AssignmentsInWindow(ctx);
         var lessons = LessonsInWindow(ctx);
         var activeEnrollments = EnrollmentsInWindow(ctx).Where(e => e.LeftAt == null);
 
