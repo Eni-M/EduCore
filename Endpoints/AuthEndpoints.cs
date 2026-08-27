@@ -27,7 +27,7 @@ public static class AuthEndpoints
         // still pending its own password change.
         var accounts = group.MapGroup("/users")
             .RequireAuthorization(Policies.AdminOrSuperAdmin)
-            .AddEndpointFilter<PasswordChangeEndpointFilter>();
+            .AddEndpointFilter<AccountStatusEndpointFilter>();
 
         accounts.MapPost("/{userId:guid}/reset-password",
             async (Guid userId, IUserService users, CancellationToken ct) =>

@@ -92,7 +92,12 @@ public class MappingProfile : Profile
             .ForCtorParam("FirstName", o => o.MapFrom(s => s.User.FirstName))
             .ForCtorParam("LastName", o => o.MapFrom(s => s.User.LastName))
             .ForCtorParam("Email", o => o.MapFrom(s => s.User.Email))
-            .ForCtorParam("IsGraduated", o => o.MapFrom(s => s.GraduationDate != null));
+            .ForCtorParam("IsGraduated", o => o.MapFrom(s => s.GraduationDate != null))
+            // Always mapped; the services strip it for callers who may not manage
+            // sign-ins. Filling it here rather than in each service keeps the one
+            // projection that knows how to reach User in one place.
+            .ForCtorParam("Account", o => o.MapFrom(s =>
+                new Dtos.Account.AccountDto(s.UserId, s.User.DeactivatedAt)));
 
         CreateMap<Student, Dtos.Student.StudentDetailDto>()
             .ForCtorParam("FirstName", o => o.MapFrom(s => s.User.FirstName))
@@ -113,7 +118,9 @@ public class MappingProfile : Profile
             .ForCtorParam("FirstName", o => o.MapFrom(t => t.User.FirstName))
             .ForCtorParam("LastName", o => o.MapFrom(t => t.User.LastName))
             .ForCtorParam("Email", o => o.MapFrom(t => t.User.Email))
-            .ForCtorParam("Subjects", o => o.MapFrom(t => t.TeacherSubjects.Select(ts => ts.Subject.Name)));
+            .ForCtorParam("Subjects", o => o.MapFrom(t => t.TeacherSubjects.Select(ts => ts.Subject.Name)))
+            .ForCtorParam("Account", o => o.MapFrom(t =>
+                new Dtos.Account.AccountDto(t.UserId, t.User.DeactivatedAt)));
 
         CreateMap<Teacher, Dtos.Teacher.TeacherDetailDto>()
             .ForCtorParam("FirstName", o => o.MapFrom(t => t.User.FirstName))
@@ -128,7 +135,10 @@ public class MappingProfile : Profile
             .ForCtorParam("FirstName", o => o.MapFrom(a => a.User.FirstName))
             .ForCtorParam("LastName", o => o.MapFrom(a => a.User.LastName))
             .ForCtorParam("Email", o => o.MapFrom(a => a.User.Email))
-            .ForCtorParam("SchoolName", o => o.MapFrom(a => a.School.Name));
+            .ForCtorParam("SchoolName", o => o.MapFrom(a => a.School.Name))
+            // /api/admins is SuperAdmin-only, so this is never stripped.
+            .ForCtorParam("Account", o => o.MapFrom(a =>
+                new Dtos.Account.AccountDto(a.UserId, a.User.DeactivatedAt)));
 
     }
 

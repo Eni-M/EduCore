@@ -57,6 +57,16 @@ public class UserService(
         if (result == PasswordVerificationResult.Failed)
             throw new UnauthorizedException("Current password is incorrect.");
 
+        // Checked here as well as at login, and checked after the password so it
+        // cannot be used to probe which accounts exist.
+        //
+        // This endpoint hands back a fresh token. Without this line a deactivated
+        // user holding a still-valid token could call it before every expiry and
+        // renew their access for ever -- deactivating the account would never
+        // have taken effect, however long you waited.
+        if (user.DeactivatedAt is not null)
+            throw new UnauthorizedException("This account has been deactivated.");
+
         user.SetPassword(dto.NewPassword, passwordHasher);
         user.MustChangePassword = false;
 
@@ -176,8 +186,12 @@ public class UserService(
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email),
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Role, user.Role.ToString()),
-            new(ClaimNames.MustChangePassword, user.MustChangePassword ? "true" : "false")
+            new(ClaimTypes.Role, user.Role.ToString())
+            // MustChangePassword is deliberately not a claim. It was one, and the
+            // copy went stale the moment an administrator reset a password: the
+            // row said "must change" while the token in the intruder's hand still
+            // said otherwise. AccountStatusEndpointFilter reads the row instead.
+            // The login response still carries it, for the client to route on.
         };
 
         if (schoolId is not null)

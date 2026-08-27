@@ -24,6 +24,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
+// Before anything reads configuration: pull .env into the environment, so the
+// secrets it holds are found by the environment-variables provider the default
+// builder already installs. See DotEnvFile for why they are not in appsettings.
+DotEnvFile.Load(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
@@ -139,22 +144,30 @@ builder.Services.AddProblemDetails();
 var jwtKey = builder.Configuration["Jwt:Key"];
 
 // HS256 needs at least 256 bits. Better to fail here than to sign tokens with a placeholder.
+//
+// The key is deliberately not in appsettings.json: that file is committed, and a
+// signing key in the repository is a signing key everyone has. Set Jwt__Key in
+// .env for local work, or in the environment for a deployment.
 if (string.IsNullOrWhiteSpace(jwtKey) || Encoding.UTF8.GetByteCount(jwtKey) < 32)
     throw new InvalidOperationException(
-        "Jwt:Key must be at least 32 bytes. Set it in user secrets or an environment variable.");
+        "Jwt:Key must be at least 32 bytes. Set Jwt__Key in .env (see .env.example) " +
+        "or as an environment variable. Generate one with: openssl rand -base64 32");
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options => options.TokenValidationParameters = new TokenValidationParameters
+    .AddJwtBearer(options =>
     {
-        ValidateIssuer = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidateAudience = true,
-        ValidAudience = builder.Configuration["Jwt:Audience"],
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-        ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
-        ValidateLifetime = true,
-        ClockSkew = TimeSpan.FromMinutes(1)
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidateAudience = true,
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
     });
 
 builder.Services.AddAuthorization(options => options.AddEduCorePolicies());
@@ -192,7 +205,14 @@ await SuperAdminSeeder.SeedAsync(app.Services, app.Configuration);
 
 app.UseExceptionHandler();
 if (!app.Environment.IsDevelopment())
+{
     app.UseHttpsRedirection();
+
+    // Redirecting to https still leaves the first request of a session on http,
+    // where it can be intercepted -- and every request after sign-in carries a
+    // bearer token in a header. HSTS tells the browser never to try http again.
+    app.UseHsts();
+}
 app.UseCors(FrontendCors);
 app.UseAuthentication();
 app.UseAuthorization();
@@ -203,7 +223,7 @@ app.MapAuthEndpoints();
 var api = app.MapGroup("/api")
     .RequireAuthorization()
     .AddEndpointFilter<ValidationEndpointFilter>()
-    .AddEndpointFilter<PasswordChangeEndpointFilter>();
+    .AddEndpointFilter<AccountStatusEndpointFilter>();
 
 api.MapSchoolEndpoints();
 api.MapSubjectEndpoints();

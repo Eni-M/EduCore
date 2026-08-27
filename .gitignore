@@ -9,3 +9,10 @@ riderModule.iml
 .idea/
 *.user
 *.DotSettings.user
+
+# Secrets. .env holds the JWT signing key, the database password and the first
+# super administrator's credentials -- see .env.example for the names, and
+# Security/DotEnvFile.cs for how it is read.
+.env
+.env.local
+.env.*.local

@@ -35,7 +35,7 @@ public class StudentService(
         var (items, totalCount) = await students.GetPagedAsync(page, pageSize, search, includeGraduated, ct);
 
         return new PagedResultDto<StudentListDto>(
-            mapper.Map<List<StudentListDto>>(items),
+            WithVisibleAccounts(mapper.Map<List<StudentListDto>>(items)).ToList(),
             page,
             pageSize,
             totalCount);
@@ -44,7 +44,11 @@ public class StudentService(
     public async Task<IEnumerable<StudentListDto>> GetByClassAsync(Guid classId, CancellationToken ct)
     {
         await access.EnsureCanViewClassAsync(classId, ct);
-        return mapper.Map<IEnumerable<StudentListDto>>(await students.GetByClassAsync(classId, ct));
+
+        // A teacher reaches this one for a class they teach, and a roster is
+        // theirs to read -- but the sign-ins behind it are not.
+        return WithVisibleAccounts(
+            mapper.Map<IEnumerable<StudentListDto>>(await students.GetByClassAsync(classId, ct)));
     }
 
     public async Task<StudentDetailDto> GetByIdAsync(Guid studentId, CancellationToken ct)
@@ -165,4 +169,10 @@ public class StudentService(
 
     private static (int Page, int PageSize) Normalize(PaginationQueryDto pagination) =>
         (Math.Max(1, pagination.Page), Math.Clamp(pagination.PageSize, 1, 100));
+
+    // The mapper fills Account for every row, because it is the projection that
+    // knows how to reach User. Whether the caller may see it is this method's
+    // question, asked in one place so no list can forget to ask it.
+    private IEnumerable<StudentListDto> WithVisibleAccounts(IEnumerable<StudentListDto> rows) =>
+        currentUser.CanManageAccounts() ? rows : rows.Select(row => row with { Account = null });
 }

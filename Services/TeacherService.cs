@@ -24,7 +24,7 @@ public class TeacherService(
     IMapper mapper) : ITeacherService
 {
     public async Task<IEnumerable<TeacherListDto>> GetAllAsync(CancellationToken ct) =>
-        mapper.Map<IEnumerable<TeacherListDto>>(await teachers.GetAllWithUserAsync(ct));
+        WithVisibleAccounts(mapper.Map<IEnumerable<TeacherListDto>>(await teachers.GetAllWithUserAsync(ct)));
 
     public async Task<TeacherDetailDto> GetByIdAsync(Guid teacherId, CancellationToken ct)
     {
@@ -35,7 +35,7 @@ public class TeacherService(
     }
 
     public async Task<IEnumerable<TeacherListDto>> GetBySubjectAsync(Guid subjectId, CancellationToken ct) =>
-        mapper.Map<IEnumerable<TeacherListDto>>(await teachers.GetBySubjectAsync(subjectId, ct));
+        WithVisibleAccounts(mapper.Map<IEnumerable<TeacherListDto>>(await teachers.GetBySubjectAsync(subjectId, ct)));
 
     public async Task<TeacherDetailDto> CreateAsync(TeacherCreateDto dto, CancellationToken ct)
     {
@@ -124,4 +124,9 @@ public class TeacherService(
         teacherSubjects.Remove(qualification);
         await teacherSubjects.SaveChangesAsync(ct);
     }
+
+    // /api/teachers answers a teacher as well as an administrator. A colleague's
+    // user id and deactivation date are an administrator's business.
+    private IEnumerable<TeacherListDto> WithVisibleAccounts(IEnumerable<TeacherListDto> rows) =>
+        currentUser.CanManageAccounts() ? rows : rows.Select(row => row with { Account = null });
 }
