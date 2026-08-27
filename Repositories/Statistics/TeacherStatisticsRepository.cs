@@ -66,12 +66,17 @@ public class TeacherStatisticsRepository(
 
         var rows = await (from t in TeachersInScope(ctx)
                           join u in _context.Users on t.UserId equals u.Id
-                          orderby u.LastName, u.FirstName
+                          join sc in _context.Schools.IgnoreQueryFilters() on t.SchoolId equals sc.Id
+                          // School first: a cross-school listing then reads as one block per
+                          // school rather than an interleaved list of names.
+                          orderby sc.Name, u.LastName, u.FirstName
                           select new
                           {
                               t.Id,
                               u.FirstName,
                               u.LastName,
+                              t.SchoolId,
+                              SchoolName = sc.Name,
                               Classes = assignments
                                   .Where(a => a.TeacherId == t.Id)
                                   .Select(a => a.ClassId)
@@ -96,7 +101,8 @@ public class TeacherStatisticsRepository(
 
         return rows
             .Select(r => new TeacherWorkloadDto(
-                r.Id, r.FirstName + " " + r.LastName, r.Classes, r.Subjects, r.Students, r.Lessons))
+                r.Id, r.FirstName + " " + r.LastName, r.SchoolId, r.SchoolName,
+                r.Classes, r.Subjects, r.Students, r.Lessons))
             .ToList();
     }
 
@@ -110,12 +116,15 @@ public class TeacherStatisticsRepository(
 
         var rows = await (from t in TeachersInScope(ctx)
                           join u in _context.Users on t.UserId equals u.Id
-                          orderby u.LastName, u.FirstName
+                          join sc in _context.Schools.IgnoreQueryFilters() on t.SchoolId equals sc.Id
+                          orderby sc.Name, u.LastName, u.FirstName
                           select new
                           {
                               t.Id,
                               u.FirstName,
                               u.LastName,
+                              t.SchoolId,
+                              SchoolName = sc.Name,
                               Lessons = lessons.Count(d => d.TeacherId == t.Id),
 
                               // A register counts as incomplete when it holds fewer rows than
@@ -136,6 +145,8 @@ public class TeacherStatisticsRepository(
             .Select(r => new TeacherCoverageDto(
                 r.Id,
                 r.FirstName + " " + r.LastName,
+                r.SchoolId,
+                r.SchoolName,
                 r.Lessons,
                 r.Incomplete,
                 r.MarksTotal,
