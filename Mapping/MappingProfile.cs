@@ -97,7 +97,11 @@ public class MappingProfile : Profile
         CreateMap<Student, Dtos.Student.StudentDetailDto>()
             .ForCtorParam("FirstName", o => o.MapFrom(s => s.User.FirstName))
             .ForCtorParam("LastName", o => o.MapFrom(s => s.User.LastName))
-            .ForCtorParam("Email", o => o.MapFrom(s => s.User.Email));
+            .ForCtorParam("Email", o => o.MapFrom(s => s.User.Email))
+            // Null when the student has no recorded city, which reads as "not recorded"
+            // rather than as a blank the caller has to interpret.
+            .ForCtorParam("CityName", o => o.MapFrom(s => s.City != null ? s.City.Name : null))
+            .ForCtorParam("StateName", o => o.MapFrom(s => s.City != null ? s.City.State.Name : null));
 
         CreateWriteMap<Dtos.Student.StudentCreateDto, Student>();
         CreateWriteMap<Dtos.Student.StudentEditDto, Student>();

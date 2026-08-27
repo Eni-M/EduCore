@@ -13,4 +13,8 @@ public class School
     // report. Zone is the sub-area within a city (district, municipality, village).
     public string? City { get; set; }
     public string? Zone { get; set; }
+
+    // The replacement for the free-text City above. Both exist for now: the demographics
+    // queries still group on the strings, and switching them over is its own change.
+    public Guid? CityId { get; set; }
 }

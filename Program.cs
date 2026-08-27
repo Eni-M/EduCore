@@ -50,6 +50,7 @@ builder.Services.AddScoped<IAdminRepository, AdminRepository>();
 builder.Services.AddScoped<IParentRepository, ParentRepository>();
 builder.Services.AddScoped<ISchoolRepository, SchoolRepository>();
 builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
+builder.Services.AddScoped<ILocationRepository, LocationRepository>();
 builder.Services.AddScoped<IAcademicYearRepository, AcademicYearRepository>();
 builder.Services.AddScoped<IGradingPeriodRepository, GradingPeriodRepository>();
 builder.Services.AddScoped<IClassRepository, ClassRepository>();
@@ -119,6 +120,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ISchoolService, SchoolService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<ISubjectService, SubjectService>();
+builder.Services.AddScoped<ILocationService, LocationService>();
 builder.Services.AddScoped<IAcademicYearService, AcademicYearService>();
 builder.Services.AddScoped<IClassService, ClassService>();
 builder.Services.AddScoped<IClassSubjectTeacherService, ClassSubjectTeacherService>();
@@ -191,6 +193,7 @@ var api = app.MapGroup("/api")
 
 api.MapSchoolEndpoints();
 api.MapSubjectEndpoints();
+api.MapLocationEndpoints();
 api.MapAcademicYearEndpoints();
 api.MapClassEndpoints();
 api.MapStudentEndpoints();

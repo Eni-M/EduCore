@@ -20,6 +20,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<DiaryEntry> DiaryEntries => Set<DiaryEntry>();
     public DbSet<Attendance> Attendances => Set<Attendance>();
     public DbSet<Mark> Marks => Set<Mark>();
+
+    // Reference data shared by every school, so no ScopeToSchool below: filtering these per
+    // school would hide a city from the very school that needs to record it.
+    public DbSet<State> States => Set<State>();
+    public DbSet<City> Cities => Set<City>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<TeacherSubject> TeacherSubjects => Set<TeacherSubject>();
@@ -143,6 +148,34 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         modelBuilder.Entity<Subject>().Property(s => s.Name).HasMaxLength(100);
         modelBuilder.Entity<Subject>().Property<uint>("Version").IsRowVersion();
         ScopeToSchool<Subject>(modelBuilder);
+
+        // ---- places ----
+        // Unique per name, and per name within a state: the whole reason these are rows
+        // rather than free text is that one place must not exist twice under two spellings.
+        modelBuilder.Entity<State>().Property(s => s.Name).HasMaxLength(150).IsRequired();
+        modelBuilder.Entity<State>().HasIndex(s => s.Name).IsUnique();
+
+        modelBuilder.Entity<City>().Property(c => c.Name).HasMaxLength(150).IsRequired();
+        modelBuilder.Entity<City>()
+            .HasOne(c => c.State)
+            .WithMany(s => s.Cities)
+            .HasForeignKey(c => c.StateId)
+            // Restrict, not cascade: a state disappearing must not silently take its cities
+            // -- and the students living in them -- with it.
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<City>().HasIndex(c => new { c.StateId, c.Name }).IsUnique();
+
+        // Nullable on both: records created before places existed have none, and inventing
+        // one would put a made-up address in a demographic report.
+        modelBuilder.Entity<Student>()
+            .HasOne(s => s.City).WithMany()
+            .HasForeignKey(s => s.CityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<School>()
+            .HasOne<City>().WithMany()
+            .HasForeignKey(s => s.CityId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 
     private void ConfigureClasses(ModelBuilder modelBuilder)

@@ -19,6 +19,7 @@ public class StudentService(
     IMarkRepository marks,
     IUserRepository userRepository,
     IUserService users,
+    ILocationRepository locations,
     IAccessGuard access,
     ICurrentUser currentUser,
     IMapper mapper) : IStudentService
@@ -91,11 +92,28 @@ public class StudentService(
         var user = await users.BuildLoginAsync(
             dto.FirstName, dto.LastName, dto.Email, dto.Password, UserRole.Student, ct);
 
+        if (dto.CityId is { } cityId && await locations.GetCityAsync(cityId, ct) is null)
+            throw new NotFoundException("City", cityId);
+
         var student = mapper.Map<Student>(dto);
         student.User = user;
         student.SchoolId = currentUser.RequireSchoolId();
 
         await students.AddAsync(student);
+
+        // The first guardian, if the form supplied one. Saved in the same transaction as the
+        // student: a pupil enrolled with no contact number because the second request was
+        // never made is exactly the gap this closes.
+        if (!string.IsNullOrWhiteSpace(dto.GuardianName)
+            && !string.IsNullOrWhiteSpace(dto.GuardianPhone))
+        {
+            student.Parents.Add(new Parent
+            {
+                Name = dto.GuardianName.Trim(),
+                PhoneNumber = dto.GuardianPhone.Trim(),
+                SchoolId = student.SchoolId
+            });
+        }
 
         await students.SaveChangesAsync(ct);
 
@@ -112,6 +130,9 @@ public class StudentService(
 
         var user = await userRepository.GetByIdAsync(student.UserId, ct)
                    ?? throw new NotFoundException("User", student.UserId);
+
+        if (dto.CityId is { } cityId && await locations.GetCityAsync(cityId, ct) is null)
+            throw new NotFoundException("City", cityId);
 
         await users.ApplyLoginEditAsync(user, dto.FirstName, dto.LastName, dto.Email, ct);
 
