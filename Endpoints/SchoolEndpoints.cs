@@ -10,25 +10,33 @@ public static class SchoolEndpoints
 {
     public static void MapSchoolEndpoints(this IEndpointRouteBuilder api)
     {
-        var schools = api.MapGroup("/schools")
-            .RequireAuthorization(Policies.SuperAdmin)
-            .WithTags("Schools");
+        var schools = api.MapGroup("/schools").WithTags("Schools");
 
-        schools.MapGet("/", async (ISchoolService service, CancellationToken ct) =>
+        // Every signed-in person's own school, named for a header or a nav --
+        // not the SuperAdmin-only management surface below, which lists every
+        // school on the platform. A SuperAdmin belongs to none, so they are not
+        // in the policy for this one.
+        schools.MapGet("/me", async (ISchoolService service, ICurrentUser currentUser, CancellationToken ct) =>
+                Results.Ok(await service.GetByIdAsync(currentUser.RequireSchoolId(), ct)))
+            .RequireAuthorization(Policies.AnySchoolUser);
+
+        var superAdminSchools = schools.RequireAuthorization(Policies.SuperAdmin);
+
+        superAdminSchools.MapGet("/", async (ISchoolService service, CancellationToken ct) =>
             Results.Ok(await service.GetAllAsync(ct)));
 
     
 
-        schools.MapGet("/{schoolId:guid}", async (Guid schoolId, ISchoolService service, CancellationToken ct) =>
+        superAdminSchools.MapGet("/{schoolId:guid}", async (Guid schoolId, ISchoolService service, CancellationToken ct) =>
             Results.Ok(await service.GetByIdAsync(schoolId, ct)));
 
-        schools.MapPost("/", async (SchoolCreateDto dto, ISchoolService service, CancellationToken ct) =>
+        superAdminSchools.MapPost("/", async (SchoolCreateDto dto, ISchoolService service, CancellationToken ct) =>
         {
             var school = await service.CreateAsync(dto, ct);
             return Results.Created($"/api/schools/{school.Id}", school);
         });
 
-        schools.MapPut("/{schoolId:guid}",
+        superAdminSchools.MapPut("/{schoolId:guid}",
             async (Guid schoolId, SchoolEditDto dto, ISchoolService service, CancellationToken ct) =>
                 Results.Ok(await service.UpdateAsync(schoolId, dto, ct)));
 

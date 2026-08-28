@@ -9,6 +9,8 @@ public interface IUserService
     Task<AuthResponseDto> LoginAsync(LoginUserDto dto, CancellationToken ct);
 
     Task<AuthResponseDto> ChangePasswordAsync(Guid userId, ChangePasswordDto dto, CancellationToken ct);
+    Task<AuthResponseDto> UpdateOwnCredentialsAsync(
+        Guid userId, string firstName, string lastName, string email, CancellationToken ct);
     Task<ResetPasswordResponseDto> AdminResetPasswordAsync(Guid userId, CancellationToken ct);
     Task SetActiveAsync(Guid userId, bool isActive, CancellationToken ct);
 

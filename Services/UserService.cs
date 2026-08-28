@@ -76,6 +76,30 @@ public class UserService(
         return await BuildAuthResponseAsync(user, ct); 
     }
 
+    public async Task<AuthResponseDto> UpdateOwnCredentialsAsync(
+        Guid userId, string firstName, string lastName, string email, CancellationToken ct)
+    {
+        var user = await userRepository.GetByIdAsync(userId, ct)
+                   ?? throw new NotFoundException("User", userId);
+
+        // Same check as ChangePasswordAsync, and for the same reason: this route
+        // sits outside the /api group, so AccountStatusEndpointFilter never sees
+        // it, and a deactivated user's still-valid token would otherwise be able
+        // to keep editing their own record.
+        if (user.DeactivatedAt is not null)
+            throw new UnauthorizedException("This account has been deactivated.");
+
+        await ApplyLoginEditAsync(user, firstName, lastName, email, ct);
+
+        userRepository.Update(user);
+        await userRepository.SaveChangesAsync(ct);
+
+        // A fresh token, matching ChangePasswordAsync -- the name and email on it
+        // are only ever the copy taken at login, and the client's stored session
+        // is what a nav bar and a profile page actually read.
+        return await BuildAuthResponseAsync(user, ct);
+    }
+
     public async Task<ResetPasswordResponseDto> AdminResetPasswordAsync(Guid userId, CancellationToken ct)
     {
         var user = await userRepository.GetByIdAsync(userId, ct)
