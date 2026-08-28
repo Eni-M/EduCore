@@ -22,10 +22,11 @@ public static class SchoolEndpoints
 
         var superAdminSchools = schools.RequireAuthorization(Policies.SuperAdmin);
 
-        superAdminSchools.MapGet("/", async (ISchoolService service, CancellationToken ct) =>
-            Results.Ok(await service.GetAllAsync(ct)));
-
-    
+        // activeOnly is what a picker creating a record against a school asks for. The default
+        // is every school, so the management screen below and the historical reports keep
+        // seeing a switched-off school -- it still owns its past.
+        superAdminSchools.MapGet("/", async (bool? activeOnly, ISchoolService service, CancellationToken ct) =>
+            Results.Ok(await service.GetAllAsync(activeOnly ?? false, ct)));
 
         superAdminSchools.MapGet("/{schoolId:guid}", async (Guid schoolId, ISchoolService service, CancellationToken ct) =>
             Results.Ok(await service.GetByIdAsync(schoolId, ct)));
@@ -39,6 +40,22 @@ public static class SchoolEndpoints
         superAdminSchools.MapPut("/{schoolId:guid}",
             async (Guid schoolId, SchoolEditDto dto, ISchoolService service, CancellationToken ct) =>
                 Results.Ok(await service.UpdateAsync(schoolId, dto, ct)));
+
+        // The same shape as the account pair in AuthEndpoints, because it is the same idea:
+        // switching something off is its own action, not a field on the edit form.
+        superAdminSchools.MapPost("/{schoolId:guid}/deactivate",
+            async (Guid schoolId, ISchoolService service, CancellationToken ct) =>
+            {
+                await service.SetActiveAsync(schoolId, false, ct);
+                return Results.NoContent();
+            });
+
+        superAdminSchools.MapPost("/{schoolId:guid}/activate",
+            async (Guid schoolId, ISchoolService service, CancellationToken ct) =>
+            {
+                await service.SetActiveAsync(schoolId, true, ct);
+                return Results.NoContent();
+            });
 
         var admins = api.MapGroup("/admins")
             .RequireAuthorization(Policies.SuperAdmin)

@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 
-namespace EduCore.Services.Calendar;
+namespace EduCore.Helpers;
 
 // Splits an academic year's own start/end into two default grading periods.
 //

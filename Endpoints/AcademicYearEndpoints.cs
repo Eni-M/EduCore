@@ -11,9 +11,12 @@ public static class AcademicYearEndpoints
     {
         var group = api.MapGroup("/academic-years").WithTags("Academic years");
 
-        group.MapGet("/", async (IAcademicYearService service, CancellationToken ct) =>
-                Results.Ok(await service.GetAllAsync(ct)))
-            .RequireAuthorization(Policies.AnySchoolUser);
+        // AdminOrSuperAdmin, not AnySchoolUser: a SuperAdmin belongs to no school and so was
+        // excluded from that policy, which made this 403 for them -- and the statistics
+        // period picker swallowed the failure and showed an empty list of years.
+        group.MapGet("/", async (Guid? schoolId, IAcademicYearService service, CancellationToken ct) =>
+                Results.Ok(await service.GetAllAsync(schoolId, ct)))
+            .RequireAuthorization(Policies.AdminOrSuperAdmin);
 
         group.MapGet("/{academicYearId:guid}",
                 async (Guid academicYearId, IAcademicYearService service, CancellationToken ct) =>

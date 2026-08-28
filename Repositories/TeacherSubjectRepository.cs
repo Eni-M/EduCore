@@ -25,6 +25,22 @@ public class TeacherSubjectRepository(AppDbContext context)
         await _context.TeacherSubjects
             .AnyAsync(ts => ts.TeacherId == teacherId && ts.SubjectId == subjectId, ct);
 
+    public async Task<IReadOnlyList<Guid>> GetSubjectIdsForTeacherAsync(
+        Guid teacherId, CancellationToken ct) =>
+        await _context.TeacherSubjects
+            .AsNoTracking()
+            .Where(ts => ts.TeacherId == teacherId)
+            .Select(ts => ts.SubjectId)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<Guid>> GetTeacherIdsForSubjectAsync(
+        Guid subjectId, CancellationToken ct) =>
+        await _context.TeacherSubjects
+            .AsNoTracking()
+            .Where(ts => ts.SubjectId == subjectId)
+            .Select(ts => ts.TeacherId)
+            .ToListAsync(ct);
+
     public async Task<bool> IsInUseAsync(Guid teacherId, Guid subjectId, CancellationToken ct) =>
         await _context.ClassSubjectTeachers
             .AnyAsync(cst => cst.TeacherId == teacherId && cst.SubjectId == subjectId, ct)

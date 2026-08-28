@@ -1,5 +1,5 @@
 using EduCore.Dtos.Statistics;
-using EduCore.Grading;
+using EduCore.Helpers;
 using EduCore.Data;
 using EduCore.Dtos.Statistics.Individual;
 using EduCore.Repositories.Interfaces;

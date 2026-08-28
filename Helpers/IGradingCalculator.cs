@@ -1,4 +1,4 @@
-namespace EduCore.Grading;
+namespace EduCore.Helpers;
 
 public interface IGradingCalculator
 {
@@ -16,7 +16,6 @@ public interface IGradingCalculator
     double AtRiskUpperValue { get; }
 
     bool IsPass(int finalMark);
-    bool IsFail(int finalMark);
     bool IsAtRisk(int finalMark);
 
     // A student is at risk overall when the mean of their unrounded marks across every subject

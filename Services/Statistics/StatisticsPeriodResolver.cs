@@ -67,8 +67,19 @@ public class StatisticsPeriodResolver(
         return await CurrentAcademicYearAsync(schoolId, ct);
     }
 
-    // Falls back to the calendar year for a school with no years defined yet, and for
+    // Falls back to the last twelve months for a school with no years defined yet, and for
     // cross-school queries where no single year is "current".
+    //
+    // It used to fall back to the calendar year, and that quietly made the two halves of the
+    // same report describe different spans. Marks are windowed by the grading periods that
+    // OVERLAP the range, lessons by their own date. Asked in August for "this calendar year",
+    // an autumn term running September to January still overlapped January, so every one of
+    // its marks counted -- while none of the lessons that produced them did, because they were
+    // taught in the previous calendar year. One tab reported on all the marks and the other on
+    // almost no attendance, for what the screen called the same period.
+    //
+    // Twelve months back from today always spans a whole school year, so both halves see the
+    // same work.
     private async Task<(DateOnly, DateOnly)> CurrentAcademicYearAsync(Guid? schoolId, CancellationToken ct)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -81,7 +92,7 @@ public class StatisticsPeriodResolver(
                 return (current.StartDate, current.EndDate);
         }
 
-        return (new DateOnly(today.Year, 1, 1), new DateOnly(today.Year, 12, 31));
+        return (today.AddYears(-1), today);
     }
 
     // Not found rather than forbidden, unlike the SchoolId check in StatisticsScopeResolver.

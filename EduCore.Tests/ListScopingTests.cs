@@ -99,6 +99,10 @@ public class ListScopingTests
         public Task<ClassSubjectTeacher?> GetActiveAsync(Guid classId, Guid subjectId, CancellationToken ct) =>
             Task.FromResult<ClassSubjectTeacher?>(null);
 
+        public Task<IReadOnlyList<ClassSubjectTeacher>> GetActiveForClassAsync(
+            Guid classId, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<ClassSubjectTeacher>>([]);
+
         public Task<bool> TeachesClassAsync(Guid teacherId, Guid classId, CancellationToken ct) =>
             Task.FromResult(classId == MyClassId);
 

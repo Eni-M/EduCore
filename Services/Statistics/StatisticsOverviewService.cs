@@ -38,7 +38,9 @@ public class StatisticsOverviewService(
         // below starts querying school by school.
         await scope.ResolveAsync(filter, ct);
 
-        var allSchools = (await schools.GetAllOrderedAsync(ct)).ToList();
+        // Every school, including switched-off ones: a school that closed still has a year of
+        // history, and dropping it here would silently change what the platform totals mean.
+        var allSchools = (await schools.GetAllOrderedAsync(activeOnly: false, ct)).ToList();
         var bySchool = new List<SchoolComparisonDto>();
 
         // One pass per school. Fine for a network of this size, but it is the most expensive

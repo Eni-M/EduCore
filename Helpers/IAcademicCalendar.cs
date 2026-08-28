@@ -1,4 +1,4 @@
-namespace EduCore.Services.Calendar;
+namespace EduCore.Helpers;
 
 public interface IAcademicCalendar
 {

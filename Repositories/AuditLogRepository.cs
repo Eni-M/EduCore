@@ -39,7 +39,8 @@ public class AuditLogRepository(AppDbContext context) : Repository<AuditLog>(con
                     a.UserId,
                     u == null ? null : u.FirstName + " " + u.LastName,
                     a.Action,
-                    a.Timestamp))
+                    a.Timestamp,
+                    a.TraceId))
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);

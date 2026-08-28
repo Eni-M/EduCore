@@ -38,6 +38,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         ConfigureLessons(modelBuilder);
 
         modelBuilder.Entity<AuditLog>().Property(a => a.Action).HasMaxLength(1000);
+        modelBuilder.Entity<AuditLog>().Property(a => a.TraceId).HasMaxLength(200);
     }
 
     // Every school-scoped entity gets the same filter: you only see your own school.

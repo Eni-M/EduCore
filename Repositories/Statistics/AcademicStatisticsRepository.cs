@@ -3,7 +3,7 @@ using EduCore.Data;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Aggregate;
 using EduCore.Dtos.Statistics.Individual;
-using EduCore.Grading;
+using EduCore.Helpers;
 using EduCore.Repositories.Interfaces;
 using EduCore.Repositories.Statistics.Interfaces;
 using Microsoft.EntityFrameworkCore;

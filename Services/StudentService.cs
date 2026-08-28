@@ -4,6 +4,7 @@ using EduCore.Dtos.Parent;
 using EduCore.Dtos.Student;
 using EduCore.Enums;
 using EduCore.Exceptions;
+using EduCore.Helpers;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
@@ -17,6 +18,8 @@ public class StudentService(
     IClassRepository classes,
     IAttendanceRepository attendances,
     IMarkRepository marks,
+    IGradingPeriodRepository gradingPeriods,
+    IClassSubjectTeacherRepository assignments,
     IUserRepository userRepository,
     IUserService users,
     ILocationRepository locations,
@@ -148,6 +151,15 @@ public class StudentService(
         return await GetByIdAsync(studentId, ct);
     }
 
+    public async Task<GraduationEligibilityDto> GetGraduationEligibilityAsync(
+        Guid studentId, CancellationToken ct)
+    {
+        var student = await students.GetByIdAsync(studentId, ct)
+                      ?? throw new NotFoundException("Student", studentId);
+
+        return await EvaluateGraduationAsync(student, ct);
+    }
+
     public async Task GraduateAsync(Guid studentId, StudentGraduateDto dto, CancellationToken ct)
     {
         var student = await students.GetByIdAsync(studentId, ct)
@@ -156,29 +168,105 @@ public class StudentService(
         if (student.GraduationDate is not null)
             throw new ConflictException("This student has already graduated.");
 
-        var enrollment = await enrollments.GetActiveForStudentAsync(studentId, ct);
-        if (enrollment is not null)
-            throw new BusinessException(
-                "Withdraw the student from their current class before recording a graduation.");
+        // The same evaluation the screen renders, so a refusal here says exactly what the
+        // disabled button said. Nothing re-checks the rule in two places.
+        var eligibility = await EvaluateGraduationAsync(student, ct);
 
-        // FinalMark stays null until both components of a mark are entered -- that
-        // is how a half-graded term reads as "not graded yet" rather than as a low
-        // grade. Graduating a student while one is still open would freeze that
-        // half-finished record as their permanent one, with no way back in: there
-        // is nothing that un-graduates a student to fix it.
-        var incompleteMarks = (await marks.GetByStudentAsync(studentId, null, null, ct))
-            .Count(m => m.FinalMark is null);
+        if (!eligibility.CanGraduate)
+            throw new BusinessException(eligibility.Reason!);
 
-        if (incompleteMarks > 0)
+        // Non-null: EvaluateGraduationAsync returns CanGraduate only when it found one.
+        var enrollment = (await enrollments.GetActiveForStudentAsync(studentId, ct))!;
+
+        if (dto.GraduationDate < enrollment.EnrolledAt)
             throw new BusinessException(
-                $"This student has {incompleteMarks} mark{(incompleteMarks == 1 ? "" : "s")} " +
-                "still missing one of its two components. Finish grading before recording a " +
-                "graduation.");
+                $"They joined this class on {enrollment.EnrolledAt:yyyy-MM-dd}; a graduation " +
+                "cannot be dated before that.");
+
+        // Graduating closes the enrollment, rather than demanding it was closed first. That
+        // is what EnrollmentExitReason.Graduated is for, and it keeps the two facts -- they
+        // left the class, and why -- from being separate actions an admin can half-do.
+        enrollment.LeftAt = dto.GraduationDate;
+        enrollment.ExitReason = EnrollmentExitReason.Graduated;
+        enrollments.Update(enrollment);
 
         student.GraduationDate = dto.GraduationDate;
-
         students.Update(student);
+
+        // One save: the student's graduation and the closing of their enrollment commit
+        // together or not at all. Both repositories share the request's AppDbContext.
         await students.SaveChangesAsync(ct);
+    }
+
+    // Every condition on graduating, in the order that produces the most useful sentence:
+    // the reason a student cannot graduate should be the first thing wrong with them, not
+    // the last. Returns a reason rather than throwing, because the screen needs to render
+    // the same answer without an exception.
+    private async Task<GraduationEligibilityDto> EvaluateGraduationAsync(
+        Models.Student student, CancellationToken ct)
+    {
+        if (student.GraduationDate is not null)
+            return new GraduationEligibilityDto(false, "This student has already graduated.");
+
+        var enrollment = await enrollments.GetActiveForStudentAsync(student.Id, ct);
+
+        if (enrollment is null)
+            return new GraduationEligibilityDto(
+                false, "This student is not currently enrolled in a class.");
+
+        var studentClass = await classes.GetDtoAsync(enrollment.ClassId, ct);
+
+        if (studentClass is null)
+            return new GraduationEligibilityDto(false, "This student's class could not be found.");
+
+        // Finishing school means finishing the last grade of one, not merely being graded.
+        if (!GraduationRule.IsFinalGrade(studentClass.Grade))
+            return new GraduationEligibilityDto(
+                false,
+                $"Only a student in grade {GraduationRule.FinalGradesText} can graduate -- those " +
+                $"are the last grade of each school. {studentClass.Name} is grade {studentClass.Grade}.");
+
+        // An academic year is always split into exactly two terms; a year that does not have
+        // both yet cannot show a full year of work either way.
+        var periods = (await gradingPeriods.GetByAcademicYearAsync(studentClass.AcademicYearId, ct))
+            .ToList();
+
+        if (periods.Count < 2)
+            return new GraduationEligibilityDto(
+                false,
+                $"{studentClass.AcademicYearName} does not have both of its terms set up yet, so a " +
+                "full year of marks cannot be confirmed.");
+
+        var subjectIds = (await assignments.GetByClassAsync(enrollment.ClassId, false, ct))
+            .Select(a => a.SubjectId)
+            .Distinct()
+            .ToList();
+
+        if (subjectIds.Count == 0)
+            return new GraduationEligibilityDto(
+                false, $"{studentClass.Name} has no subjects assigned, so there is nothing to complete.");
+
+        // A mark holds both components for one subject in one term, and FinalMark is null
+        // until both are entered -- so "graded" and "fully graded" are the same test here.
+        // Marks from other years simply do not match any period below.
+        var graded = (await marks.GetByStudentAsync(student.Id, null, null, ct))
+            .Where(m => m.FinalMark is not null)
+            .Select(m => (m.SubjectId, m.GradingPeriodId))
+            .ToHashSet();
+
+        var missing = (from subjectId in subjectIds
+                       from period in periods
+                       where !graded.Contains((subjectId, period.Id))
+                       select subjectId).Count();
+
+        if (missing > 0)
+            return new GraduationEligibilityDto(
+                false,
+                $"{missing} subject-term pair{(missing == 1 ? "" : "s")} across " +
+                $"{studentClass.AcademicYearName} still {(missing == 1 ? "needs" : "need")} both " +
+                "marks. A student graduates on a complete year, not a partial one.");
+
+        return new GraduationEligibilityDto(true, null);
     }
 
     private static (int Page, int PageSize) Normalize(PaginationQueryDto pagination) =>

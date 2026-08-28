@@ -1,4 +1,4 @@
-using EduCore.Grading;
+using EduCore.Helpers;
 using EduCore.Services.Statistics;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -88,7 +88,6 @@ public class GradingCalculatorTests
         var calculator = Calculator();
 
         Assert.Equal(expectPass, calculator.IsPass(finalMark));
-        Assert.Equal(!expectPass, calculator.IsFail(finalMark));
         Assert.Equal(expectAtRisk, calculator.IsAtRisk(finalMark));
     }
 

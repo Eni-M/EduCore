@@ -65,7 +65,10 @@ public class MappingProfile : Profile
 
     private void MapAcademicCalendar()
     {
-        CreateMap<AcademicYear, Dtos.AcademicYear.AcademicYearListDto>();
+        // SchoolName has no source on the entity: it is joined in only for the SuperAdmin
+        // list, which is projected in the repository rather than mapped here.
+        CreateMap<AcademicYear, Dtos.AcademicYear.AcademicYearListDto>()
+            .ForCtorParam("SchoolName", o => o.MapFrom(_ => (string?)null));
         CreateWriteMap<Dtos.AcademicYear.AcademicYearCreateDto, AcademicYear>();
         // GradingPeriod is built manually in AcademicYearService (auto-created with the year)
         // and edited in place, so it has no write map.

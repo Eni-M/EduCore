@@ -15,7 +15,11 @@ public class AuditLogService(IAuditLogRepository auditLogs) : IAuditLogService
         CancellationToken ct)
     {
         var page = Math.Max(1, pagination.Page);
-        var pageSize = Math.Clamp(pagination.PageSize, 1, 100);
+
+        // Capped at 20, not the 100 the other lists allow. One action writes one audit row per
+        // entity it touched, so these rows arrive in bursts that share a trace id -- and a
+        // burst is only readable as one action if the page is short enough to see it whole.
+        var pageSize = Math.Clamp(pagination.PageSize, 1, 20);
 
         var (items, totalCount) = await auditLogs.GetPagedAsync(page, pageSize, userId, Utc(from), Utc(to), ct);
 

@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 
-namespace EduCore.Grading;
+namespace EduCore.Helpers;
 
 // Every grading rule in the system, in one class.
 //
@@ -50,7 +50,6 @@ public class GradingCalculator(IOptions<GradingOptions> options) : IGradingCalcu
     public double AtRiskUpperValue => _options.AtRiskMark + 0.5;
 
     public bool IsPass(int finalMark) => finalMark >= _options.PassMark;
-    public bool IsFail(int finalMark) => finalMark < _options.PassMark;
     public bool IsAtRisk(int finalMark) => finalMark == _options.AtRiskMark;
 
     // A whole student, not one mark: someone scraping through several subjects is at risk even

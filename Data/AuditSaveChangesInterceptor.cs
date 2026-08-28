@@ -45,11 +45,16 @@ public class AuditSaveChangesInterceptor(IHttpContextAccessor httpContextAccesso
         var userId = CurrentUserId();
         var timestamp = DateTime.UtcNow;
 
+        // Read once, not per row: every entry this save produces belongs to the same request,
+        // and sharing one trace id is exactly what makes them readable as a single action.
+        var traceId = httpContextAccessor.HttpContext?.TraceIdentifier;
+
         context.AddRange(changes.Select(action => new AuditLog
         {
             UserId = userId,
             Action = action,
-            Timestamp = timestamp
+            Timestamp = timestamp,
+            TraceId = traceId
         }));
     }
 

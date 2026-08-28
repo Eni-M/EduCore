@@ -1,4 +1,4 @@
-using EduCore.Services.Calendar;
+using EduCore.Helpers;
 using Microsoft.Extensions.Options;
 using Xunit;
 

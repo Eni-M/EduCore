@@ -151,6 +151,10 @@ namespace EduCore.Migrations
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("TraceId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<Guid?>("UserId")
                         .HasColumnType("uuid");
 
@@ -515,6 +519,9 @@ namespace EduCore.Migrations
 
                     b.Property<Guid?>("CityId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeactivatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()

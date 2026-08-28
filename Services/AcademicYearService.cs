@@ -5,7 +5,7 @@ using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
-using EduCore.Services.Calendar;
+using EduCore.Helpers;
 using EduCore.Services.Interfaces;
 
 namespace EduCore.Services;
@@ -17,8 +17,14 @@ public class AcademicYearService(
     ICurrentUser currentUser,
     IMapper mapper) : IAcademicYearService
 {
-    public async Task<IEnumerable<AcademicYearListDto>> GetAllAsync(CancellationToken ct) =>
-        mapper.Map<IEnumerable<AcademicYearListDto>>(await academicYears.GetAllOrderedAsync(ct));
+    public async Task<IEnumerable<AcademicYearListDto>> GetAllAsync(Guid? schoolId, CancellationToken ct) =>
+        // A SuperAdmin has no school, so the global filter would hide every year in the
+        // system from them -- which is why the statistics period picker could only ever
+        // offer "current". They read across schools instead, narrowed to the one the filter
+        // has selected when it has selected one.
+        currentUser.IsSuperAdmin
+            ? await academicYears.GetAllAcrossSchoolsAsync(schoolId, ct)
+            : mapper.Map<IEnumerable<AcademicYearListDto>>(await academicYears.GetAllOrderedAsync(ct));
 
     public async Task<AcademicYearListDto> GetByIdAsync(Guid academicYearId, CancellationToken ct) =>
         mapper.Map<AcademicYearListDto>(await GetOwnedYearAsync(academicYearId, ct));

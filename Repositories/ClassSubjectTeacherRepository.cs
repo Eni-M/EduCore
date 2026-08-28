@@ -63,6 +63,13 @@ public class ClassSubjectTeacherRepository(AppDbContext context)
                 cst => cst.ClassId == classId && cst.SubjectId == subjectId && cst.EndedOn == null,
                 ct);
 
+    // Tracked, like GetActiveAsync: the caller ends these assignments by setting EndedOn.
+    public async Task<IReadOnlyList<ClassSubjectTeacher>> GetActiveForClassAsync(
+        Guid classId, CancellationToken ct) =>
+        await _context.ClassSubjectTeachers
+            .Where(cst => cst.ClassId == classId && cst.EndedOn == null)
+            .ToListAsync(ct);
+
     public async Task<bool> TeachesClassAsync(Guid teacherId, Guid classId, CancellationToken ct) =>
         await _context.ClassSubjectTeachers
             .AnyAsync(cst => cst.TeacherId == teacherId && cst.ClassId == classId && cst.EndedOn == null, ct);

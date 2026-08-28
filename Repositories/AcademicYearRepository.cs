@@ -1,4 +1,6 @@
 using EduCore.Data;
+using EduCore.Dtos.AcademicYear;
+using EduCore.Helpers;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +16,22 @@ public class AcademicYearRepository(AppDbContext context)
             .OrderByDescending(a => a.StartDate)
             .ToListAsync(ct);
 
+    public async Task<IEnumerable<AcademicYearListDto>> GetAllAcrossSchoolsAsync(
+        Guid? schoolId, CancellationToken ct)
+    {
+        var query = _context.AcademicYears.AsNoTracking().IgnoreQueryFilters();
+
+        if (schoolId is not null)
+            query = query.Where(a => a.SchoolId == schoolId);
+
+        return await (
+                from a in query
+                join s in _context.Schools on a.SchoolId equals s.Id
+                orderby a.StartDate descending, s.Name
+                select new AcademicYearListDto(a.Id, a.Name, a.StartDate, a.EndDate, s.Name))
+            .ToListAsync(ct);
+    }
+
     public async Task<bool> NameExistsAsync(string name, CancellationToken ct) =>
         await _context.AcademicYears.AnyAsync(a => a.Name.ToLower() == name.ToLower(), ct);
 
@@ -26,14 +44,15 @@ public class AcademicYearRepository(AppDbContext context)
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(a => a.Id == academicYearId, ct);
 
-    // Falls back to the most recent year when today sits in a gap between two of them (a
-    // summer break), so statistics still have a sensible default window.
+    // Which year a report defaults to. The choosing is AcademicYearPicker's -- see there for
+    // why "the most recent year" is the one that most recently ENDED, not the one with the
+    // latest start date.
     public async Task<AcademicYear?> GetCurrentAsync(Guid schoolId, DateOnly onDate, CancellationToken ct) =>
-        await _context.AcademicYears
-            .AsNoTracking()
-            .IgnoreQueryFilters()
-            .Where(a => a.SchoolId == schoolId)
-            .OrderByDescending(a => a.StartDate <= onDate && onDate <= a.EndDate)
-            .ThenByDescending(a => a.StartDate)
-            .FirstOrDefaultAsync(ct);
+        AcademicYearPicker.CurrentOn(
+            await _context.AcademicYears
+                .AsNoTracking()
+                .IgnoreQueryFilters()
+                .Where(a => a.SchoolId == schoolId)
+                .ToListAsync(ct),
+            onDate);
 }

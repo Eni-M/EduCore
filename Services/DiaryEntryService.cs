@@ -13,6 +13,7 @@ public class DiaryEntryService(
     IAttendanceRepository attendances,
     IEnrollmentRepository enrollments,
     IClassRepository classes,
+    IAcademicYearRepository academicYears,
     ISubjectRepository subjects,
     ITeacherSubjectRepository teacherSubjects,
     IClassSubjectTeacherRepository assignments,
@@ -87,6 +88,22 @@ public class DiaryEntryService(
 
         if (!everAssigned)
             throw new BusinessException("That subject is not taught in this class.");
+
+        // Nothing checked the date until now, and both of these had already happened in the
+        // register: lessons dated after their academic year had finished, and one dated for
+        // tomorrow. Such a row is not merely untidy -- it falls outside every year-based
+        // report, so the attendance it carries silently stops being counted anywhere.
+        if (dto.Date > DateOnly.FromDateTime(DateTime.UtcNow))
+            throw new BusinessException("A lesson cannot be recorded before it has been taught.");
+
+        var year = await academicYears.GetByIdAsync(@class.AcademicYearId, ct)
+                   ?? throw new NotFoundException("Academic year", @class.AcademicYearId);
+
+        if (dto.Date < year.StartDate || dto.Date > year.EndDate)
+            throw new BusinessException(
+                $"{year.Name} runs from {year.StartDate:yyyy-MM-dd} to {year.EndDate:yyyy-MM-dd}. " +
+                "A lesson dated outside its own academic year would not show up in any report " +
+                "for that year.");
 
         if (await diaryEntries.SlotTakenAsync(dto.ClassId, dto.Date, dto.Period, ct))
             throw new ConflictException("A lesson is already recorded for this class in that period.");
