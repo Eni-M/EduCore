@@ -37,11 +37,12 @@ public static class DotEnvFile
             var name = parts[0].Trim();
             var value = parts[1].Trim();
 
-            // Set only what is not already set. A real environment variable wins,
-            // which is how a deployment supplies its secrets the normal way and
-            // never ships a .env at all -- and how a stale file on a server
-            // cannot quietly override it.
-            if (Environment.GetEnvironmentVariable(name) == null)
+            // Set only what is not already set to something. A real environment
+            // variable wins, which is how a deployment supplies its secrets the
+            // normal way and never ships a .env at all -- and how a stale file on
+            // a server cannot quietly override it. Empty counts as unset: a
+            // variable exported with no value is a mistake, not a choice.
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(name)))
                 Environment.SetEnvironmentVariable(name, value);
         }
     }

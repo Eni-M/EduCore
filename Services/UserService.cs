@@ -104,10 +104,15 @@ public class UserService(
         var user = await userRepository.GetByIdAsync(userId, ct)
                    ?? throw new NotFoundException("User", userId);
 
-        await EnsureCanManageAsync(user, ct);
-
-        if (userId == currentUser.UserId)
+        // Before the permission check, so someone switching themselves off is
+        // told the actual reason rather than an authorization message. Only on
+        // the way off: reactivating an account that is already active is a
+        // harmless no-op, and refusing it with "you cannot deactivate your own
+        // account" made no sense.
+        if (!isActive && userId == currentUser.UserId)
             throw new BusinessException("You cannot deactivate your own account.");
+
+        await EnsureCanManageAsync(user, ct);
 
         user.DeactivatedAt = isActive ? null : DateTime.UtcNow;
 
@@ -159,6 +164,15 @@ public class UserService(
 
     private async Task EnsureCanManageAsync(User target, CancellationToken ct)
     {
+        // A super administrator may manage anyone except another super
+        // administrator. Without this, one of them could reset a peer's password
+        // -- the reset returns the new password in the response -- and sign in as
+        // them, or simply switch them off; deactivating the last active one
+        // leaves a system nobody can administer.
+        if (target.Role == UserRole.SuperAdmin && target.Id != currentUser.UserId)
+            throw new ForbiddenException(
+                "A super administrator's account cannot be managed through the API.");
+
         if (currentUser.IsSuperAdmin)
             return;
 

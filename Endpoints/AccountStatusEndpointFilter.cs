@@ -29,18 +29,15 @@ namespace EduCore.Endpoints;
 // The cost is one lookup by primary key per request. That is the price of being
 // able to revoke at all: the alternative is a token nobody can withdraw once it
 // is out.
-public class AccountStatusEndpointFilter : IEndpointFilter
+// Both dependencies arrive through the constructor: AddEndpointFilter<T> builds
+// the filter once per request from that request's services, so a scoped service
+// is exactly what it can supply. ValidationEndpointFilter next door does the
+// same thing.
+public class AccountStatusEndpointFilter(IUserRepository users, ICurrentUser currentUser)
+    : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
-        // Asked for here rather than through the constructor: a filter is built
-        // once, at start-up, from the application's own service provider, and
-        // these two are scoped to a request. Constructor-injecting them would
-        // fail on the first request -- or worse, hand every request the same one.
-        var services = context.HttpContext.RequestServices;
-        var users = services.GetRequiredService<IUserRepository>();
-        var currentUser = services.GetRequiredService<ICurrentUser>();
-
         var user = await users.GetByIdAsync(currentUser.UserId, context.HttpContext.RequestAborted);
 
         // Deleted or switched off. 401 rather than 403, because the right answer

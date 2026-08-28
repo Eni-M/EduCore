@@ -27,7 +27,13 @@ using Microsoft.IdentityModel.Tokens;
 // Before anything reads configuration: pull .env into the environment, so the
 // secrets it holds are found by the environment-variables provider the default
 // builder already installs. See DotEnvFile for why they are not in appsettings.
+//
+// Two places, because the answer differs by how the app was started: the working
+// directory when it is run from the project folder, and the publish folder when
+// it is started from somewhere else. The first to set a name wins, so a
+// developer's own .env takes precedence.
 DotEnvFile.Load(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
+DotEnvFile.Load(Path.Combine(AppContext.BaseDirectory, ".env"));
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -222,8 +228,10 @@ app.MapAuthEndpoints();
 // Everything else requires a token and a password that is not pending a change.
 var api = app.MapGroup("/api")
     .RequireAuthorization()
-    .AddEndpointFilter<ValidationEndpointFilter>()
-    .AddEndpointFilter<AccountStatusEndpointFilter>();
+    // Identity first: there is no point validating the body of a request from
+    // an account that is switched off.
+    .AddEndpointFilter<AccountStatusEndpointFilter>()
+    .AddEndpointFilter<ValidationEndpointFilter>();
 
 api.MapSchoolEndpoints();
 api.MapSubjectEndpoints();
