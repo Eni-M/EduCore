@@ -161,6 +161,20 @@ public class StudentService(
             throw new BusinessException(
                 "Withdraw the student from their current class before recording a graduation.");
 
+        // FinalMark stays null until both components of a mark are entered -- that
+        // is how a half-graded term reads as "not graded yet" rather than as a low
+        // grade. Graduating a student while one is still open would freeze that
+        // half-finished record as their permanent one, with no way back in: there
+        // is nothing that un-graduates a student to fix it.
+        var incompleteMarks = (await marks.GetByStudentAsync(studentId, null, null, ct))
+            .Count(m => m.FinalMark is null);
+
+        if (incompleteMarks > 0)
+            throw new BusinessException(
+                $"This student has {incompleteMarks} mark{(incompleteMarks == 1 ? "" : "s")} " +
+                "still missing one of its two components. Finish grading before recording a " +
+                "graduation.");
+
         student.GraduationDate = dto.GraduationDate;
 
         students.Update(student);
