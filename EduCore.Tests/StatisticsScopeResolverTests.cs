@@ -8,9 +8,6 @@ using Xunit;
 
 namespace EduCore.Tests;
 
-// School isolation for the statistics module. The rest of the app leans on the global query
-// filter; statistics cannot, because a SuperAdmin has no school and the filter would match
-// nothing for them. That makes this class the boundary, and these tests the proof.
 public class StatisticsScopeResolverTests
 {
     private static readonly Guid SchoolA = Guid.NewGuid();
@@ -29,7 +26,6 @@ public class StatisticsScopeResolverTests
         public bool IsStudent => role == UserRole.Student;
     }
 
-    // The period resolver is exercised separately; here it only needs to return a window.
     private sealed class StubPeriodResolver : IStatisticsPeriodResolver
     {
         public Guid? LastSchoolId { get; private set; }
@@ -64,8 +60,6 @@ public class StatisticsScopeResolverTests
         Assert.Equal(SchoolA, context.SchoolId);
     }
 
-    // Refused rather than quietly rewritten to their own school: coercing it would keep the
-    // attempt out of the audit log, which is exactly where it belongs.
     [Fact]
     public async Task Admin_AskingForAnotherSchool_IsRefused() =>
         await Assert.ThrowsAsync<ForbiddenException>(() =>
@@ -92,8 +86,6 @@ public class StatisticsScopeResolverTests
         Assert.False(context.CrossSchool);
     }
 
-    // The resolved school, not the requested one, is what decides which academic year counts
-    // as "current" -- otherwise a SuperAdmin could read one school's calendar into another's.
     [Fact]
     public async Task ResolvedSchool_IsWhatThePeriodResolverSees()
     {

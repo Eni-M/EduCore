@@ -13,8 +13,6 @@ public class AttendanceStatisticsService(
     IStatisticsScopeResolver scope,
     ICellSuppressor suppressor) : IAttendanceStatisticsService
 {
-    // What counts as "excessive" when the caller does not say. Deliberately a default rather
-    // than a constant buried in a query, so an admin can ask a different question.
     private const double DefaultExcessiveAbsenceRate = 20.0;
 
     public async Task<AttendanceStatisticsDto> GetSummaryAsync(
@@ -28,9 +26,6 @@ public class AttendanceStatisticsService(
             suppressor.Apply(Measures.Rate(totals.Present, totals.Records)),
             suppressor.Apply(Measures.Rate(totals.Absent, totals.Records)),
             suppressor.Apply(Measures.Rate(totals.ExcusedAbsences, totals.Records)),
-            // Sample size is the number of behaviour marks, not the number of attendance rows
-            // -- otherwise one child's behaviour mark would sail past suppression looking like
-            // a whole class's average.
             suppressor.Apply(Measures.Average(totals.AverageBehaviorMark, totals.BehaviorMarkCount)));
     }
 
@@ -92,8 +87,6 @@ public class AttendanceStatisticsService(
         return trend;
     }
 
-    // Individual-level from here down: these name students, so they are never suppressed and
-    // never part of a public slice.
     public async Task<IReadOnlyList<StudentAttendanceSummaryDto>> GetByStudentAsync(
         StatisticsFilter filter, CancellationToken ct) =>
         await attendance.GetByStudentAsync(await scope.ResolveAsync(filter, ct), ct);

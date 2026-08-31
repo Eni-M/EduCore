@@ -44,9 +44,6 @@ public class AcademicYearRepository(AppDbContext context)
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(a => a.Id == academicYearId, ct);
 
-    // Which year a report defaults to. The choosing is AcademicYearPicker's -- see there for
-    // why "the most recent year" is the one that most recently ENDED, not the one with the
-    // latest start date.
     public async Task<AcademicYear?> GetCurrentAsync(Guid schoolId, DateOnly onDate, CancellationToken ct) =>
         AcademicYearPicker.CurrentOn(
             await _context.AcademicYears

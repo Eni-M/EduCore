@@ -10,16 +10,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EduCore.Repositories.Statistics;
 
-// Aggregates marks into the academic figures.
-//
-// The weighting appears inline in the grouped queries below rather than coming from
-// MarkRepository, and that is a constraint rather than a preference: EF cannot see through a
-// constructed type, so composing over MarkRepository.Value fails to translate the moment the
-// query joins or groups on one of its properties. The scalar paths still go through
-// MarkRepository.WeightedValues, which does translate.
-//
-// GradingRuleAgreementTests pins every form of the rule against GradingCalculator, so the
-// repetition cannot silently drift.
 public class AcademicStatisticsRepository(
     AppDbContext context,
     IMarkRepository marks,
@@ -116,8 +106,6 @@ public class AcademicStatisticsRepository(
             .ToList();
     }
 
-    // The school-wide average for a subject at a grade level: the baseline every per-class and
-    // per-teacher figure is reported against, so no number is ever shown bare.
     public async Task<IReadOnlyList<AcademicGroup>> GetSubjectGradeBaselinesAsync(
         StatisticsQuery ctx, CancellationToken ct)
     {
@@ -158,7 +146,6 @@ public class AcademicStatisticsRepository(
         var values = await Values(ctx).ToListAsync(ct);
         var total = values.Count;
 
-        // Rounded here rather than in SQL so it rounds identically to GradingCalculator.
         var counts = values
             .GroupBy(value => (int)Math.Round(value, MidpointRounding.AwayFromZero))
             .ToDictionary(g => g.Key, g => g.Count());
@@ -181,8 +168,6 @@ public class AcademicStatisticsRepository(
         var (first, second) = (grading.FirstMarkWeight, grading.SecondMarkWeight);
         var (pass, atRiskUpper) = (grading.PassValue, grading.AtRiskUpperValue);
 
-        // Grouped per student across their subjects, so "at risk" reflects the whole record
-        // rather than a single weak subject.
         var rows = await (from m in GradedMarks(ctx)
                           join e in Scope(_context.Enrollments, ctx) on m.EnrollmentId equals e.Id
                           join st in Scope(_context.Students, ctx) on e.StudentId equals st.Id

@@ -24,8 +24,6 @@ public class TeacherStatisticsService(
         var studentTotals = await students.GetTotalsAsync(ctx, ct);
         var workload = await teachers.GetWorkloadAsync(ctx, ct);
 
-        // Suppressed like any other aggregate: at a school with a handful of teachers -- or
-        // with a teacherId filter applied -- these describe one identifiable person.
         return new TeacherStatisticsDto(
             teacherCount,
             teacherCount == 0
@@ -46,15 +44,11 @@ public class TeacherStatisticsService(
         StatisticsFilter filter, CancellationToken ct) =>
         await teachers.GetCoverageAsync(await scope.ResolveAsync(filter, ct), ct);
 
-    // The teacher view. Work metrics and outcome metrics are kept apart deliberately, and no
-    // outcome number is ever returned bare -- see TeacherDetailStatisticsDto for why.
     public async Task<TeacherDetailStatisticsDto> GetDetailAsync(
         StatisticsFilter filter, Guid teacherId, CancellationToken ct)
     {
         var ctx = await scope.ResolveAsync(filter, ct);
 
-        // Confirms the teacher exists and is inside the caller's school before anything else
-        // is queried -- GetTeacherNameAsync is scoped, so a foreign teacher reads as missing.
         _ = await teachers.GetTeacherNameAsync(ctx, teacherId, ct)
             ?? throw new NotFoundException("Teacher", teacherId);
 
@@ -63,8 +57,6 @@ public class TeacherStatisticsService(
         var workload = (await teachers.GetWorkloadAsync(scopedToTeacher, ct)).Single();
         var coverage = (await teachers.GetCoverageAsync(scopedToTeacher, ct)).Single();
 
-        // Baselines come from the whole school, not from this teacher's own classes -- that is
-        // the entire point of showing them.
         var baselines = (await academic.GetSubjectGradeBaselinesAsync(ctx, ct))
             .ToDictionary(b => b.Key, b => b);
 

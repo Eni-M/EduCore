@@ -6,8 +6,6 @@ using EduCore.Services.Statistics.Interfaces;
 
 namespace EduCore.Services.Statistics;
 
-// Student figures are headcounts throughout, so nothing here is cell-suppressed. See
-// CellSuppressor for where that line sits and why.
 public class StudentStatisticsService(
     IStudentStatisticsRepository students,
     IStatisticsScopeResolver scope) : IStudentStatisticsService
@@ -47,7 +45,6 @@ public class StudentStatisticsService(
                 month,
                 monthEnd > ctx.To ? ctx.To : monthEnd,
                 month.ToString("MMM yyyy"),
-                // A headcount, not a measurement of the students in it -- see CellSuppressor.
                 Measures.Count(count).WithPrevious(previous)));
 
             previous = count;
@@ -56,8 +53,6 @@ public class StudentStatisticsService(
         return trend;
     }
 
-    // Headcounts stay exact and unsuppressed. They carry no baseline because there is nothing
-    // meaningful to compare a raw count against -- see CellSuppressor for where the line sits.
     private static IReadOnlyList<CountByKeyDto> Map(IEnumerable<Dtos.Statistics.Rows.CountRow> rows) =>
         rows.Select(r => new CountByKeyDto(r.Key, r.Label, r.Count)).ToList();
 }

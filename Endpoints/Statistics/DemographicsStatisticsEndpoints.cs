@@ -7,9 +7,6 @@ public static class DemographicsStatisticsEndpoints
 {
     public static void MapDemographicsStatisticsEndpoints(this RouteGroupBuilder group)
     {
-        // Cross-school by nature -- "which city has the most students" is not a question one
-        // school can ask about itself. The service enforces this too, in case the route is
-        // ever remapped.
         var demographics = group.MapGroup("/demographics")
             .RequireAuthorization(Policies.SuperAdmin);
 

@@ -5,8 +5,6 @@ using EduCore.Enums;
 
 namespace EduCore.Dtos.Student;
 
-// The full "everything about this student" view: identity, guardians, current placement,
-// and their complete attendance/behavior/academic history in one call.
 public record StudentProfileDto(
     Guid Id,
     string FirstName,

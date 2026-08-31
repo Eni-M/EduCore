@@ -65,21 +65,15 @@ public class AcademicStatisticsService(
         StatisticsFilter filter, CancellationToken ct) =>
         Suppress(await academic.GetDistributionAsync(await scope.ResolveAsync(filter, ct), ct));
 
-    // Withheld whole rather than bucket by bucket: a partly-suppressed distribution still
-    // gives the missing bucket away by subtraction from the total.
     private GradeDistributionResultDto Suppress(GradeDistributionResultDto distribution) =>
         suppressor.ShouldSuppress(distribution.TotalMarks)
             ? distribution with { Suppressed = true, Buckets = [] }
             : distribution;
 
-    // Individual-level: names students, so it is never suppressed and never public.
     public async Task<IReadOnlyList<AtRiskStudentDto>> GetAtRiskAsync(
         StatisticsFilter filter, CancellationToken ct) =>
         await academic.GetAtRiskAsync(await scope.ResolveAsync(filter, ct), ct);
 
-    // "Class A vs Class B, Mathematics, 4.1 vs 3.6". Each class is reported against the
-    // school-wide average for that subject, so the comparison is between the classes AND
-    // against the school, not just between two bare numbers.
     public async Task<SubjectComparisonDto> GetSubjectComparisonAsync(
         StatisticsFilter filter, Guid subjectId, CancellationToken ct)
     {

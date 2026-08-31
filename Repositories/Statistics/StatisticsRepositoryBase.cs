@@ -5,13 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EduCore.Repositories.Statistics;
 
-// Every statistics query goes through Scope, which is the one place school isolation is
-// applied for this module.
-//
-// The rest of the app relies on the global query filter in AppDbContext. Statistics cannot:
-// a SuperAdmin has no school of their own, so the filter would match nothing for them. These
-// queries therefore drop the filter and scope explicitly -- and the guard below makes running
-// unscoped an exception rather than a silent leak of every school's data.
 public abstract class StatisticsRepositoryBase(AppDbContext context)
 {
     protected readonly AppDbContext _context = context;
@@ -31,8 +24,6 @@ public abstract class StatisticsRepositoryBase(AppDbContext context)
             : query.Where(e => e.SchoolId == ctx.SchoolId);
     }
 
-    // Attendance and diary entries are dated by the lesson, so a calendar window is applied
-    // to the diary entry rather than to the attendance row.
     protected IQueryable<Models.DiaryEntry> LessonsInWindow(StatisticsQuery ctx)
     {
         var lessons = Scope(_context.DiaryEntries, ctx)
@@ -50,8 +41,6 @@ public abstract class StatisticsRepositoryBase(AppDbContext context)
         return lessons;
     }
 
-    // Marks belong to a grading period rather than to a date, so they are windowed by the
-    // periods that overlap the requested range.
     protected IQueryable<Models.Mark> MarksInWindow(StatisticsQuery ctx)
     {
         var periodIds = Scope(_context.GradingPeriods, ctx)
@@ -94,7 +83,6 @@ public abstract class StatisticsRepositoryBase(AppDbContext context)
         return classes;
     }
 
-    // Enrollments that were live at any point in the window.
     protected IQueryable<Models.Enrollment> EnrollmentsInWindow(StatisticsQuery ctx)
     {
         var classIds = ClassesInScope(ctx).Select(c => c.Id);

@@ -11,6 +11,5 @@ public class Class : ISchoolScoped
     public int Grade { get; set; }
     public Guid? HomeroomTeacherId { get; set; }
 
-    // Nullable: capacity-vs-actual is reported only for classes that declare one.
     public int? Capacity { get; set; }
 }

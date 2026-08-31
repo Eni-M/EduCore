@@ -18,7 +18,6 @@ public static class StudentEndpoints
                     new PaginationQueryDto(page ?? 1, pageSize ?? 20), search, includeGraduated ?? false, ct)))
             .RequireAuthorization(Policies.Admin);
 
-        // So the front end does not have to keep track of its own student id.
         group.MapGet("/me", async (IStudentService service, ICurrentUser currentUser, CancellationToken ct) =>
                 Results.Ok(await service.GetProfileAsync(currentUser.RequireStudentId(), ct)))
             .RequireAuthorization(Policies.AnySchoolUser);
@@ -44,8 +43,6 @@ public static class StudentEndpoints
                     Results.Ok(await service.UpdateAsync(studentId, dto, ct)))
             .RequireAuthorization(Policies.Admin);
 
-        // Read-only twin of the POST below: the same rule, asked rather than applied, so the
-        // student page can say why the button is disabled instead of guessing at it.
         group.MapGet("/{studentId:guid}/graduation-eligibility",
                 async (Guid studentId, IStudentService service, CancellationToken ct) =>
                     Results.Ok(await service.GetGraduationEligibilityAsync(studentId, ct)))

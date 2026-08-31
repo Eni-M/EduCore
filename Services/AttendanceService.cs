@@ -37,8 +37,6 @@ public class AttendanceService(
         if (currentUser.IsTeacher && entry.TeacherId != currentUser.TeacherId)
             throw new ForbiddenException("You can only mark attendance for lessons you taught.");
 
-        // Comment and BehaviorMark are plain fields, so the mapper handles them. Presence goes
-        // through Record, which is what keeps "excused presence" from ever being stored.
         mapper.Map(dto, attendance);
         attendance.Record(dto.IsPresent, dto.IsExcused);
 

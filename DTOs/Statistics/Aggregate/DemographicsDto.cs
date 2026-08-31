@@ -1,8 +1,5 @@
 namespace EduCore.Dtos.Statistics.Aggregate;
 
-// Where the students actually are. City and Zone are nullable on School, so schools with no
-// recorded location are reported under "Not recorded" rather than dropped -- a demographic
-// report that quietly omits schools is worse than one that admits a gap.
 public record CityDemographicsDto(
     string City,
     int Schools,

@@ -9,8 +9,6 @@ namespace EduCore.Repositories;
 public class ClassSubjectTeacherRepository(AppDbContext context)
     : Repository<ClassSubjectTeacher>(context), IClassSubjectTeacherRepository
 {
-    // Sorted in memory below: the names come from joins, and EF cannot sort on a property of
-    // an already-projected record. These lists are one row per subject, so they are tiny.
     private IQueryable<ClassSubjectTeacherListDto> Project(IQueryable<ClassSubjectTeacher> assignments) =>
         from cst in assignments
         join c in _context.Classes on cst.ClassId equals c.Id
@@ -63,7 +61,6 @@ public class ClassSubjectTeacherRepository(AppDbContext context)
                 cst => cst.ClassId == classId && cst.SubjectId == subjectId && cst.EndedOn == null,
                 ct);
 
-    // Tracked, like GetActiveAsync: the caller ends these assignments by setting EndedOn.
     public async Task<IReadOnlyList<ClassSubjectTeacher>> GetActiveForClassAsync(
         Guid classId, CancellationToken ct) =>
         await _context.ClassSubjectTeachers

@@ -8,10 +8,6 @@ public static class LocationEndpoints
 {
     public static void MapLocationEndpoints(this IEndpointRouteBuilder api)
     {
-        // Reading is open to any signed-in school user, because every form that records a
-        // person's home town needs to offer the list. Writing is SuperAdmin only: these rows
-        // are shared by every school, so one school's administrator must not be able to
-        // rename or delete a place another school depends on.
         var states = api.MapGroup("/states").WithTags("Locations");
 
         states.MapGet("/", async (ILocationService service, CancellationToken ct) =>

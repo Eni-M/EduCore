@@ -5,8 +5,6 @@ using EduCore.Services.Statistics.Interfaces;
 
 namespace EduCore.Services.Statistics;
 
-// Every statistics service takes a StatisticsQuery, never a raw StatisticsFilter, so a
-// query cannot be run against input that has not been through here first.
 public class StatisticsScopeResolver(
     ICurrentUser currentUser,
     IStatisticsPeriodResolver periods) : IStatisticsScopeResolver
@@ -32,13 +30,10 @@ public class StatisticsScopeResolver(
     private (Guid? SchoolId, bool CrossSchool) ResolveSchool(StatisticsFilter filter)
     {
         if (currentUser.IsSuperAdmin)
-            // No school id means every school, aggregated.
             return (filter.SchoolId, filter.SchoolId is null);
 
         var ownSchoolId = currentUser.RequireSchoolId();
 
-        // Refused, not quietly rewritten to their own school: coercing it would keep the
-        // attempt out of the audit log, which is exactly where it belongs.
         if (filter.SchoolId is not null && filter.SchoolId != ownSchoolId)
             throw new ForbiddenException("You can only view statistics for your own school.");
 

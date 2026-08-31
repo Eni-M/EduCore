@@ -18,9 +18,6 @@ public class ClassService(
     ICurrentUser currentUser,
     IMapper mapper) : IClassService
 {
-    // The endpoint policy admits an administrator and a teacher alike, so the narrowing has
-    // to happen here: an administrator manages the whole school, while a teacher may only see
-    // the classes they actually teach or are homeroom for.
     public async Task<IEnumerable<ClassListDto>> GetAllAsync(Guid? academicYearId, CancellationToken ct)
     {
         if (currentUser.IsAdmin || currentUser.IsSuperAdmin)
@@ -28,7 +25,6 @@ public class ClassService(
 
         var mine = await classes.GetByTeacherAsync(currentUser.RequireTeacherId(), ct);
 
-        // Filtered in memory: a teacher has a handful of classes, not a school's worth.
         return academicYearId is null
             ? mine
             : mine.Where(c => c.AcademicYearId == academicYearId);
@@ -94,8 +90,6 @@ public class ClassService(
         entity.HomeroomTeacherId = dto.TeacherId;
         classes.Update(entity);
 
-        // For an elementary school, homeroom IS the subject assignment -- this grants (or
-        // moves) every subject the school has. A no-op for any other school type.
         await elementarySync.SyncHomeroomChangeAsync(
             entity.SchoolId, classId, oldTeacherId, dto.TeacherId, ct);
 

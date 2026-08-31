@@ -4,8 +4,6 @@ using Xunit;
 
 namespace EduCore.Tests;
 
-// An academic year always has exactly two grading periods -- this is what computes their
-// default dates when a year is created.
 public class AcademicCalendarTests
 {
     private static AcademicCalendar Calendar(string firstEnd = "12-26", string secondStart = "01-07") =>
@@ -15,8 +13,6 @@ public class AcademicCalendarTests
             SecondPeriodStart = secondStart
         }));
 
-    // The worked example: a year starting September 1st splits into autumn (ending December)
-    // and spring (starting January of the following calendar year).
     [Fact]
     public void StandardSeptemberYear_SplitsAcrossTheNewYear()
     {
@@ -33,7 +29,6 @@ public class AcademicCalendarTests
         Assert.Equal(yearEnd, secondEnd);
     }
 
-    // The two periods must never overlap, and the second must start after the first ends.
     [Fact]
     public void Periods_DoNotOverlap()
     {
@@ -47,8 +42,6 @@ public class AcademicCalendarTests
         Assert.True(secondStart > firstEnd);
     }
 
-    // A year that does not span a calendar boundary the way September-start years do --
-    // the computed dates still land, clamped, inside the year's own range.
     [Fact]
     public void ShortYear_ClampsBothPeriodsInsideItsOwnRange()
     {

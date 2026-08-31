@@ -14,11 +14,6 @@ using Xunit;
 
 namespace EduCore.Tests;
 
-// A list endpoint's policy says which ROLES may call it, never which ROWS come back. Both
-// /api/classes and /api/subjects admit more than one role, so the narrowing lives in the
-// service -- and that makes it invisible from the route table. These tests are the proof
-// that a teacher cannot list a colleague's class and a student cannot list a subject they
-// are not taught.
 public class ListScopingTests
 {
     private static readonly Guid SchoolId = Guid.NewGuid();
@@ -48,7 +43,6 @@ public class ListScopingTests
 
     private sealed class FakeClassRepository : IClassRepository
     {
-        // Every class in the school, versus the two this teacher is attached to.
         public Task<IEnumerable<ClassListDto>> GetAllAsync(Guid? academicYearId, CancellationToken ct) =>
             Task.FromResult<IEnumerable<ClassListDto>>(
                 [Class(MyClassId, "10A"), Class(OtherClassId, "10B")]);
@@ -81,8 +75,6 @@ public class ListScopingTests
 
     private sealed class FakeAssignmentRepository : IClassSubjectTeacherRepository
     {
-        // Deliberately returns the same subject twice: one row exists per (class, subject),
-        // so a teacher across two classes must still see the subject once.
         public Task<IEnumerable<ClassSubjectTeacherListDto>> GetByTeacherAsync(
             Guid teacherId, bool includeEnded, CancellationToken ct) =>
             Task.FromResult<IEnumerable<ClassSubjectTeacherListDto>>(
@@ -183,8 +175,6 @@ public class ListScopingTests
             new FakeCurrentUser(role),
             Mapper());
 
-    // ---- classes -------------------------------------------------------------------
-
     [Fact]
     public async Task Admin_listing_classes_sees_the_whole_school()
     {
@@ -220,8 +210,6 @@ public class ListScopingTests
         Assert.Single(await service.GetAllAsync(YearId, CancellationToken.None));
     }
 
-    // ---- subjects ------------------------------------------------------------------
-
     [Fact]
     public async Task Admin_listing_subjects_sees_the_whole_catalogue()
     {
@@ -233,8 +221,6 @@ public class ListScopingTests
     {
         var result = await Subjects(UserRole.Teacher).GetAllAsync(CancellationToken.None);
 
-        // Two assignment rows, one subject: the same subject taught to two classes is still
-        // one subject, and Physics is not theirs at all.
         Assert.Equal(MySubjectId, Assert.Single(result).Id);
     }
 
@@ -249,8 +235,6 @@ public class ListScopingTests
     [Fact]
     public async Task Unplaced_student_listing_subjects_gets_nothing_rather_than_everything()
     {
-        // The failure that matters: falling back to the school catalogue for a student with
-        // no class would hand them every subject in the school.
         Assert.Empty(await Subjects(UserRole.Student, enrolled: false).GetAllAsync(CancellationToken.None));
     }
 }

@@ -18,9 +18,6 @@ public class SubjectService(
     ICurrentUser currentUser,
     IMapper mapper) : ISubjectService
 {
-    // "The subjects" means something different per role, and the endpoint policy cannot say
-    // so on its own. An administrator maintains the school's catalogue and needs all of it;
-    // a teacher and a student are entitled only to the subjects they are actually part of.
     public async Task<IEnumerable<SubjectListDto>> GetAllAsync(CancellationToken ct)
     {
         if (currentUser.IsAdmin || currentUser.IsSuperAdmin)
@@ -30,8 +27,6 @@ public class SubjectService(
             return Distinct(
                 await assignments.GetByTeacherAsync(currentUser.RequireTeacherId(), false, ct));
 
-        // A student's subjects are whatever is taught to the class they are enrolled in. Not
-        // being enrolled is an empty list, not an error: an unplaced student has no subjects.
         var enrollment = await enrollments.GetActiveForStudentAsync(currentUser.RequireStudentId(), ct);
 
         return enrollment is null
@@ -39,8 +34,6 @@ public class SubjectService(
             : Distinct(await assignments.GetByClassAsync(enrollment.ClassId, false, ct));
     }
 
-    // One assignment row exists per (class, subject), so a teacher across several classes --
-    // or a class with a subject split between teachers -- would otherwise repeat the subject.
     private static IEnumerable<SubjectListDto> Distinct(
         IEnumerable<ClassSubjectTeacherListDto> rows) =>
         rows.GroupBy(a => a.SubjectId)
@@ -60,8 +53,6 @@ public class SubjectService(
 
         await subjects.AddAsync(subject);
 
-        // Elementary: every class that already has a homeroom teacher gets this subject
-        // assigned to them immediately. A no-op for any other school type.
         await elementarySync.SyncNewSubjectAsync(subject.SchoolId, subject.Id, ct);
 
         await subjects.SaveChangesAsync(ct);

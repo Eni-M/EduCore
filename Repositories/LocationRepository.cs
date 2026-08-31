@@ -33,8 +33,6 @@ public class LocationRepository(AppDbContext context) : ILocationRepository
         if (stateId is not null)
             query = query.Where(c => c.StateId == stateId);
 
-        // State first: a flat list of every city is otherwise unreadable once there are more
-        // than a handful of states.
         return await query
             .OrderBy(c => c.State.Name)
             .ThenBy(c => c.Name)
@@ -60,9 +58,6 @@ public class LocationRepository(AppDbContext context) : ILocationRepository
                  && (excludeCityId == null || c.Id != excludeCityId),
             ct);
 
-    // Students and schools are checked with the school filter ignored: a SuperAdmin deleting
-    // a city belongs to no school, and the filter would otherwise report the city as unused
-    // while rows in other schools still point at it.
     public async Task<bool> CityIsInUseAsync(Guid cityId, CancellationToken ct) =>
         await context.Students.IgnoreQueryFilters().AnyAsync(s => s.CityId == cityId, ct)
         || await context.Schools.AnyAsync(s => s.CityId == cityId, ct);

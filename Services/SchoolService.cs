@@ -49,10 +49,6 @@ public class SchoolService(ISchoolRepository schools, IMapper mapper) : ISchoolS
         return mapper.Map<SchoolListDto>(school);
     }
 
-    // Reversible by design: this writes one nullable timestamp and touches nothing else. No
-    // row is deleted, no account is locked out, and passing true clears it again. What it
-    // changes is what GetAllAsync(activeOnly: true) returns -- the pickers that create new
-    // records against a school stop offering this one.
     public async Task SetActiveAsync(Guid schoolId, bool isActive, CancellationToken ct)
     {
         var school = await schools.GetByIdAsync(schoolId, ct)

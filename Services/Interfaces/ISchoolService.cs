@@ -9,6 +9,5 @@ public interface ISchoolService
     Task<SchoolListDto> CreateAsync(SchoolCreateDto dto, CancellationToken ct);
     Task<SchoolListDto> UpdateAsync(Guid schoolId, SchoolEditDto dto, CancellationToken ct);
 
-    // Separate from UpdateAsync on purpose -- see the comment on SchoolListDto.
     Task SetActiveAsync(Guid schoolId, bool isActive, CancellationToken ct);
 }

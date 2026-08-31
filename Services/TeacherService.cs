@@ -88,9 +88,6 @@ public class TeacherService(
         if (await teacherSubjects.ExistsAsync(dto.TeacherId, dto.SubjectId, ct))
             throw new ConflictException("This teacher is already qualified for that subject.");
 
-        // Elementary is exempt: a homeroom teacher is expected to cover every subject the
-        // school has, and is assigned that way automatically rather than through this
-        // manual grant -- see ElementaryAssignmentSync.
         var school = await schools.GetByIdAsync(teacher.SchoolId, ct);
 
         if (school?.Type != SchoolType.Elementary)
@@ -125,8 +122,6 @@ public class TeacherService(
         await teacherSubjects.SaveChangesAsync(ct);
     }
 
-    // /api/teachers answers a teacher as well as an administrator. A colleague's
-    // user id and deactivation date are an administrator's business.
     private IEnumerable<TeacherListDto> WithVisibleAccounts(IEnumerable<TeacherListDto> rows) =>
         currentUser.CanManageAccounts() ? rows : rows.Select(row => row with { Account = null });
 }

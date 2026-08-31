@@ -4,13 +4,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EduCore.Repositories.Statistics;
 
-// Demographics work across schools by definition -- "which city has the most students" is not
-// a question a single school can ask about itself. The service layer therefore restricts these
-// to SuperAdmin, and the queries deliberately span every school.
-//
-// School is not ISchoolScoped (it is the tenant root, not a tenant member), so these do not go
-// through StatisticsRepositoryBase.Scope. The per-school tables they join do, which is why
-// each one drops the global filter explicitly.
 public class DemographicsStatisticsRepository(AppDbContext context) : IDemographicsStatisticsRepository
 {
     private const string NotRecorded = "Not recorded";
@@ -34,8 +27,6 @@ public class DemographicsStatisticsRepository(AppDbContext context) : IDemograph
             })
             .ToListAsync(ct);
 
-        // Grouped in memory: this is one row per school, and doing it here lets null and empty
-        // city names collapse into the same "Not recorded" bucket without a SQL COALESCE.
         return rows
             .GroupBy(r => string.IsNullOrWhiteSpace(r.City) ? NotRecorded : r.City!)
             .Select(g => (

@@ -2,7 +2,6 @@ using EduCore.Data;
 
 namespace EduCore.Models;
 
-// School-scoped, not global -- term/year boundaries genuinely differ between schools.
 public class AcademicYear : ISchoolScoped
 {
     public Guid Id { get; set; }

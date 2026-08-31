@@ -5,9 +5,6 @@ using EduCore.Services.Statistics.Interfaces;
 
 namespace EduCore.Services.Statistics;
 
-// No ICellSuppressor here, deliberately. Everything this service returns is either an exact
-// headcount or a figure sitting next to the raw count it was derived from, so suppressing the
-// percentage would hide nothing that is not already on the same response.
 public class EnrollmentStatisticsService(
     IEnrollmentStatisticsRepository enrollments,
     IStatisticsScopeResolver scope) : IEnrollmentStatisticsService
@@ -19,8 +16,6 @@ public class EnrollmentStatisticsService(
 
         var active = await enrollments.CountActiveAsync(ctx, ct);
 
-        // Growth is measured against the same point one year earlier, so a window of any
-        // length compares like with like rather than against the previous window's length.
         var yearAgo = await enrollments.CountActiveOnAsync(ctx, ctx.To.AddYears(-1), ct);
 
         return new EnrollmentStatisticsDto(
@@ -55,12 +50,6 @@ public class EnrollmentStatisticsService(
                 r.Grade,
                 r.Capacity,
                 r.Enrolled,
-                // Empty rather than zero or infinite for a class that never declared a
-                // capacity -- "0% full" and "unknown" are different statements.
-                //
-                // Not suppressed: this describes a room, not a person, and the raw enrolled
-                // count sits right beside it anyway, so hiding the percentage would protect
-                // nothing.
                 r.Capacity is null or 0
                     ? Measure.None("no capacity recorded")
                     : Measures.Rate(r.Enrolled, r.Capacity.Value)))

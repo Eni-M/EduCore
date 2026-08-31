@@ -7,8 +7,6 @@ using EduCore.Services.Interfaces;
 
 namespace EduCore.Endpoints;
 
-// Enrollments, lessons, attendance and marks. The listings for these live under /classes and
-// /students, which is where they are actually read from.
 public static class LessonEndpoints
 {
     public static void MapLessonEndpoints(this IEndpointRouteBuilder api)
@@ -20,7 +18,6 @@ public static class LessonEndpoints
         enrollments.MapPost("/", async (EnrollmentCreateDto dto, IEnrollmentService service, CancellationToken ct) =>
             Results.Ok(await service.EnrollAsync(dto, ct)));
 
-        // Ended, not deleted, so the student keeps their marks for that class.
         enrollments.MapPost("/{enrollmentId:guid}/withdraw",
             async (Guid enrollmentId, EnrollmentWithdrawDto dto, IEnrollmentService service, CancellationToken ct) =>
             {
@@ -39,7 +36,6 @@ public static class LessonEndpoints
                     Results.Ok(await service.GetDetailAsync(diaryEntryId, ct)))
             .RequireAuthorization(Policies.AnySchoolUser);
 
-        // Logging a lesson also opens its register, everyone marked present.
         diary.MapPost("/", async (DiaryEntryCreateDto dto, IDiaryEntryService service, CancellationToken ct) =>
             {
                 var entry = await service.CreateAsync(dto, ct);
@@ -67,8 +63,6 @@ public static class LessonEndpoints
             .RequireAuthorization(Policies.AdminOrTeacher)
             .WithTags("Marks");
 
-        // Create-or-update: there is one mark per subject per grading period, so a teacher
-        // setting the second mark later updates that row rather than adding another.
         marks.MapPost("/", async (MarkUpsertDto dto, IMarkService service, CancellationToken ct) =>
             Results.Ok(await service.UpsertAsync(dto, ct)));
 

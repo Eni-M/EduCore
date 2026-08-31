@@ -10,7 +10,6 @@ public interface IEnrollmentStatisticsRepository
     Task<int> CountStartedAsync(StatisticsQuery ctx, CancellationToken ct);
     Task<int> CountExitedAsync(StatisticsQuery ctx, CancellationToken ct);
 
-    // Active enrollments as they stood one year before the window started, for growth.
     Task<int> CountActiveOnAsync(StatisticsQuery ctx, DateOnly on, CancellationToken ct);
 
     Task<IReadOnlyList<CountRow>> GetExitsByReasonAsync(StatisticsQuery ctx, CancellationToken ct);

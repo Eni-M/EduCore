@@ -12,7 +12,6 @@ public interface IStudentStatisticsRepository
     Task<IReadOnlyList<ClassCountRow>> GetByClassAsync(StatisticsQuery ctx, CancellationToken ct);
     Task<IReadOnlyList<CountRow>> GetByAgeAsync(StatisticsQuery ctx, CancellationToken ct);
 
-    // Active enrollments at the end of each month in the window.
     Task<IReadOnlyList<(DateOnly Month, int Count)>> GetEnrollmentTrendAsync(
         StatisticsQuery ctx, CancellationToken ct);
 }

@@ -6,9 +6,6 @@ using Xunit;
 
 namespace EduCore.Tests;
 
-// Suppression is the difference between publishing "grade 12 average: 2.1" and publishing the
-// grades of the two girls in grade 12. Getting the boundary wrong is a privacy failure, not a
-// rounding error.
 public class CellSuppressorTests
 {
     private static CellSuppressor Suppressor(int minimum = 5) =>
@@ -36,7 +33,6 @@ public class CellSuppressorTests
         Assert.Equal(3.5, result.Value);
     }
 
-    // No data is not the same as data withheld, and callers may need to say so differently.
     [Fact]
     public void EmptySample_IsNotMarkedSuppressed()
     {
@@ -46,8 +42,6 @@ public class CellSuppressorTests
         Assert.Null(result.Value);
     }
 
-    // A baseline or a previous value would leak the same information the suppressed value was
-    // hidden to protect.
     [Fact]
     public void Suppression_AlsoClearsBaselineAndPrevious()
     {
@@ -59,12 +53,9 @@ public class CellSuppressorTests
         Assert.Null(result.Baseline);
         Assert.Null(result.Previous);
 
-        // The label survives, so the frontend can still explain what is missing and why.
         Assert.Equal("school average", result.BaselineLabel);
     }
 
-    // ShouldSuppress is what results that are not a single Measure -- a grade distribution --
-    // are withheld by, so it has to agree with Apply exactly.
     [Theory]
     [InlineData(0, false)]
     [InlineData(1, true)]

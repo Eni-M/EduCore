@@ -4,8 +4,6 @@ using FluentValidation;
 
 namespace EduCore.Endpoints;
 
-// Validates any argument that has a FluentValidation validator registered. Added once to the
-// api group, so no endpoint has to remember to call it.
 public class ValidationEndpointFilter(IServiceProvider services) : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
@@ -14,8 +12,6 @@ public class ValidationEndpointFilter(IServiceProvider services) : IEndpointFilt
 
         foreach (var argument in context.Arguments)
         {
-            // Only request bodies are worth looking up: the rest of the arguments are route
-            // values, injected services and the cancellation token.
             if (argument is null || argument.GetType().Namespace?.StartsWith("EduCore.Dtos") != true)
                 continue;
 

@@ -13,7 +13,6 @@ public class EnrollmentStatisticsRepository(AppDbContext context)
     public async Task<int> CountActiveAsync(StatisticsQuery ctx, CancellationToken ct) =>
         await EnrollmentsInWindow(ctx).CountAsync(e => e.LeftAt == null, ct);
 
-    // Enrollments that began inside the window, whether or not they have since ended.
     public async Task<int> CountStartedAsync(StatisticsQuery ctx, CancellationToken ct) =>
         await EnrollmentsInWindow(ctx)
             .CountAsync(e => e.EnrolledAt >= ctx.From && e.EnrolledAt <= ctx.To, ct);
@@ -40,8 +39,6 @@ public class EnrollmentStatisticsRepository(AppDbContext context)
             .Select(g => new { Reason = g.Key, Count = g.Count() })
             .ToListAsync(ct);
 
-        // Enrollments closed before the reason was recorded come back as null, and are shown
-        // as "Not recorded" rather than being dropped or lumped into a real reason.
         return rows
             .Select(r => new CountRow(
                 r.Reason?.ToString() ?? "NotRecorded",

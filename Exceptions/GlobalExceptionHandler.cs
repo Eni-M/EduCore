@@ -11,9 +11,6 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
     {
         var traceId = httpContext.TraceIdentifier;
 
-        // Several uniqueness rules exist only as database indexes, so turn the raw Postgres
-        // violation into a normal conflict. The constraint name is logged, not returned --
-        // it would tell a caller about rows in other schools.
         if (exception is DbUpdateException dbEx && dbEx.InnerException is PostgresException { SqlState: "23505" } pgEx)
         {
             logger.LogWarning(
@@ -30,10 +27,6 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
             BusinessException => (StatusCodes.Status400BadRequest, "Business Error", exception.Message),
             ConflictException => (StatusCodes.Status409Conflict, "Conflict", exception.Message),
             ForbiddenException => (StatusCodes.Status403Forbidden, "Forbidden", exception.Message),
-            // Two people edited the same row at once -- every entity carries a
-            // rowversion, so EF catches it. That is a conflict the caller can act
-            // on, not a fault: as a 500 it read as "the server is broken" and was
-            // logged as an error.
             DbUpdateConcurrencyException => (
                 StatusCodes.Status409Conflict,
                 "Conflict",

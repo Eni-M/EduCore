@@ -13,18 +13,14 @@ public static class TeacherStatisticsEndpoints
                 [AsParameters] StatisticsFilter filter, ITeacherStatisticsService service, CancellationToken ct) =>
             Results.Ok(await service.GetSummaryAsync(filter, ct)));
 
-        // individual -- names teachers
         teachers.MapGet("/workload", async (
                 [AsParameters] StatisticsFilter filter, ITeacherStatisticsService service, CancellationToken ct) =>
             Results.Ok(await service.GetWorkloadAsync(filter, ct)));
 
-        // individual -- names teachers
         teachers.MapGet("/coverage", async (
                 [AsParameters] StatisticsFilter filter, ITeacherStatisticsService service, CancellationToken ct) =>
             Results.Ok(await service.GetCoverageAsync(filter, ct)));
 
-        // individual. There is deliberately no endpoint ranking teachers against each other:
-        // once a leaderboard exists, the context beside each number stops being read.
         teachers.MapGet("/{teacherId:guid}", async (
                 Guid teacherId,
                 [AsParameters] StatisticsFilter filter,

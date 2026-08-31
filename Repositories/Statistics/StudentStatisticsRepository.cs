@@ -12,8 +12,6 @@ namespace EduCore.Repositories.Statistics;
 public class StudentStatisticsRepository(AppDbContext context)
     : StatisticsRepositoryBase(context), IStudentStatisticsRepository
 {
-    // Students reachable in this context: everyone in scope, narrowed to the classes the
-    // filter selects when it selects any.
     private IQueryable<Models.Student> StudentsInScope(StatisticsQuery ctx)
     {
         var students = Scope(_context.Students, ctx);
@@ -30,10 +28,6 @@ public class StudentStatisticsRepository(AppDbContext context)
     {
         var students = StudentsInScope(ctx);
 
-        // A student counts as an arrival when their very first enrollment anywhere starts
-        // inside the window. This is what §11 of the design calls a "new arrival" rather than
-        // a transfer: Student is school-scoped, so someone moving in from another school is
-        // simply a new record with no link to where they came from.
         var enrollments = Scope(_context.Enrollments, ctx);
 
         var newArrivals = await students
@@ -93,8 +87,6 @@ public class StudentStatisticsRepository(AppDbContext context)
     public async Task<IReadOnlyList<CountRow>> GetByAgeAsync(
         StatisticsQuery ctx, CancellationToken ct)
     {
-        // Age is derived from the end of the window rather than from today, so a report run
-        // for a past period gives the ages the students were at the time.
         var reference = ctx.To;
 
         var birthDates = await StudentsInScope(ctx)
@@ -129,9 +121,6 @@ public class StudentStatisticsRepository(AppDbContext context)
 
         var months = new List<(DateOnly, int)>();
 
-        // Walks month ends across the window and counts who was enrolled on each. Done in
-        // memory because the set is already narrowed to one window's enrollments, and a
-        // month-by-month SQL equivalent would be far harder to read for no real gain.
         for (var month = new DateOnly(ctx.From.Year, ctx.From.Month, 1);
              month <= ctx.To;
              month = month.AddMonths(1))

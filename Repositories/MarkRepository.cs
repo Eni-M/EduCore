@@ -18,8 +18,6 @@ public class MarkRepository(
 {
     private readonly GradingOptions _weights = weights.Value;
 
-    // FinalMark is filled in by WithFinalMarks rather than in SQL, so the weighting rule stays
-    // in GradingCalculator. These lists are one class or one student at a time.
     private IQueryable<MarkListDto> Project(IQueryable<Mark> marks) =>
         from m in marks
         join e in _context.Enrollments on m.EnrollmentId equals e.Id
@@ -61,10 +59,6 @@ public class MarkRepository(
             .Select(m => m.FirstMark!.Value * weights.FirstMarkWeight
                          + m.SecondMark!.Value * weights.SecondMarkWeight);
 
-    // Static and taking its weights as an argument so a test can run this exact query over an
-    // in-memory list. That matters: if the test re-typed the formula instead, it would only be
-    // comparing one copy of the arithmetic against another and would pass even after the real
-    // query drifted. See GradingRuleAgreementTests.
     public static IQueryable<ValuedMark> Value(IQueryable<Mark> marks, GradingOptions weights) =>
         marks
             .Where(m => m.FirstMark != null && m.SecondMark != null)
@@ -97,8 +91,6 @@ public class MarkRepository(
         return mark is null ? null : WithFinalMarks([mark]).First();
     }
 
-    // The upsert path: one mark exists per (enrollment, subject, grading period), enforced by
-    // a unique index, so this is how MarkService decides between insert and update.
     public async Task<Mark?> GetForUpsertAsync(
         Guid enrollmentId, Guid subjectId, Guid gradingPeriodId, CancellationToken ct) =>
         await _context.Marks.FirstOrDefaultAsync(
@@ -127,7 +119,6 @@ public class MarkRepository(
         return WithFinalMarks(results);
     }
 
-    // Sorted in memory: the student name lives on a joined user, and a class is small.
     public async Task<IEnumerable<MarkListDto>> GetByClassAsync(
         Guid classId,
         Guid? subjectId,

@@ -6,9 +6,6 @@ using EduCore.Services.Interfaces;
 
 namespace EduCore.Services;
 
-// Places are reference data: everything else points at them, so the rules here are about
-// keeping that reference sound -- no duplicate names, and nothing deleted out from under a
-// record that still uses it.
 public class LocationService(ILocationRepository locations) : ILocationService
 {
     public async Task<IEnumerable<StateListDto>> GetStatesAsync(CancellationToken ct) =>
@@ -35,8 +32,6 @@ public class LocationService(ILocationRepository locations) : ILocationService
         if (await locations.StateNameExistsAsync(dto.Name, stateId, ct))
             throw new ConflictException($"A state named {dto.Name} already exists.");
 
-        // Renaming in place is the point of holding these as rows: every student and school
-        // pointing here follows the correction automatically.
         state.Name = dto.Name.Trim();
         await locations.SaveChangesAsync(ct);
 
@@ -48,8 +43,6 @@ public class LocationService(ILocationRepository locations) : ILocationService
         var state = await locations.GetStateAsync(stateId, ct)
                     ?? throw new NotFoundException("State", stateId);
 
-        // Refused rather than cascaded: deleting a state silently taking its cities with it
-        // would strand every student who lives in one.
         if (await locations.StateHasCitiesAsync(stateId, ct))
             throw new ConflictException(
                 "This state still has cities. Move or delete them first.");

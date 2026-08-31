@@ -5,8 +5,6 @@ using EduCore.Services.Statistics.Interfaces;
 
 namespace EduCore.Services.Statistics;
 
-// Composes the academic, attendance and enrollment repositories rather than owning queries of
-// its own -- a class summary is those three things joined on class id, not a new measurement.
 public class ClassStatisticsService(
     IAcademicStatisticsRepository academic,
     IAttendanceStatisticsRepository attendance,
@@ -70,8 +68,6 @@ public class ClassStatisticsService(
             SuppressDistribution(await academic.GetDistributionAsync(ctx, ct)));
     }
 
-    // Same rule as AcademicStatisticsService: a distribution over too few marks names the
-    // pupils in it, so it is withheld whole rather than bucket by bucket.
     private GradeDistributionResultDto SuppressDistribution(GradeDistributionResultDto distribution) =>
         suppressor.ShouldSuppress(distribution.TotalMarks)
             ? distribution with { Suppressed = true, Buckets = [] }
@@ -98,8 +94,6 @@ public class ClassStatisticsService(
             ? (double?)null
             : Math.Round(attendanceTotals.Present * 100.0 / attendanceTotals.Records, 2);
 
-        // Driven off the student counts, so a class with no marks and no lessons yet still
-        // appears -- with empty measures rather than being missing from the report.
         return studentsByClass
             .Select(sc =>
             {

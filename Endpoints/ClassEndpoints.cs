@@ -35,7 +35,6 @@ public static class ClassEndpoints
                     Results.Ok(await service.UpdateAsync(classId, dto, ct)))
             .RequireAuthorization(Policies.Admin);
 
-        // Its own route because passing null here clears the assignment.
         group.MapPut("/{classId:guid}/homeroom-teacher",
                 async (Guid classId, ClassAssignHomeroomTeacherDto dto, IClassService service, CancellationToken ct) =>
                     Results.Ok(await service.AssignHomeroomTeacherAsync(classId, dto, ct)))
@@ -75,7 +74,6 @@ public static class ClassEndpoints
             async (ClassSubjectTeacherCreateDto dto, IClassSubjectTeacherService service, CancellationToken ct) =>
                 Results.Ok(await service.CreateAsync(dto, ct)));
 
-        // Ended, not deleted, so past lessons and marks keep pointing at a real assignment.
         assignments.MapPost("/{assignmentId:guid}/end",
             async (Guid assignmentId, ClassSubjectTeacherEndDto dto, IClassSubjectTeacherService service,
                 CancellationToken ct) =>

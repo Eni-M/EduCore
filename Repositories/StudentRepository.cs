@@ -7,8 +7,6 @@ namespace EduCore.Repositories;
 
 public class StudentRepository(AppDbContext context) : Repository<Student>(context), IStudentRepository
 {
-    // Runs at login, before a school claim exists, so the filter would hide the very row
-    // that says which school this person belongs to.
     public async Task<Student?> GetByUserIdAsync(Guid userId, CancellationToken ct) =>
         await _context.Students
             .AsNoTracking()
@@ -23,7 +21,6 @@ public class StudentRepository(AppDbContext context) : Repository<Student>(conte
             .Include(s => s.Parents)
             .FirstOrDefaultAsync(s => s.Id == studentId, ct);
 
-    // A national ID is unique across all schools, so this one check looks past the filter.
     public async Task<bool> PersonalNumberExistsAsync(
         string personalNumber,
         Guid? excludeStudentId,
@@ -56,7 +53,6 @@ public class StudentRepository(AppDbContext context) : Repository<Student>(conte
                 || EF.Functions.ILike(s.User.Email, term));
         }
 
-        // Counted before paging, so the total covers the whole filtered set.
         var totalCount = await query.CountAsync(ct);
 
         var items = await query

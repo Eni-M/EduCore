@@ -9,9 +9,6 @@ namespace EduCore.Repositories;
 public class EnrollmentRepository(AppDbContext context)
     : Repository<Enrollment>(context), IEnrollmentRepository
 {
-    // Ordering has to happen either on the source query or in memory afterwards. EF cannot
-    // sort on a property of an already-projected record, because it has no way to map that
-    // property back onto a constructor argument.
     private IQueryable<EnrollmentListDto> Project(IQueryable<Enrollment> enrollments) =>
         from e in enrollments
         join s in _context.Students on e.StudentId equals s.Id
@@ -31,7 +28,6 @@ public class EnrollmentRepository(AppDbContext context)
         await Project(_context.Enrollments.AsNoTracking().Where(e => e.Id == enrollmentId))
             .FirstOrDefaultAsync(ct);
 
-    // Sorted in memory: the name lives on the joined user, and a class roster is small.
     public async Task<IEnumerable<EnrollmentListDto>> GetByClassAsync(
         Guid classId,
         bool includeLeft,

@@ -23,14 +23,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
-// Before anything reads configuration: pull .env into the environment, so the
-// secrets it holds are found by the environment-variables provider the default
-// builder already installs. See DotEnvFile for why they are not in appsettings.
-//
-// Two places, because the answer differs by how the app was started: the working
-// directory when it is run from the project folder, and the publish folder when
-// it is started from somewhere else. The first to set a name wins, so a
-// developer's own .env takes precedence.
 DotEnvFile.Load(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
 DotEnvFile.Load(Path.Combine(AppContext.BaseDirectory, ".env"));
 
@@ -72,13 +64,8 @@ builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
 builder.Services.AddScoped<IMarkRepository, MarkRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 
-// Stateless and thread-safe, so one instance serves the whole app. Registering it here
-// rather than newing it up inside UserService means hashing options are configured in one
-// place and every password in the system goes through the same settings.
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
-// The state's grading rules, and how small an aggregate may be before it is withheld. What
-// counts as a valid configuration lives in the two validator classes, not here.
 builder.Services.AddOptions<GradingOptions>()
     .Bind(builder.Configuration.GetSection(GradingOptions.SectionName))
     .ValidateOnStart();
@@ -89,8 +76,6 @@ builder.Services.AddOptions<PrivacyOptions>()
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<PrivacyOptions>, PrivacyOptionsValidator>();
 
-// How many subjects a junior-high/high-school teacher may hold, and the default split of a
-// new academic year into its two grading periods.
 builder.Services.AddOptions<AssignmentOptions>()
     .Bind(builder.Configuration.GetSection(AssignmentOptions.SectionName))
     .ValidateOnStart();
@@ -148,11 +133,6 @@ builder.Services.AddProblemDetails();
 
 var jwtKey = builder.Configuration["Jwt:Key"];
 
-// HS256 needs at least 256 bits. Better to fail here than to sign tokens with a placeholder.
-//
-// The key is deliberately not in appsettings.json: that file is committed, and a
-// signing key in the repository is a signing key everyone has. Set Jwt__Key in
-// .env for local work, or in the environment for a deployment.
 if (string.IsNullOrWhiteSpace(jwtKey) || Encoding.UTF8.GetByteCount(jwtKey) < 32)
     throw new InvalidOperationException(
         "Jwt:Key must be at least 32 bytes. Set Jwt__Key in .env (see .env.example) " +
@@ -191,17 +171,6 @@ if (app.Environment.IsDevelopment())
     app.Services.GetRequiredService<IMapper>().ConfigurationProvider.AssertConfigurationIsValid();
     app.MapOpenApi();
 
-    // Bring the database up to the current model on start-up.
-    //
-    // Development only, and deliberately so: applying migrations automatically is unsafe
-    // where more than one instance can start at once, or where a migration is destructive
-    // and wants a human looking at it. Deployments run "dotnet ef database update" as their
-    // own step.
-    //
-    // The failure this prevents is a quiet one. A pulled branch that adds a column leaves
-    // the model and the database disagreeing, and EF then names the new column in every
-    // query it writes -- so an untouched screen starts answering 500 with "An unexpected
-    // error occurred", and nothing points at the migration as the cause.
     await using (var scope = app.Services.CreateAsyncScope())
         await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
 }
@@ -213,9 +182,6 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 
-    // Redirecting to https still leaves the first request of a session on http,
-    // where it can be intercepted -- and every request after sign-in carries a
-    // bearer token in a header. HSTS tells the browser never to try http again.
     app.UseHsts();
 }
 app.UseCors(FrontendCors);
@@ -224,11 +190,8 @@ app.UseAuthorization();
 
 app.MapAuthEndpoints();
 
-// Everything else requires a token and a password that is not pending a change.
 var api = app.MapGroup("/api")
     .RequireAuthorization()
-    // Identity first: there is no point validating the body of a request from
-    // an account that is switched off.
     .AddEndpointFilter<AccountStatusEndpointFilter>()
     .AddEndpointFilter<ValidationEndpointFilter>();
 

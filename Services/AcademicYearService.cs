@@ -18,10 +18,6 @@ public class AcademicYearService(
     IMapper mapper) : IAcademicYearService
 {
     public async Task<IEnumerable<AcademicYearListDto>> GetAllAsync(Guid? schoolId, CancellationToken ct) =>
-        // A SuperAdmin has no school, so the global filter would hide every year in the
-        // system from them -- which is why the statistics period picker could only ever
-        // offer "current". They read across schools instead, narrowed to the one the filter
-        // has selected when it has selected one.
         currentUser.IsSuperAdmin
             ? await academicYears.GetAllAcrossSchoolsAsync(schoolId, ct)
             : mapper.Map<IEnumerable<AcademicYearListDto>>(await academicYears.GetAllOrderedAsync(ct));

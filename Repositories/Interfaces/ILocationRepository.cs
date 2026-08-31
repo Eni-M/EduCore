@@ -3,8 +3,6 @@ using EduCore.Models;
 
 namespace EduCore.Repositories.Interfaces;
 
-// States and cities are one repository rather than two: they are never used apart, and every
-// city query needs its state alongside it.
 public interface ILocationRepository
 {
     Task<IEnumerable<StateListDto>> GetStatesAsync(CancellationToken ct);
@@ -16,8 +14,6 @@ public interface ILocationRepository
     Task<City?> GetCityAsync(Guid cityId, CancellationToken ct);
     Task<CityListDto?> GetCityDtoAsync(Guid cityId, CancellationToken ct);
 
-    // Scoped to the state: two different states may each have a "Springfield", and refusing
-    // that would be wrong.
     Task<bool> CityNameExistsInStateAsync(
         Guid stateId, string name, Guid? excludeCityId, CancellationToken ct);
 

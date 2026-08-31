@@ -57,13 +57,6 @@ public class UserService(
         if (result == PasswordVerificationResult.Failed)
             throw new UnauthorizedException("Current password is incorrect.");
 
-        // Checked here as well as at login, and checked after the password so it
-        // cannot be used to probe which accounts exist.
-        //
-        // This endpoint hands back a fresh token. Without this line a deactivated
-        // user holding a still-valid token could call it before every expiry and
-        // renew their access for ever -- deactivating the account would never
-        // have taken effect, however long you waited.
         if (user.DeactivatedAt is not null)
             throw new UnauthorizedException("This account has been deactivated.");
 
@@ -73,7 +66,7 @@ public class UserService(
         userRepository.Update(user);
         await userRepository.SaveChangesAsync(ct);
 
-        return await BuildAuthResponseAsync(user, ct); 
+        return await BuildAuthResponseAsync(user, ct);
     }
 
     public async Task<AuthResponseDto> UpdateOwnCredentialsAsync(
@@ -82,10 +75,6 @@ public class UserService(
         var user = await userRepository.GetByIdAsync(userId, ct)
                    ?? throw new NotFoundException("User", userId);
 
-        // Same check as ChangePasswordAsync, and for the same reason: this route
-        // sits outside the /api group, so AccountStatusEndpointFilter never sees
-        // it, and a deactivated user's still-valid token would otherwise be able
-        // to keep editing their own record.
         if (user.DeactivatedAt is not null)
             throw new UnauthorizedException("This account has been deactivated.");
 
@@ -94,9 +83,6 @@ public class UserService(
         userRepository.Update(user);
         await userRepository.SaveChangesAsync(ct);
 
-        // A fresh token, matching ChangePasswordAsync -- the name and email on it
-        // are only ever the copy taken at login, and the client's stored session
-        // is what a nav bar and a profile page actually read.
         return await BuildAuthResponseAsync(user, ct);
     }
 
@@ -128,11 +114,6 @@ public class UserService(
         var user = await userRepository.GetByIdAsync(userId, ct)
                    ?? throw new NotFoundException("User", userId);
 
-        // Before the permission check, so someone switching themselves off is
-        // told the actual reason rather than an authorization message. Only on
-        // the way off: reactivating an account that is already active is a
-        // harmless no-op, and refusing it with "you cannot deactivate your own
-        // account" made no sense.
         if (!isActive && userId == currentUser.UserId)
             throw new BusinessException("You cannot deactivate your own account.");
 
@@ -188,11 +169,6 @@ public class UserService(
 
     private async Task EnsureCanManageAsync(User target, CancellationToken ct)
     {
-        // A super administrator may manage anyone except another super
-        // administrator. Without this, one of them could reset a peer's password
-        // -- the reset returns the new password in the response -- and sign in as
-        // them, or simply switch them off; deactivating the last active one
-        // leaves a system nobody can administer.
         if (target.Role == UserRole.SuperAdmin && target.Id != currentUser.UserId)
             throw new ForbiddenException(
                 "A super administrator's account cannot be managed through the API.");
@@ -225,11 +201,6 @@ public class UserService(
             new(JwtRegisteredClaimNames.Email, user.Email),
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Role, user.Role.ToString())
-            // MustChangePassword is deliberately not a claim. It was one, and the
-            // copy went stale the moment an administrator reset a password: the
-            // row said "must change" while the token in the intruder's hand still
-            // said otherwise. AccountStatusEndpointFilter reads the row instead.
-            // The login response still carries it, for the client to route on.
         };
 
         if (schoolId is not null)

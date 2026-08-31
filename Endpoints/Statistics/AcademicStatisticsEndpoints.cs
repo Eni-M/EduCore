@@ -29,7 +29,6 @@ public static class AcademicStatisticsEndpoints
                 [AsParameters] StatisticsFilter filter, IAcademicStatisticsService service, CancellationToken ct) =>
             Results.Ok(await service.GetDistributionAsync(filter, ct)));
 
-        // "Class A vs Class B, Mathematics, 4.1 vs 3.6"
         academic.MapGet("/subject-comparison/{subjectId:guid}", async (
                 Guid subjectId,
                 [AsParameters] StatisticsFilter filter,
@@ -37,7 +36,6 @@ public static class AcademicStatisticsEndpoints
                 CancellationToken ct) =>
             Results.Ok(await service.GetSubjectComparisonAsync(filter, subjectId, ct)));
 
-        // individual -- names students
         academic.MapGet("/at-risk", async (
                 [AsParameters] StatisticsFilter filter, IAcademicStatisticsService service, CancellationToken ct) =>
             Results.Ok(await service.GetAtRiskAsync(filter, ct)));

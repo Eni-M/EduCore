@@ -11,15 +11,10 @@ public class Student : ISchoolScoped
     public DateOnly DateOfBirth { get; set; }
     public string PersonalNumber { get; set; } = null!;
 
-    // Where the student lives. Nullable: students recorded before places existed have none,
-    // and the state is reachable through the city rather than stored twice.
     public Guid? CityId { get; set; }
     public City? City { get; set; }
     public DateOnly? GraduationDate { get; set; }
 
-    // Nullable because students created before gender was recorded genuinely have none --
-    // defaulting them would invent data that then shows up in a government report. Required
-    // for new students via StudentCreateDto.
     public Gender? Gender { get; set; }
 
     public User User { get; set; } = null!;

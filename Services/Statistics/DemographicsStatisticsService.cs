@@ -7,12 +7,6 @@ using EduCore.Services.Statistics.Interfaces;
 
 namespace EduCore.Services.Statistics;
 
-// SuperAdmin only, and not because of squeamishness: "which city has the most students" is a
-// question about the whole network, and a single school answering it about itself would be
-// meaningless. Guarded here as well as at the endpoint, so the rule holds even if the route
-// is later remapped.
-// Every figure here is an exact headcount, or a share sitting beside the counts it was
-// derived from, so there is nothing for CellSuppressor to protect -- see its header.
 public class DemographicsStatisticsService(
     IDemographicsStatisticsRepository demographics,
     ICurrentUser currentUser) : IDemographicsStatisticsService
@@ -51,8 +45,6 @@ public class DemographicsStatisticsService(
 
         var zones = await demographics.GetByZoneAsync(city, ct);
 
-        // Each zone's share is of its own city's students, not of the whole country -- a zone
-        // holding 40% of its city is the useful figure, not that it holds 0.3% nationally.
         var cityTotals = zones
             .GroupBy(z => z.City)
             .ToDictionary(g => g.Key, g => g.Sum(z => z.Students));

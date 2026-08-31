@@ -48,8 +48,6 @@ public class StudentService(
     {
         await access.EnsureCanViewClassAsync(classId, ct);
 
-        // A teacher reaches this one for a class they teach, and a roster is
-        // theirs to read -- but the sign-ins behind it are not.
         return WithVisibleAccounts(
             mapper.Map<IEnumerable<StudentListDto>>(await students.GetByClassAsync(classId, ct)));
     }
@@ -108,9 +106,6 @@ public class StudentService(
 
         await students.AddAsync(student);
 
-        // The first guardian, if the form supplied one. Saved in the same transaction as the
-        // student: a pupil enrolled with no contact number because the second request was
-        // never made is exactly the gap this closes.
         if (!string.IsNullOrWhiteSpace(dto.GuardianName)
             && !string.IsNullOrWhiteSpace(dto.GuardianPhone))
         {
@@ -168,14 +163,11 @@ public class StudentService(
         if (student.GraduationDate is not null)
             throw new ConflictException("This student has already graduated.");
 
-        // The same evaluation the screen renders, so a refusal here says exactly what the
-        // disabled button said. Nothing re-checks the rule in two places.
         var eligibility = await EvaluateGraduationAsync(student, ct);
 
         if (!eligibility.CanGraduate)
             throw new BusinessException(eligibility.Reason!);
 
-        // Non-null: EvaluateGraduationAsync returns CanGraduate only when it found one.
         var enrollment = (await enrollments.GetActiveForStudentAsync(studentId, ct))!;
 
         if (dto.GraduationDate < enrollment.EnrolledAt)
@@ -183,9 +175,6 @@ public class StudentService(
                 $"They joined this class on {enrollment.EnrolledAt:yyyy-MM-dd}; a graduation " +
                 "cannot be dated before that.");
 
-        // Graduating closes the enrollment, rather than demanding it was closed first. That
-        // is what EnrollmentExitReason.Graduated is for, and it keeps the two facts -- they
-        // left the class, and why -- from being separate actions an admin can half-do.
         enrollment.LeftAt = dto.GraduationDate;
         enrollment.ExitReason = EnrollmentExitReason.Graduated;
         enrollments.Update(enrollment);
@@ -193,15 +182,9 @@ public class StudentService(
         student.GraduationDate = dto.GraduationDate;
         students.Update(student);
 
-        // One save: the student's graduation and the closing of their enrollment commit
-        // together or not at all. Both repositories share the request's AppDbContext.
         await students.SaveChangesAsync(ct);
     }
 
-    // Every condition on graduating, in the order that produces the most useful sentence:
-    // the reason a student cannot graduate should be the first thing wrong with them, not
-    // the last. Returns a reason rather than throwing, because the screen needs to render
-    // the same answer without an exception.
     private async Task<GraduationEligibilityDto> EvaluateGraduationAsync(
         Models.Student student, CancellationToken ct)
     {
@@ -219,15 +202,12 @@ public class StudentService(
         if (studentClass is null)
             return new GraduationEligibilityDto(false, "This student's class could not be found.");
 
-        // Finishing school means finishing the last grade of one, not merely being graded.
         if (!GraduationRule.IsFinalGrade(studentClass.Grade))
             return new GraduationEligibilityDto(
                 false,
                 $"Only a student in grade {GraduationRule.FinalGradesText} can graduate -- those " +
                 $"are the last grade of each school. {studentClass.Name} is grade {studentClass.Grade}.");
 
-        // An academic year is always split into exactly two terms; a year that does not have
-        // both yet cannot show a full year of work either way.
         var periods = (await gradingPeriods.GetByAcademicYearAsync(studentClass.AcademicYearId, ct))
             .ToList();
 
@@ -246,9 +226,6 @@ public class StudentService(
             return new GraduationEligibilityDto(
                 false, $"{studentClass.Name} has no subjects assigned, so there is nothing to complete.");
 
-        // A mark holds both components for one subject in one term, and FinalMark is null
-        // until both are entered -- so "graded" and "fully graded" are the same test here.
-        // Marks from other years simply do not match any period below.
         var graded = (await marks.GetByStudentAsync(student.Id, null, null, ct))
             .Where(m => m.FinalMark is not null)
             .Select(m => (m.SubjectId, m.GradingPeriodId))
@@ -272,9 +249,6 @@ public class StudentService(
     private static (int Page, int PageSize) Normalize(PaginationQueryDto pagination) =>
         (Math.Max(1, pagination.Page), Math.Clamp(pagination.PageSize, 1, 100));
 
-    // The mapper fills Account for every row, because it is the projection that
-    // knows how to reach User. Whether the caller may see it is this method's
-    // question, asked in one place so no list can forget to ask it.
     private IEnumerable<StudentListDto> WithVisibleAccounts(IEnumerable<StudentListDto> rows) =>
         currentUser.CanManageAccounts() ? rows : rows.Select(row => row with { Account = null });
 }

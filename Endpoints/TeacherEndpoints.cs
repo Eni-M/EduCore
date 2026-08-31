@@ -42,7 +42,6 @@ public static class TeacherEndpoints
                     Results.Ok(await service.GetSubjectsAsync(teacherId, ct)))
             .RequireAuthorization(Policies.AdminOrTeacher);
 
-        // Qualifying a teacher for a subject: the prerequisite for assigning them to a class.
         group.MapPost("/subjects", async (TeacherSubjectCreateDto dto, ITeacherService service, CancellationToken ct) =>
                 Results.Ok(await service.AddSubjectAsync(dto, ct)))
             .RequireAuthorization(Policies.Admin);

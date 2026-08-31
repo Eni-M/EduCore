@@ -49,8 +49,6 @@ public class DiaryEntryService(
         if (!currentUser.IsStudent)
             return detail;
 
-        // The register lists every classmate's absences, comments and behavior marks. A
-        // student may see the lesson, but only their own row of it.
         var mine = await enrollments.GetActiveForStudentAsync(currentUser.RequireStudentId(), ct);
 
         return detail with
@@ -66,8 +64,6 @@ public class DiaryEntryService(
 
         _ = await subjects.GetByIdAsync(dto.SubjectId, ct) ?? throw new NotFoundException("Subject", dto.SubjectId);
 
-        // A teacher always logs their own lesson, so an omitted id is theirs. An
-        // administrator logging on someone's behalf has to say whose it was.
         var teacherId = dto.TeacherId
                         ?? (currentUser.IsTeacher
                             ? currentUser.RequireTeacherId()
@@ -76,8 +72,6 @@ public class DiaryEntryService(
         if (currentUser.IsTeacher && teacherId != currentUser.TeacherId)
             throw new ForbiddenException("You can only log lessons that you taught yourself.");
 
-        // Without this a teacher could open a register for any class in the school and then
-        // mark attendance and behavior for students they have nothing to do with.
         await access.EnsureCanTeachClassAsync(dto.ClassId, ct);
 
         if (!await teacherSubjects.ExistsAsync(teacherId, dto.SubjectId, ct))
@@ -89,10 +83,6 @@ public class DiaryEntryService(
         if (!everAssigned)
             throw new BusinessException("That subject is not taught in this class.");
 
-        // Nothing checked the date until now, and both of these had already happened in the
-        // register: lessons dated after their academic year had finished, and one dated for
-        // tomorrow. Such a row is not merely untidy -- it falls outside every year-based
-        // report, so the attendance it carries silently stops being counted anywhere.
         if (dto.Date > DateOnly.FromDateTime(DateTime.UtcNow))
             throw new BusinessException("A lesson cannot be recorded before it has been taught.");
 
@@ -109,19 +99,13 @@ public class DiaryEntryService(
             throw new ConflictException("A lesson is already recorded for this class in that period.");
 
         var entry = mapper.Map<DiaryEntry>(dto);
-        // Set explicitly, never left to the mapper: DiaryEntry.TeacherId is a non-nullable
-        // Guid and the DTO's is now nullable, so an omitted id would map to Guid.Empty and
-        // be written as a lesson taught by nobody.
         entry.TeacherId = teacherId;
         entry.SchoolId = currentUser.RequireSchoolId();
 
-        // After AddAsync the entry has its Id, which the attendance rows below need --
-        // Attendance has no navigation property back to DiaryEntry for EF to fix up.
         await diaryEntries.AddAsync(entry);
 
         foreach (var enrollment in await enrollments.GetActiveByClassAsync(dto.ClassId, ct))
         {
-            // Everyone starts present; the teacher then marks the exceptions.
             await attendances.AddAsync(new Attendance
             {
                 DiaryEntryId = entry.Id,

@@ -7,8 +7,6 @@ namespace EduCore.Repositories;
 
 public class TeacherRepository(AppDbContext context) : Repository<Teacher>(context), ITeacherRepository
 {
-    // Runs at login, before a school claim exists, so the filter would hide the very row
-    // that says which school this person belongs to.
     public async Task<Teacher?> GetByUserIdAsync(Guid userId, CancellationToken ct) =>
         await _context.Teachers
             .AsNoTracking()

@@ -29,12 +29,10 @@ public static class AttendanceStatisticsEndpoints
                 [AsParameters] StatisticsFilter filter, IAttendanceStatisticsService service, CancellationToken ct) =>
             Results.Ok(await service.GetTrendAsync(filter, ct)));
 
-        // individual -- names students
         attendance.MapGet("/by-student", async (
                 [AsParameters] StatisticsFilter filter, IAttendanceStatisticsService service, CancellationToken ct) =>
             Results.Ok(await service.GetByStudentAsync(filter, ct)));
 
-        // individual -- names students
         attendance.MapGet("/excessive-absences", async (
                 [AsParameters] StatisticsFilter filter,
                 double? thresholdPercent,

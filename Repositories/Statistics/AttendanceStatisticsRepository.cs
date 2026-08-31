@@ -8,9 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EduCore.Repositories.Statistics;
 
-// Attendance rows carry no date of their own -- they hang off the diary entry for the lesson.
-// Every query here therefore joins through LessonsInWindow, which is also why
-// DiaryEntry(SchoolId, Date) is indexed.
 public class AttendanceStatisticsRepository(AppDbContext context)
     : StatisticsRepositoryBase(context), IAttendanceStatisticsRepository
 {
@@ -141,9 +138,6 @@ public class AttendanceStatisticsRepository(AppDbContext context)
     {
         var rows = await StudentAttendanceRowsAsync(ctx, ct);
 
-        // Excused absences are counted in the total but the threshold is applied to unexcused
-        // ones -- a student with a term of doctor's notes is not the same problem as a student
-        // who simply stops coming.
         return rows
             .Select(r => new
             {

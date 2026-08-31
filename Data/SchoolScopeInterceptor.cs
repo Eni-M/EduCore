@@ -4,8 +4,6 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace EduCore.Data;
 
-// Query filters hide other schools' rows from reads. This is the write side: you may only
-// save a row into your own school. A SuperAdmin has no school and may write into any.
 public class SchoolScopeInterceptor(ICurrentUser currentUser) : SaveChangesInterceptor
 {
     public override InterceptionResult<int> SavingChanges(

@@ -15,10 +15,6 @@ public class TeacherStatisticsRepository(
     IGradingCalculator grading) : StatisticsRepositoryBase(context), ITeacherStatisticsRepository
 {
 
-    // Assignments to classes that are in scope, active at some point in the window. Teacher
-    // has no employment dates and no academic year of its own, so this is what ties a teacher
-    // to a period: the class they are assigned to belongs to one academic year, and
-    // ClassesInScope applies the year/class/grade filters.
     private IQueryable<Models.ClassSubjectTeacher> AssignmentsInWindow(StatisticsQuery ctx)
     {
         var classIds = ClassesInScope(ctx).Select(c => c.Id);
@@ -32,15 +28,9 @@ public class TeacherStatisticsRepository(
     {
         var teachers = Scope(_context.Teachers, ctx);
 
-        // Asking about one named teacher is a different question from "who taught here this
-        // year": their detail view must still render for a period they did not teach in,
-        // showing zeros rather than a missing row.
         if (ctx.TeacherId is not null)
             return teachers.Where(t => t.Id == ctx.TeacherId);
 
-        // Otherwise "teachers" means the ones actually teaching in this period. Counting every
-        // teacher row in the school instead would report the same figure for every academic
-        // year, and would credit a newly hired teacher to years they were never here for.
         var assignedTeacherIds = AssignmentsInWindow(ctx).Select(a => a.TeacherId);
 
         return teachers.Where(t => assignedTeacherIds.Contains(t.Id));
@@ -67,8 +57,6 @@ public class TeacherStatisticsRepository(
         var rows = await (from t in TeachersInScope(ctx)
                           join u in _context.Users on t.UserId equals u.Id
                           join sc in _context.Schools.IgnoreQueryFilters() on t.SchoolId equals sc.Id
-                          // School first: a cross-school listing then reads as one block per
-                          // school rather than an interleaved list of names.
                           orderby sc.Name, u.LastName, u.FirstName
                           select new
                           {
@@ -127,8 +115,6 @@ public class TeacherStatisticsRepository(
                               SchoolName = sc.Name,
                               Lessons = lessons.Count(d => d.TeacherId == t.Id),
 
-                              // A register counts as incomplete when it holds fewer rows than
-                              // the class had enrolled students at the time.
                               Incomplete = lessons
                                   .Where(d => d.TeacherId == t.Id)
                                   .Count(d => attendances.Count(a => a.DiaryEntryId == d.Id)
@@ -162,8 +148,6 @@ public class TeacherStatisticsRepository(
     {
         var pass = grading.PassValue;
 
-        // Inline for the same reason as AcademicStatisticsRepository: a constructed type
-        // cannot be joined or grouped on in a translatable query.
         var first = grading.FirstMarkWeight;
         var second = grading.SecondMarkWeight;
 

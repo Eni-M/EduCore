@@ -15,8 +15,6 @@ public interface IAcademicStatisticsRepository
     Task<GradeDistributionResultDto> GetDistributionAsync(StatisticsQuery ctx, CancellationToken ct);
     Task<IReadOnlyList<AtRiskStudentDto>> GetAtRiskAsync(StatisticsQuery ctx, CancellationToken ct);
 
-    // The school-wide average for a subject at a grade level -- the baseline every per-class
-    // and per-teacher figure is reported against.
     Task<IReadOnlyList<AcademicGroup>> GetSubjectGradeBaselinesAsync(
         StatisticsQuery ctx, CancellationToken ct);
 }

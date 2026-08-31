@@ -1,14 +1,5 @@
 namespace EduCore.Dtos.Statistics;
 
-// Every aggregate number in the statistics API is one of these rather than a bare double.
-//
-// A single number is a verdict; a number next to its baseline is context. Reporting "3.4"
-// for a class says nothing useful -- "3.4 against a school average of 3.7 for the same
-// subject and grade" does. SampleSize lets a caller tell a figure computed from four marks
-// apart from one computed from four hundred.
-//
-// Value being null is NOT the same as zero and must never be rendered as one: it means the
-// figure was suppressed (see CellSuppressor) or there was no data at all.
 public record Measure(
     double? Value,
     double? Baseline,

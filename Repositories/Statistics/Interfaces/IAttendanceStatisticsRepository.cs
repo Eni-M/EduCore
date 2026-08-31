@@ -18,7 +18,6 @@ public interface IAttendanceStatisticsRepository
     Task<IReadOnlyList<StudentAttendanceSummaryDto>> GetByStudentAsync(
         StatisticsQuery ctx, CancellationToken ct);
 
-    // Students whose unexcused absence rate is at or above the given threshold.
     Task<IReadOnlyList<ExcessiveAbsenceStudentDto>> GetExcessiveAbsencesAsync(
         StatisticsQuery ctx, double absenceRateThreshold, CancellationToken ct);
 }

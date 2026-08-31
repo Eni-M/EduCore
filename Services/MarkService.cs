@@ -36,11 +36,6 @@ public class MarkService(
         return await marks.GetByClassAsync(classId, subjectId, gradingPeriodId, ct);
     }
 
-    // Create-or-update. A teacher normally sets FirstMark part-way through the period and
-    // SecondMark at the end, so the second call updates the row the first one created.
-    //
-    // A mark the caller leaves null is left as it was, rather than being cleared -- otherwise
-    // sending only SecondMark would wipe a FirstMark that was already given.
     public async Task<MarkListDto> UpsertAsync(MarkUpsertDto dto, CancellationToken ct)
     {
         var enrollment = await enrollments.GetByIdAsync(dto.EnrollmentId, ct)
@@ -56,10 +51,6 @@ public class MarkService(
         if (currentUser.IsTeacher && assignment.TeacherId != currentUser.TeacherId)
             throw new ForbiddenException("Only the teacher assigned to this class-subject can give marks for it.");
 
-        // The class fixes the academic year, so an omitted term means "the one we are in
-        // today". Resolving it here rather than asking the caller keeps a teacher from
-        // picking a term belonging to a different year -- a mistake the check below can only
-        // catch after the fact.
         var gradingPeriod = dto.GradingPeriodId is { } explicitPeriodId
             ? await gradingPeriods.GetByIdAsync(explicitPeriodId, ct)
               ?? throw new NotFoundException("Grading period", explicitPeriodId)
