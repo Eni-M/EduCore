@@ -1,7 +1,6 @@
 namespace EduCore.Dtos.User;
 
 public record AuthResponseDto(
-    string Token,
     DateTime ExpiresAt,
     Guid UserId,
     Guid? SchoolId,

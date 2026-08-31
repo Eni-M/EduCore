@@ -86,6 +86,12 @@ builder.Services.AddOptions<AcademicCalendarOptions>()
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<AcademicCalendarOptions>, AcademicCalendarOptionsValidator>();
 
+builder.Services.AddOptions<SessionCookieOptions>()
+    .Bind(builder.Configuration.GetSection(SessionCookieOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<SessionCookieOptions>, SessionCookieOptionsValidator>();
+builder.Services.AddSingleton<ISessionCookies, SessionCookies>();
+
 builder.Services.AddScoped<IElementaryAssignmentSync, ElementaryAssignmentSync>();
 builder.Services.AddScoped<IAcademicCalendar, AcademicCalendar>();
 
@@ -138,9 +144,23 @@ if (string.IsNullOrWhiteSpace(jwtKey) || Encoding.UTF8.GetByteCount(jwtKey) < 32
         "Jwt:Key must be at least 32 bytes. Set Jwt__Key in .env (see .env.example) " +
         "or as an environment variable. Generate one with: openssl rand -base64 32");
 
+var sessionCookieName =
+    builder.Configuration.GetSection(SessionCookieOptions.SectionName)["CookieName"] ?? "educore.session";
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                if (string.IsNullOrEmpty(context.Token))
+                    context.Token = context.Request.Cookies[sessionCookieName];
+
+                return Task.CompletedTask;
+            }
+        };
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -162,7 +182,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy(FrontendCors, policy => policy
         .WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [])
         .AllowAnyHeader()
-        .AllowAnyMethod()));
+        .AllowAnyMethod()
+        .AllowCredentials()));
 
 var app = builder.Build();
 
@@ -185,6 +206,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 app.UseCors(FrontendCors);
+app.UseMiddleware<CsrfProtectionMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 

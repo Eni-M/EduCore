@@ -6,11 +6,13 @@ namespace EduCore.Services.Interfaces;
 
 public interface IUserService
 {
-    Task<AuthResponseDto> LoginAsync(LoginUserDto dto, CancellationToken ct);
+    Task<AuthResultDto> LoginAsync(LoginUserDto dto, CancellationToken ct);
 
-    Task<AuthResponseDto> ChangePasswordAsync(Guid userId, ChangePasswordDto dto, CancellationToken ct);
-    Task<AuthResponseDto> UpdateOwnCredentialsAsync(
+    Task<AuthResultDto> ChangePasswordAsync(Guid userId, ChangePasswordDto dto, CancellationToken ct);
+    Task<AuthResultDto> UpdateOwnCredentialsAsync(
         Guid userId, string firstName, string lastName, string email, CancellationToken ct);
+    Task<AuthResponseDto> GetCurrentAsync(Guid userId, CancellationToken ct);
+
     Task<ResetPasswordResponseDto> AdminResetPasswordAsync(Guid userId, CancellationToken ct);
     Task SetActiveAsync(Guid userId, bool isActive, CancellationToken ct);
 

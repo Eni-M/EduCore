@@ -12,18 +12,55 @@ public static class AuthEndpoints
             .AddEndpointFilter<ValidationEndpointFilter>()
             .WithTags("Auth");
 
-        group.MapPost("/login", async (LoginUserDto dto, IUserService users, CancellationToken ct) =>
-            Results.Ok(await users.LoginAsync(dto, ct)));
+        group.MapPost("/login", async (
+            LoginUserDto dto,
+            IUserService users,
+            ISessionCookies cookies,
+            HttpResponse response,
+            CancellationToken ct) =>
+        {
+            var result = await users.LoginAsync(dto, ct);
+            cookies.Issue(response, result.Token, result.User.ExpiresAt);
+            return Results.Ok(result.User);
+        });
 
-        group.MapPost("/change-password",
-                async (ChangePasswordDto dto, IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
-                    Results.Ok(await users.ChangePasswordAsync(currentUser.UserId, dto, ct)))
+        group.MapPost("/logout", (ISessionCookies cookies, HttpResponse response) =>
+        {
+            cookies.Clear(response);
+            return Results.NoContent();
+        });
+
+        group.MapGet("/me", async (IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
+                Results.Ok(await users.GetCurrentAsync(currentUser.UserId, ct)))
             .RequireAuthorization();
 
-        group.MapPut("/me",
-                async (UpdateMyCredentialsDto dto, IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
-                    Results.Ok(await users.UpdateOwnCredentialsAsync(
-                        currentUser.UserId, dto.FirstName, dto.LastName, dto.Email, ct)))
+        group.MapPost("/change-password", async (
+                ChangePasswordDto dto,
+                IUserService users,
+                ICurrentUser currentUser,
+                ISessionCookies cookies,
+                HttpResponse response,
+                CancellationToken ct) =>
+            {
+                var result = await users.ChangePasswordAsync(currentUser.UserId, dto, ct);
+                cookies.Issue(response, result.Token, result.User.ExpiresAt);
+                return Results.Ok(result.User);
+            })
+            .RequireAuthorization();
+
+        group.MapPut("/me", async (
+                UpdateMyCredentialsDto dto,
+                IUserService users,
+                ICurrentUser currentUser,
+                ISessionCookies cookies,
+                HttpResponse response,
+                CancellationToken ct) =>
+            {
+                var result = await users.UpdateOwnCredentialsAsync(
+                    currentUser.UserId, dto.FirstName, dto.LastName, dto.Email, ct);
+                cookies.Issue(response, result.Token, result.User.ExpiresAt);
+                return Results.Ok(result.User);
+            })
             .RequireAuthorization();
 
         var accounts = group.MapGroup("/users")

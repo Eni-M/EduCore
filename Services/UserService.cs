@@ -23,7 +23,7 @@ public class UserService(
     ICurrentUser currentUser,
     IConfiguration config) : IUserService
 {
-    public async Task<AuthResponseDto> LoginAsync(LoginUserDto dto, CancellationToken ct)
+    public async Task<AuthResultDto> LoginAsync(LoginUserDto dto, CancellationToken ct)
     {
         var user = await userRepository.GetByEmailAsync(dto.Email, ct);
 
@@ -47,7 +47,7 @@ public class UserService(
         return await BuildAuthResponseAsync(user, ct);
     }
 
-    public async Task<AuthResponseDto> ChangePasswordAsync(Guid userId, ChangePasswordDto dto, CancellationToken ct)
+    public async Task<AuthResultDto> ChangePasswordAsync(Guid userId, ChangePasswordDto dto, CancellationToken ct)
     {
         var user = await userRepository.GetByIdAsync(userId, ct)
                    ?? throw new NotFoundException("User", userId);
@@ -69,7 +69,7 @@ public class UserService(
         return await BuildAuthResponseAsync(user, ct);
     }
 
-    public async Task<AuthResponseDto> UpdateOwnCredentialsAsync(
+    public async Task<AuthResultDto> UpdateOwnCredentialsAsync(
         Guid userId, string firstName, string lastName, string email, CancellationToken ct)
     {
         var user = await userRepository.GetByIdAsync(userId, ct)
@@ -84,6 +84,17 @@ public class UserService(
         await userRepository.SaveChangesAsync(ct);
 
         return await BuildAuthResponseAsync(user, ct);
+    }
+
+    public async Task<AuthResponseDto> GetCurrentAsync(Guid userId, CancellationToken ct)
+    {
+        var user = await userRepository.GetByIdAsync(userId, ct)
+                   ?? throw new NotFoundException("User", userId);
+
+        if (user.DeactivatedAt is not null)
+            throw new UnauthorizedException("This account has been deactivated.");
+
+        return (await BuildAuthResponseAsync(user, ct)).User;
     }
 
     public async Task<ResetPasswordResponseDto> AdminResetPasswordAsync(Guid userId, CancellationToken ct)
@@ -188,7 +199,7 @@ public class UserService(
             throw new ForbiddenException("You are not allowed to manage this account.");
     }
 
-    private async Task<AuthResponseDto> BuildAuthResponseAsync(User user, CancellationToken ct)
+    private async Task<AuthResultDto> BuildAuthResponseAsync(User user, CancellationToken ct)
     {
         var (schoolId, teacherId, studentId) = await ResolveProfileAsync(user, ct);
 
@@ -223,18 +234,19 @@ public class UserService(
             expires: expiresAt,
             signingCredentials: credentials);
 
-        return new AuthResponseDto(
+        return new AuthResultDto(
             Token: new JwtSecurityTokenHandler().WriteToken(token),
-            ExpiresAt: expiresAt,
-            UserId: user.Id,
-            SchoolId: schoolId,
-            TeacherId: teacherId,
-            StudentId: studentId,
-            Email: user.Email,
-            FirstName: user.FirstName,
-            LastName: user.LastName,
-            Role: user.Role.ToString(),
-            MustChangePassword: user.MustChangePassword);
+            User: new AuthResponseDto(
+                ExpiresAt: expiresAt,
+                UserId: user.Id,
+                SchoolId: schoolId,
+                TeacherId: teacherId,
+                StudentId: studentId,
+                Email: user.Email,
+                FirstName: user.FirstName,
+                LastName: user.LastName,
+                Role: user.Role.ToString(),
+                MustChangePassword: user.MustChangePassword));
     }
 
     private async Task<(Guid? SchoolId, Guid? TeacherId, Guid? StudentId)> ResolveProfileAsync(
