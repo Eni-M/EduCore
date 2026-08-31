@@ -22,7 +22,7 @@ public static class AuthEndpoints
             var result = await users.LoginAsync(dto, ct);
             cookies.Issue(response, result.Token, result.User.ExpiresAt);
             return Results.Ok(result.User);
-        });
+        }).RequireRateLimiting("LoginPolicy");
 
         group.MapPost("/logout", (ISessionCookies cookies, HttpResponse response) =>
         {

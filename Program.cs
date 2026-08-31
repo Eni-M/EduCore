@@ -1,6 +1,8 @@
 using EduCore.Helpers;
 using EduCore.Services.Assignment;
 using System.Text;
+using System.Threading.RateLimiting;
+using System.Security.Claims;
 using AutoMapper;
 using EduCore.Data;
 using EduCore.Endpoints;
@@ -22,6 +24,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.RateLimiting;
 
 DotEnvFile.Load(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
 DotEnvFile.Load(Path.Combine(AppContext.BaseDirectory, ".env"));
@@ -185,6 +188,50 @@ builder.Services.AddCors(options =>
         .AllowAnyMethod()
         .AllowCredentials()));
 
+// Rate limiting: per-user (by user id claim) otherwise per-IP token-bucket limiter.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        // Prefer authenticated user id partitioning, fallback to remote IP
+        var userId = httpContext.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var partitionKey = !string.IsNullOrEmpty(userId)
+            ? $"user:{userId}"
+            : $"ip:{httpContext.Connection.RemoteIpAddress}";
+
+        return RateLimitPartition.GetTokenBucketLimiter(partitionKey, _ => new TokenBucketRateLimiterOptions
+        {
+            TokenLimit = 100,
+            TokensPerPeriod = 100,
+            ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+            AutoReplenishment = true,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0
+        });
+    });
+
+    // Login-specific stricter policy to prevent brute-force attempts
+    options.AddPolicy("LoginPolicy", context =>
+        RateLimitPartition.GetTokenBucketLimiter("login", _ => new TokenBucketRateLimiterOptions
+        {
+            TokenLimit = 5,
+            TokensPerPeriod = 5,
+            ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+            AutoReplenishment = true,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0
+        }));
+
+    // Add a Retry-After header when rejected
+    options.OnRejected = async (context, ct) =>
+    {
+        context.HttpContext.Response.Headers["Retry-After"] = "60";
+        await Task.CompletedTask;
+    };
+});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -208,6 +255,8 @@ if (!app.Environment.IsDevelopment())
 app.UseCors(FrontendCors);
 app.UseMiddleware<CsrfProtectionMiddleware>();
 app.UseAuthentication();
+// Rate limiter middleware — run after authentication so per-user limits can be applied
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapAuthEndpoints();
