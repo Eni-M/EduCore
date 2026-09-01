@@ -198,6 +198,11 @@ DECLARE
   high         uuid := gen_random_uuid();
   closed       uuid := gen_random_uuid();
 
+  zone_qendra_prishtina uuid := gen_random_uuid();
+  zone_dardania         uuid := gen_random_uuid();
+  zone_qendra_prizren   uuid := gen_random_uuid();
+  zone_qendra_peja      uuid := gen_random_uuid();
+
   e_y25 uuid; e_y26 uuid; e_y27 uuid;
   j_y26 uuid; j_y27 uuid;
   h_y24 uuid; h_y25 uuid; h_y26 uuid; h_y27 uuid;
@@ -228,12 +233,15 @@ BEGIN
   INSERT INTO "Cities"("Id","Name","StateId") VALUES
     (prishtina,'Prishtina',kosova), (prizren,'Prizren',kosova),
     (peja,'Peja',kosova), (tirana,'Tirana',shqiperia);
+  INSERT INTO "Zones"("Id","Name","CityId") VALUES
+    (zone_qendra_prishtina,'Qendra',prishtina), (zone_dardania,'Dardania',prishtina),
+    (zone_qendra_prizren,'Qendra',prizren), (zone_qendra_peja,'Qendra',peja);
 
-  INSERT INTO "Schools"("Id","Name","Type","City","Zone","CityId","DeactivatedAt") VALUES
-    (elem,  'Shkolla Fillore Naim Frasheri', 0, 'Prishtina','Qendra', prishtina, NULL),
-    (junior,'Shkolla Ismail Qemali',         1, 'Prishtina','Dardania',prishtina, NULL),
-    (high,  'Gjimnazi Sami Frasheri',        2, 'Prizren',  'Qendra',  prizren,   NULL),
-    (closed,'Akademia e Vjeter',             2, 'Peja',     'Qendra',  peja,      now() - interval '30 days');
+  INSERT INTO "Schools"("Id","Name","Type","CityId","ZoneId","DeactivatedAt") VALUES
+    (elem,  'Shkolla Fillore Naim Frasheri', 0, prishtina, zone_qendra_prishtina, NULL),
+    (junior,'Shkolla Ismail Qemali',         1, prishtina, zone_dardania,         NULL),
+    (high,  'Gjimnazi Sami Frasheri',        2, prizren,   zone_qendra_prizren,   NULL),
+    (closed,'Akademia e Vjeter',             2, peja,      zone_qendra_peja,      now() - interval '30 days');
 
   INSERT INTO "Admins"("Id","UserId","SchoolId") VALUES
     (gen_random_uuid(), sd_user('Arta','Krasniqi','admin.fillore@educore.com',2), elem),

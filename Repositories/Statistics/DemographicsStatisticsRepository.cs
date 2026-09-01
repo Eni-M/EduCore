@@ -20,7 +20,7 @@ public class DemographicsStatisticsRepository(AppDbContext context) : IDemograph
             .Select(s => new
             {
                 s.Id,
-                s.City,
+                CityName = s.City == null ? null : s.City.Name,
                 Students = students.Count(st => st.SchoolId == s.Id && st.GraduationDate == null),
                 Teachers = teachers.Count(t => t.SchoolId == s.Id),
                 Classes = classes.Count(c => c.SchoolId == s.Id)
@@ -28,7 +28,7 @@ public class DemographicsStatisticsRepository(AppDbContext context) : IDemograph
             .ToListAsync(ct);
 
         return rows
-            .GroupBy(r => string.IsNullOrWhiteSpace(r.City) ? NotRecorded : r.City!)
+            .GroupBy(r => string.IsNullOrWhiteSpace(r.CityName) ? NotRecorded : r.CityName!)
             .Select(g => (
                 City: g.Key,
                 Schools: g.Count(),
@@ -48,13 +48,13 @@ public class DemographicsStatisticsRepository(AppDbContext context) : IDemograph
         var query = context.Schools.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(city))
-            query = query.Where(s => s.City == city);
+            query = query.Where(s => s.City != null && s.City.Name == city);
 
         var rows = await query
             .Select(s => new
             {
-                s.City,
-                s.Zone,
+                CityName = s.City == null ? null : s.City.Name,
+                ZoneName = s.Zone == null ? null : s.Zone.Name,
                 Students = students.Count(st => st.SchoolId == s.Id && st.GraduationDate == null)
             })
             .ToListAsync(ct);
@@ -62,8 +62,8 @@ public class DemographicsStatisticsRepository(AppDbContext context) : IDemograph
         return rows
             .GroupBy(r => new
             {
-                City = string.IsNullOrWhiteSpace(r.City) ? NotRecorded : r.City!,
-                Zone = string.IsNullOrWhiteSpace(r.Zone) ? NotRecorded : r.Zone!
+                City = string.IsNullOrWhiteSpace(r.CityName) ? NotRecorded : r.CityName!,
+                Zone = string.IsNullOrWhiteSpace(r.ZoneName) ? NotRecorded : r.ZoneName!
             })
             .Select(g => (
                 g.Key.City,

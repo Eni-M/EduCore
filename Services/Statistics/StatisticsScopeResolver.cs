@@ -24,7 +24,10 @@ public class StatisticsScopeResolver(
             filter.ClassId,
             filter.Grade,
             filter.SubjectId,
-            filter.TeacherId);
+            filter.TeacherId,
+            filter.CityId,
+            filter.ZoneId,
+            filter.StateId);
     }
 
     private (Guid? SchoolId, bool CrossSchool) ResolveSchool(StatisticsFilter filter)

@@ -13,4 +13,9 @@ public interface ILocationService
     Task<CityListDto> CreateCityAsync(CityWriteDto dto, CancellationToken ct);
     Task<CityListDto> UpdateCityAsync(Guid cityId, CityWriteDto dto, CancellationToken ct);
     Task DeleteCityAsync(Guid cityId, CancellationToken ct);
+
+    Task<IEnumerable<ZoneListDto>> GetZonesAsync(Guid? cityId, CancellationToken ct);
+    Task<ZoneListDto> CreateZoneAsync(ZoneWriteDto dto, CancellationToken ct);
+    Task<ZoneListDto> UpdateZoneAsync(Guid zoneId, ZoneWriteDto dto, CancellationToken ct);
+    Task DeleteZoneAsync(Guid zoneId, CancellationToken ct);
 }

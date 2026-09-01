@@ -108,4 +108,21 @@ public class StatisticsScopeResolverTests
         Assert.Equal(classId, context.ClassId);
         Assert.Equal(9, context.Grade);
     }
+
+    [Fact]
+    public async Task LocationDimensions_AreCarriedThrough()
+    {
+        var cityId = Guid.NewGuid();
+        var zoneId = Guid.NewGuid();
+        var stateId = Guid.NewGuid();
+
+        var context = await Resolver(UserRole.Admin, SchoolA, new StubPeriodResolver())
+            .ResolveAsync(
+                new StatisticsFilter { CityId = cityId, ZoneId = zoneId, StateId = stateId },
+                CancellationToken.None);
+
+        Assert.Equal(cityId, context.CityId);
+        Assert.Equal(zoneId, context.ZoneId);
+        Assert.Equal(stateId, context.StateId);
+    }
 }

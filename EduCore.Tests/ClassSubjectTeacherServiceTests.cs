@@ -53,6 +53,7 @@ public class ClassSubjectTeacherServiceTests
     private sealed class FakeSchoolRepository(School school) : ISchoolRepository
     {
         public Task<School?> GetByIdAsync(Guid id, CancellationToken ct) => Task.FromResult<School?>(school);
+        public Task<School?> GetWithLocationAsync(Guid schoolId, CancellationToken ct) => Task.FromResult<School?>(school);
         public Task<IEnumerable<School>> GetAllOrderedAsync(bool activeOnly, CancellationToken ct) =>
             Task.FromResult<IEnumerable<School>>([]);
         public Task<bool> NameExistsAsync(string name, Guid? excludeSchoolId, CancellationToken ct) =>

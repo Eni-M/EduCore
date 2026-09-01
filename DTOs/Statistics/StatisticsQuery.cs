@@ -10,4 +10,7 @@ public record StatisticsQuery(
     Guid? ClassId,
     int? Grade,
     Guid? SubjectId,
-    Guid? TeacherId);
+    Guid? TeacherId,
+    Guid? CityId,
+    Guid? ZoneId,
+    Guid? StateId);

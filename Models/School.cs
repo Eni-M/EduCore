@@ -8,10 +8,11 @@ public class School
     public string Name { get; set; } = null!;
     public SchoolType Type { get; set; }
 
-    public string? City { get; set; }
-    public string? Zone { get; set; }
-
     public Guid? CityId { get; set; }
+    public City? City { get; set; }
+
+    public Guid? ZoneId { get; set; }
+    public Zone? Zone { get; set; }
 
     public DateTime? DeactivatedAt { get; set; }
 }

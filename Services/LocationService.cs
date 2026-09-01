@@ -95,11 +95,65 @@ public class LocationService(ILocationRepository locations) : ILocationService
         var city = await locations.GetCityAsync(cityId, ct)
                    ?? throw new NotFoundException("City", cityId);
 
+        if (await locations.CityHasZonesAsync(cityId, ct))
+            throw new ConflictException("This city still has zones. Move or delete them first.");
+
         if (await locations.CityIsInUseAsync(cityId, ct))
             throw new ConflictException(
                 "This city is recorded against a student or a school and cannot be deleted.");
 
         locations.RemoveCity(city);
+        await locations.SaveChangesAsync(ct);
+    }
+
+    public async Task<IEnumerable<ZoneListDto>> GetZonesAsync(Guid? cityId, CancellationToken ct) =>
+        await locations.GetZonesAsync(cityId, ct);
+
+    public async Task<ZoneListDto> CreateZoneAsync(ZoneWriteDto dto, CancellationToken ct)
+    {
+        _ = await locations.GetCityAsync(dto.CityId, ct)
+            ?? throw new NotFoundException("City", dto.CityId);
+
+        if (await locations.ZoneNameExistsInCityAsync(dto.CityId, dto.Name, null, ct))
+            throw new ConflictException($"A zone named {dto.Name} already exists in that city.");
+
+        var zone = new Zone { Name = dto.Name.Trim(), CityId = dto.CityId };
+
+        await locations.AddZoneAsync(zone);
+        await locations.SaveChangesAsync(ct);
+
+        return await locations.GetZoneDtoAsync(zone.Id, ct)
+               ?? throw new NotFoundException("Zone", zone.Id);
+    }
+
+    public async Task<ZoneListDto> UpdateZoneAsync(Guid zoneId, ZoneWriteDto dto, CancellationToken ct)
+    {
+        var zone = await locations.GetZoneAsync(zoneId, ct)
+                   ?? throw new NotFoundException("Zone", zoneId);
+
+        _ = await locations.GetCityAsync(dto.CityId, ct)
+            ?? throw new NotFoundException("City", dto.CityId);
+
+        if (await locations.ZoneNameExistsInCityAsync(dto.CityId, dto.Name, zoneId, ct))
+            throw new ConflictException($"A zone named {dto.Name} already exists in that city.");
+
+        zone.Name = dto.Name.Trim();
+        zone.CityId = dto.CityId;
+        await locations.SaveChangesAsync(ct);
+
+        return await locations.GetZoneDtoAsync(zoneId, ct)
+               ?? throw new NotFoundException("Zone", zoneId);
+    }
+
+    public async Task DeleteZoneAsync(Guid zoneId, CancellationToken ct)
+    {
+        var zone = await locations.GetZoneAsync(zoneId, ct)
+                   ?? throw new NotFoundException("Zone", zoneId);
+
+        if (await locations.ZoneIsInUseAsync(zoneId, ct))
+            throw new ConflictException("This zone is recorded against a school and cannot be deleted.");
+
+        locations.RemoveZone(zone);
         await locations.SaveChangesAsync(ct);
     }
 }

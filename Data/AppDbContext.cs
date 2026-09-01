@@ -23,6 +23,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
 
     public DbSet<State> States => Set<State>();
     public DbSet<City> Cities => Set<City>();
+    public DbSet<Zone> Zones => Set<Zone>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<TeacherSubject> TeacherSubjects => Set<TeacherSubject>();
@@ -105,9 +106,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     private void ConfigureSchoolCalendar(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<School>().Property(s => s.Name).HasMaxLength(200);
-        modelBuilder.Entity<School>().Property(s => s.City).HasMaxLength(120);
-        modelBuilder.Entity<School>().Property(s => s.Zone).HasMaxLength(120);
-        modelBuilder.Entity<School>().HasIndex(s => new { s.City, s.Zone });
         modelBuilder.Entity<School>().Property<uint>("Version").IsRowVersion();
 
         modelBuilder.Entity<AcademicYear>()
@@ -152,14 +150,26 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<City>().HasIndex(c => new { c.StateId, c.Name }).IsUnique();
 
+        modelBuilder.Entity<Zone>().Property(z => z.Name).HasMaxLength(150).IsRequired();
+        modelBuilder.Entity<Zone>()
+            .HasOne(z => z.City).WithMany()
+            .HasForeignKey(z => z.CityId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Zone>().HasIndex(z => new { z.CityId, z.Name }).IsUnique();
+
         modelBuilder.Entity<Student>()
             .HasOne(s => s.City).WithMany()
             .HasForeignKey(s => s.CityId)
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<School>()
-            .HasOne<City>().WithMany()
+            .HasOne(s => s.City).WithMany()
             .HasForeignKey(s => s.CityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<School>()
+            .HasOne(s => s.Zone).WithMany()
+            .HasForeignKey(s => s.ZoneId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 

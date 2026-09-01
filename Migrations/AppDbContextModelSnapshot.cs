@@ -513,10 +513,6 @@ namespace EduCore.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("City")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
                     b.Property<Guid?>("CityId")
                         .HasColumnType("uuid");
 
@@ -537,15 +533,14 @@ namespace EduCore.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
-                    b.Property<string>("Zone")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
+                    b.Property<Guid?>("ZoneId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
                     b.HasIndex("CityId");
 
-                    b.HasIndex("City", "Zone");
+                    b.HasIndex("ZoneId");
 
                     b.ToTable("Schools");
                 });
@@ -754,6 +749,28 @@ namespace EduCore.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("EduCore.Models.Zone", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CityId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("Zones");
+                });
+
             modelBuilder.Entity("EduCore.Models.AcademicYear", b =>
                 {
                     b.HasOne("EduCore.Models.School", null)
@@ -956,10 +973,19 @@ namespace EduCore.Migrations
 
             modelBuilder.Entity("EduCore.Models.School", b =>
                 {
-                    b.HasOne("EduCore.Models.City", null)
+                    b.HasOne("EduCore.Models.City", "City")
                         .WithMany()
                         .HasForeignKey("CityId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EduCore.Models.Zone", "Zone")
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("City");
+
+                    b.Navigation("Zone");
                 });
 
             modelBuilder.Entity("EduCore.Models.Student", b =>
@@ -1033,6 +1059,17 @@ namespace EduCore.Migrations
                         .IsRequired();
 
                     b.Navigation("Subject");
+                });
+
+            modelBuilder.Entity("EduCore.Models.Zone", b =>
+                {
+                    b.HasOne("EduCore.Models.City", "City")
+                        .WithMany()
+                        .HasForeignKey("CityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("City");
                 });
 
             modelBuilder.Entity("EduCore.Models.State", b =>

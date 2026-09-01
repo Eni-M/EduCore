@@ -19,3 +19,12 @@ public class CityWriteDtoValidator : AbstractValidator<CityWriteDto>
         RuleFor(x => x.StateId).NotEmpty();
     }
 }
+
+public class ZoneWriteDtoValidator : AbstractValidator<ZoneWriteDto>
+{
+    public ZoneWriteDtoValidator()
+    {
+        RuleFor(x => x.Name).NotEmpty().MaximumLength(150);
+        RuleFor(x => x.CityId).NotEmpty();
+    }
+}

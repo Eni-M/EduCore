@@ -3,6 +3,9 @@ namespace EduCore.Dtos.Statistics;
 public record StatisticsFilter
 {
     public Guid? SchoolId { get; init; }
+    public Guid? CityId { get; init; }
+    public Guid? ZoneId { get; init; }
+    public Guid? StateId { get; init; }
 
     public Guid? AcademicYearId { get; init; }
     public Guid? GradingPeriodId { get; init; }

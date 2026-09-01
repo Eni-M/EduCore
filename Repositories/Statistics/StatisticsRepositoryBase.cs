@@ -19,9 +19,21 @@ public abstract class StatisticsRepositoryBase(AppDbContext context)
 
         query = query.AsNoTracking().IgnoreQueryFilters();
 
-        return ctx.SchoolId is null
-            ? query
-            : query.Where(e => e.SchoolId == ctx.SchoolId);
+        if (ctx.SchoolId is not null)
+            query = query.Where(e => e.SchoolId == ctx.SchoolId);
+
+        if (ctx.CityId is not null || ctx.ZoneId is not null)
+        {
+            var schoolIds = _context.Schools
+                .AsNoTracking()
+                .Where(s => ctx.CityId == null || s.CityId == ctx.CityId)
+                .Where(s => ctx.ZoneId == null || s.ZoneId == ctx.ZoneId)
+                .Select(s => s.Id);
+
+            query = query.Where(e => schoolIds.Contains(e.SchoolId));
+        }
+
+        return query;
     }
 
     protected IQueryable<Models.DiaryEntry> LessonsInWindow(StatisticsQuery ctx)

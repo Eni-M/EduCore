@@ -62,10 +62,51 @@ public class LocationRepository(AppDbContext context) : ILocationRepository
         await context.Students.IgnoreQueryFilters().AnyAsync(s => s.CityId == cityId, ct)
         || await context.Schools.AnyAsync(s => s.CityId == cityId, ct);
 
+    public async Task<bool> CityHasZonesAsync(Guid cityId, CancellationToken ct) =>
+        await context.Zones.AnyAsync(z => z.CityId == cityId, ct);
+
+    public async Task<IEnumerable<ZoneListDto>> GetZonesAsync(Guid? cityId, CancellationToken ct)
+    {
+        var query = context.Zones.AsNoTracking().AsQueryable();
+
+        if (cityId is not null)
+            query = query.Where(z => z.CityId == cityId);
+
+        return await query
+            .OrderBy(z => z.City.State.Name)
+            .ThenBy(z => z.City.Name)
+            .ThenBy(z => z.Name)
+            .Select(z => new ZoneListDto(z.Id, z.Name, z.CityId, z.City.Name, z.City.State.Name))
+            .ToListAsync(ct);
+    }
+
+    public async Task<Zone?> GetZoneAsync(Guid zoneId, CancellationToken ct) =>
+        await context.Zones.FirstOrDefaultAsync(z => z.Id == zoneId, ct);
+
+    public async Task<ZoneListDto?> GetZoneDtoAsync(Guid zoneId, CancellationToken ct) =>
+        await context.Zones
+            .AsNoTracking()
+            .Where(z => z.Id == zoneId)
+            .Select(z => new ZoneListDto(z.Id, z.Name, z.CityId, z.City.Name, z.City.State.Name))
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<bool> ZoneNameExistsInCityAsync(
+        Guid cityId, string name, Guid? excludeZoneId, CancellationToken ct) =>
+        await context.Zones.AnyAsync(
+            z => z.CityId == cityId
+                 && z.Name.ToLower() == name.ToLower()
+                 && (excludeZoneId == null || z.Id != excludeZoneId),
+            ct);
+
+    public async Task<bool> ZoneIsInUseAsync(Guid zoneId, CancellationToken ct) =>
+        await context.Schools.AnyAsync(s => s.ZoneId == zoneId, ct);
+
     public async Task AddStateAsync(State state) => await context.States.AddAsync(state);
     public async Task AddCityAsync(City city) => await context.Cities.AddAsync(city);
+    public async Task AddZoneAsync(Zone zone) => await context.Zones.AddAsync(zone);
     public void RemoveState(State state) => context.States.Remove(state);
     public void RemoveCity(City city) => context.Cities.Remove(city);
+    public void RemoveZone(Zone zone) => context.Zones.Remove(zone);
 
     public async Task<bool> SaveChangesAsync(CancellationToken ct) =>
         await context.SaveChangesAsync(ct) > 0;

@@ -6,6 +6,9 @@ public record SchoolListDto(
     Guid Id,
     string Name,
     SchoolType Type,
-    string? City,
-    string? Zone,
+    Guid? CityId,
+    string? CityName,
+    Guid? ZoneId,
+    string? ZoneName,
+    string? StateName,
     DateTime? DeactivatedAt);

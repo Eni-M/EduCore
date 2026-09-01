@@ -59,5 +59,31 @@ public static class LocationEndpoints
                     return Results.NoContent();
                 })
             .RequireAuthorization(Policies.SuperAdmin);
+
+        var zones = api.MapGroup("/zones").WithTags("Locations");
+
+        zones.MapGet("/", async (Guid? cityId, ILocationService service, CancellationToken ct) =>
+                Results.Ok(await service.GetZonesAsync(cityId, ct)))
+            .RequireAuthorization();
+
+        zones.MapPost("/", async (ZoneWriteDto dto, ILocationService service, CancellationToken ct) =>
+            {
+                var zone = await service.CreateZoneAsync(dto, ct);
+                return Results.Created($"/api/zones/{zone.Id}", zone);
+            })
+            .RequireAuthorization(Policies.SuperAdmin);
+
+        zones.MapPut("/{zoneId:guid}",
+                async (Guid zoneId, ZoneWriteDto dto, ILocationService service, CancellationToken ct) =>
+                    Results.Ok(await service.UpdateZoneAsync(zoneId, dto, ct)))
+            .RequireAuthorization(Policies.SuperAdmin);
+
+        zones.MapDelete("/{zoneId:guid}",
+                async (Guid zoneId, ILocationService service, CancellationToken ct) =>
+                {
+                    await service.DeleteZoneAsync(zoneId, ct);
+                    return Results.NoContent();
+                })
+            .RequireAuthorization(Policies.SuperAdmin);
     }
 }

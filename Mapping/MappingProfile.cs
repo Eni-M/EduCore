@@ -38,7 +38,10 @@ public class MappingProfile : Profile
 
     private void MapSchools()
     {
-        CreateMap<School, Dtos.School.SchoolListDto>();
+        CreateMap<School, Dtos.School.SchoolListDto>()
+            .ForCtorParam("CityName", o => o.MapFrom(s => s.City != null ? s.City.Name : null))
+            .ForCtorParam("ZoneName", o => o.MapFrom(s => s.Zone != null ? s.Zone.Name : null))
+            .ForCtorParam("StateName", o => o.MapFrom(s => s.City != null ? s.City.State.Name : null));
         CreateWriteMap<Dtos.School.SchoolCreateDto, School>();
         CreateWriteMap<Dtos.School.SchoolEditDto, School>();
     }
