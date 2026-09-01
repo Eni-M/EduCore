@@ -11,6 +11,7 @@ namespace EduCore.Services;
 
 public class ClassService(
     IClassRepository classes,
+    ISchoolRepository schools,
     IAcademicYearRepository academicYears,
     IAccessGuard access,
     ITeacherRepository teachers,
@@ -51,8 +52,13 @@ public class ClassService(
         if (await classes.NameExistsInYearAsync(dto.AcademicYearId, dto.Name, null, ct))
             throw new ConflictException($"A class named {dto.Name} already exists in this academic year.");
 
+        var schoolId = currentUser.RequireSchoolId();
+        var school = await schools.GetByIdAsync(schoolId, ct)
+                     ?? throw new NotFoundException("School", schoolId);
+        GradeBands.Validate(school.Type, dto.Grade);
+
         var entity = mapper.Map<Class>(dto);
-        entity.SchoolId = currentUser.RequireSchoolId();
+        entity.SchoolId = schoolId;
 
         await classes.AddAsync(entity);
         await classes.SaveChangesAsync(ct);
@@ -66,6 +72,10 @@ public class ClassService(
 
         if (await classes.NameExistsInYearAsync(entity.AcademicYearId, dto.Name, classId, ct))
             throw new ConflictException($"A class named {dto.Name} already exists in this academic year.");
+
+        var school = await schools.GetByIdAsync(entity.SchoolId, ct)
+                     ?? throw new NotFoundException("School", entity.SchoolId);
+        GradeBands.Validate(school.Type, dto.Grade);
 
         mapper.Map(dto, entity);
 

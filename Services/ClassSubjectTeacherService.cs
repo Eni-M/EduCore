@@ -11,6 +11,7 @@ namespace EduCore.Services;
 public class ClassSubjectTeacherService(
     IClassSubjectTeacherRepository assignments,
     IClassRepository classes,
+    ISchoolRepository schools,
     ISubjectRepository subjects,
     ITeacherSubjectRepository teacherSubjects,
     IAccessGuard access,
@@ -41,8 +42,13 @@ public class ClassSubjectTeacherService(
         ClassSubjectTeacherCreateDto dto,
         CancellationToken ct)
     {
-        _ = await classes.GetByIdAsync(dto.ClassId, ct) ?? throw new NotFoundException("Class", dto.ClassId);
+        var classEntity = await classes.GetByIdAsync(dto.ClassId, ct)
+                           ?? throw new NotFoundException("Class", dto.ClassId);
         _ = await subjects.GetByIdAsync(dto.SubjectId, ct) ?? throw new NotFoundException("Subject", dto.SubjectId);
+
+        var school = await schools.GetByIdAsync(classEntity.SchoolId, ct)
+                     ?? throw new NotFoundException("School", classEntity.SchoolId);
+        GradeBands.Validate(school.Type, classEntity.Grade);
 
         if (!await teacherSubjects.ExistsAsync(dto.TeacherId, dto.SubjectId, ct))
             throw new BusinessException("This teacher is not qualified to teach that subject.");
