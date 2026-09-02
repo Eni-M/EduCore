@@ -25,6 +25,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<DiaryEntry> DiaryEntries => Set<DiaryEntry>();
     public DbSet<Attendance> Attendances => Set<Attendance>();
     public DbSet<Mark> Marks => Set<Mark>();
+    public DbSet<SchoolingHistory> SchoolingHistories => Set<SchoolingHistory>();
+    public DbSet<StudentDocument> StudentDocuments => Set<StudentDocument>();
+    public DbSet<StudentMedicalRecord> StudentMedicalRecords => Set<StudentMedicalRecord>();
 
     public DbSet<State> States => Set<State>();
     public DbSet<City> Cities => Set<City>();
@@ -45,6 +48,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         ConfigureClasses(modelBuilder);
         ConfigureLessons(modelBuilder);
         ConfigureScheduling(modelBuilder);
+        ConfigureStudentRecords(modelBuilder);
 
         modelBuilder.Entity<AuditLog>().Property(a => a.Action).HasMaxLength(1000);
         modelBuilder.Entity<AuditLog>().Property(a => a.TraceId).HasMaxLength(200);
@@ -440,5 +444,55 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         modelBuilder.Entity<Mark>().HasIndex(m => new { m.SchoolId, m.GradingPeriodId, m.SubjectId });
         modelBuilder.Entity<Mark>().HasIndex(m => new { m.TeacherId, m.GradingPeriodId });
         ScopeToSchool<Mark>(modelBuilder);
+    }
+
+    // Records that hang off a single student. All three use the same composite (StudentId,
+    // SchoolId) -> Student(Id, SchoolId) key the rest of the model uses, so a row can never point
+    // at a student in another school, and Restrict keeps the history from vanishing under a delete.
+    private void ConfigureStudentRecords(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<SchoolingHistory>()
+            .HasOne<Student>().WithMany()
+            .HasForeignKey(h => new { h.StudentId, h.SchoolId })
+            .HasPrincipalKey(s => new { s.Id, s.SchoolId })
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SchoolingHistory>().HasIndex(h => new { h.SchoolId, h.StudentId });
+        modelBuilder.Entity<SchoolingHistory>().Property(h => h.PreviousSchoolName).HasMaxLength(200);
+        modelBuilder.Entity<SchoolingHistory>().Property(h => h.City).HasMaxLength(150);
+        modelBuilder.Entity<SchoolingHistory>().Property(h => h.GradeOrLevel).HasMaxLength(50);
+        modelBuilder.Entity<SchoolingHistory>().Property(h => h.ExitReason).HasMaxLength(200);
+        modelBuilder.Entity<SchoolingHistory>().Property(h => h.Notes).HasMaxLength(2000);
+        modelBuilder.Entity<SchoolingHistory>().Property<uint>("Version").IsRowVersion();
+        ScopeToSchool<SchoolingHistory>(modelBuilder);
+
+        modelBuilder.Entity<StudentDocument>()
+            .HasOne<Student>().WithMany()
+            .HasForeignKey(d => new { d.StudentId, d.SchoolId })
+            .HasPrincipalKey(s => new { s.Id, s.SchoolId })
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<StudentDocument>().HasIndex(d => new { d.SchoolId, d.StudentId });
+        modelBuilder.Entity<StudentDocument>().Property(d => d.Title).HasMaxLength(200);
+        modelBuilder.Entity<StudentDocument>().Property(d => d.FileName).HasMaxLength(260);
+        modelBuilder.Entity<StudentDocument>().Property(d => d.ContentType).HasMaxLength(150);
+        modelBuilder.Entity<StudentDocument>().Property(d => d.StorageKey).HasMaxLength(400);
+        modelBuilder.Entity<StudentDocument>().Property<uint>("Version").IsRowVersion();
+        ScopeToSchool<StudentDocument>(modelBuilder);
+
+        // One medical record per student.
+        modelBuilder.Entity<StudentMedicalRecord>()
+            .HasOne<Student>().WithMany()
+            .HasForeignKey(m => new { m.StudentId, m.SchoolId })
+            .HasPrincipalKey(s => new { s.Id, s.SchoolId })
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<StudentMedicalRecord>().HasIndex(m => m.StudentId).IsUnique();
+        modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.BloodType).HasMaxLength(10);
+        modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.Allergies).HasMaxLength(2000);
+        modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.ChronicConditions).HasMaxLength(2000);
+        modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.Medications).HasMaxLength(2000);
+        modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.EmergencyContactName).HasMaxLength(200);
+        modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.EmergencyContactPhone).HasMaxLength(30);
+        modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.Notes).HasMaxLength(4000);
+        modelBuilder.Entity<StudentMedicalRecord>().Property<uint>("Version").IsRowVersion();
+        ScopeToSchool<StudentMedicalRecord>(modelBuilder);
     }
 }

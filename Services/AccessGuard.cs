@@ -92,4 +92,45 @@ public class AccessGuard(
 
         throw new ForbiddenException("You do not have access to this student.");
     }
+
+    public async Task EnsureCanViewStudentMedicalAsync(Guid studentId, CancellationToken ct)
+    {
+        if (currentUser.IsDirectorate)
+            return;
+
+        if (currentUser.IsStudent)
+        {
+            if (currentUser.StudentId == studentId)
+                return;
+
+            throw new ForbiddenException("You can only view your own medical record.");
+        }
+
+        if (currentUser.IsGuardian)
+        {
+            if (await guardians.LinkExistsAsync(currentUser.RequireGuardianId(), studentId, ct))
+                return;
+
+            throw new ForbiddenException("You can only view the medical record of a student in your care.");
+        }
+
+        if (currentUser.IsTeacher)
+        {
+            // Deliberately narrower than viewing the student at large: teaching the class is not
+            // enough, only being its homeroom teacher -- the one person responsible for the child.
+            var enrollment = await enrollments.GetActiveForStudentAsync(studentId, ct);
+
+            if (enrollment is not null)
+            {
+                var @class = await classes.GetByIdAsync(enrollment.ClassId, ct);
+
+                if (@class?.HomeroomTeacherId == currentUser.RequireTeacherId())
+                    return;
+            }
+
+            throw new ForbiddenException("Only the student's homeroom teacher may view their medical record.");
+        }
+
+        throw new ForbiddenException("You do not have access to this student's medical record.");
+    }
 }

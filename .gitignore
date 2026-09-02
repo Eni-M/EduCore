@@ -16,3 +16,7 @@ riderModule.iml
 .env
 .env.local
 .env.*.local
+
+# Uploaded student documents kept by the local file-storage backend (Storage:LocalRoot).
+# User data, never committed.
+/storage/

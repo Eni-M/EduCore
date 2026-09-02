@@ -16,6 +16,7 @@ public class MappingProfile : Profile
         MapAccountTiers();
         MapClasses();
         MapLessonRecords();
+        MapStudentRecords();
     }
 
     private IMappingExpression<TSource, TDestination> CreateWriteMap<TSource, TDestination>()
@@ -164,5 +165,16 @@ public class MappingProfile : Profile
         CreateWriteMap<Dtos.DiaryEntry.DiaryEntryEditDto, DiaryEntry>();
         CreateWriteMap<Dtos.Attendance.AttendanceEditDto, Attendance>();
         CreateWriteMap<Dtos.Mark.MarkUpsertDto, Mark>();
+    }
+    private void MapStudentRecords()
+    {
+        CreateMap<SchoolingHistory, Dtos.SchoolingHistory.SchoolingHistoryListDto>();
+        CreateWriteMap<Dtos.SchoolingHistory.SchoolingHistoryCreateDto, SchoolingHistory>();
+        CreateWriteMap<Dtos.SchoolingHistory.SchoolingHistoryEditDto, SchoolingHistory>();
+
+        CreateMap<StudentDocument, Dtos.StudentDocument.StudentDocumentListDto>();
+
+        CreateMap<StudentMedicalRecord, Dtos.Medical.StudentMedicalRecordDto>();
+        CreateWriteMap<Dtos.Medical.StudentMedicalRecordUpsertDto, StudentMedicalRecord>();
     }
 }

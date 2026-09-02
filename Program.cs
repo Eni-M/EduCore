@@ -19,6 +19,7 @@ using EduCore.Services;
 using EduCore.Services.Interfaces;
 using EduCore.Services.Statistics;
 using EduCore.Services.Statistics.Interfaces;
+using EduCore.Services.Storage;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -72,6 +73,9 @@ builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
 builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
 builder.Services.AddScoped<IMarkRepository, MarkRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddScoped<ISchoolingHistoryRepository, SchoolingHistoryRepository>();
+builder.Services.AddScoped<IStudentDocumentRepository, StudentDocumentRepository>();
+builder.Services.AddScoped<IStudentMedicalRecordRepository, StudentMedicalRecordRepository>();
 
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
@@ -108,6 +112,14 @@ builder.Services.AddOptions<AcademicCalendarOptions>()
     .Bind(builder.Configuration.GetSection(AcademicCalendarOptions.SectionName))
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<AcademicCalendarOptions>, AcademicCalendarOptionsValidator>();
+
+// Where student documents are kept, how big they may be, and which content types are allowed.
+// Only a local-disk backend exists today; IFileStorage is the seam a cloud one slots into later.
+builder.Services.AddOptions<StorageOptions>()
+    .Bind(builder.Configuration.GetSection(StorageOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<StorageOptions>, StorageOptionsValidator>();
+builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();
 
 builder.Services.AddOptions<SessionCookieOptions>()
     .Bind(builder.Configuration.GetSection(SessionCookieOptions.SectionName))
@@ -159,6 +171,9 @@ builder.Services.AddScoped<IScheduleService, ScheduleService>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IMarkService, MarkService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<ISchoolingHistoryService, SchoolingHistoryService>();
+builder.Services.AddScoped<IStudentDocumentService, StudentDocumentService>();
+builder.Services.AddScoped<IStudentMedicalRecordService, StudentMedicalRecordService>();
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
@@ -319,6 +334,7 @@ api.MapLocationEndpoints();
 api.MapAcademicYearEndpoints();
 api.MapClassEndpoints();
 api.MapStudentEndpoints();
+api.MapStudentRecordsEndpoints();
 api.MapTeacherEndpoints();
 api.MapLessonEndpoints();
 api.MapScheduleEndpoints();
