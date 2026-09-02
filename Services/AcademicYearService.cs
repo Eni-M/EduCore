@@ -18,9 +18,7 @@ public class AcademicYearService(
     IMapper mapper) : IAcademicYearService
 {
     public async Task<IEnumerable<AcademicYearListDto>> GetAllAsync(Guid? schoolId, CancellationToken ct) =>
-        currentUser.IsSuperAdmin
-            ? await academicYears.GetAllAcrossSchoolsAsync(schoolId, ct)
-            : mapper.Map<IEnumerable<AcademicYearListDto>>(await academicYears.GetAllOrderedAsync(ct));
+        mapper.Map<IEnumerable<AcademicYearListDto>>(await academicYears.GetAllOrderedAsync(ct));
 
     public async Task<AcademicYearListDto> GetByIdAsync(Guid academicYearId, CancellationToken ct) =>
         mapper.Map<AcademicYearListDto>(await GetOwnedYearAsync(academicYearId, ct));

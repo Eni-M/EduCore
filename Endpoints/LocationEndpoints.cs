@@ -19,12 +19,12 @@ public static class LocationEndpoints
                 var state = await service.CreateStateAsync(dto, ct);
                 return Results.Created($"/api/states/{state.Id}", state);
             })
-            .RequireAuthorization(Policies.SuperAdmin);
+            .RequireAuthorization(Policies.StateAdmin);
 
         states.MapPut("/{stateId:guid}",
                 async (Guid stateId, StateWriteDto dto, ILocationService service, CancellationToken ct) =>
                     Results.Ok(await service.UpdateStateAsync(stateId, dto, ct)))
-            .RequireAuthorization(Policies.SuperAdmin);
+            .RequireAuthorization(Policies.StateAdmin);
 
         states.MapDelete("/{stateId:guid}",
                 async (Guid stateId, ILocationService service, CancellationToken ct) =>
@@ -32,7 +32,7 @@ public static class LocationEndpoints
                     await service.DeleteStateAsync(stateId, ct);
                     return Results.NoContent();
                 })
-            .RequireAuthorization(Policies.SuperAdmin);
+            .RequireAuthorization(Policies.StateAdmin);
 
         var cities = api.MapGroup("/cities").WithTags("Locations");
 
@@ -45,12 +45,12 @@ public static class LocationEndpoints
                 var city = await service.CreateCityAsync(dto, ct);
                 return Results.Created($"/api/cities/{city.Id}", city);
             })
-            .RequireAuthorization(Policies.SuperAdmin);
+            .RequireAuthorization(Policies.StateAdmin);
 
         cities.MapPut("/{cityId:guid}",
                 async (Guid cityId, CityWriteDto dto, ILocationService service, CancellationToken ct) =>
                     Results.Ok(await service.UpdateCityAsync(cityId, dto, ct)))
-            .RequireAuthorization(Policies.SuperAdmin);
+            .RequireAuthorization(Policies.StateAdmin);
 
         cities.MapDelete("/{cityId:guid}",
                 async (Guid cityId, ILocationService service, CancellationToken ct) =>
@@ -58,7 +58,7 @@ public static class LocationEndpoints
                     await service.DeleteCityAsync(cityId, ct);
                     return Results.NoContent();
                 })
-            .RequireAuthorization(Policies.SuperAdmin);
+            .RequireAuthorization(Policies.StateAdmin);
 
         var zones = api.MapGroup("/zones").WithTags("Locations");
 
@@ -71,12 +71,12 @@ public static class LocationEndpoints
                 var zone = await service.CreateZoneAsync(dto, ct);
                 return Results.Created($"/api/zones/{zone.Id}", zone);
             })
-            .RequireAuthorization(Policies.SuperAdmin);
+            .RequireAuthorization(Policies.StateAdmin);
 
         zones.MapPut("/{zoneId:guid}",
                 async (Guid zoneId, ZoneWriteDto dto, ILocationService service, CancellationToken ct) =>
                     Results.Ok(await service.UpdateZoneAsync(zoneId, dto, ct)))
-            .RequireAuthorization(Policies.SuperAdmin);
+            .RequireAuthorization(Policies.StateAdmin);
 
         zones.MapDelete("/{zoneId:guid}",
                 async (Guid zoneId, ILocationService service, CancellationToken ct) =>
@@ -84,6 +84,6 @@ public static class LocationEndpoints
                     await service.DeleteZoneAsync(zoneId, ct);
                     return Results.NoContent();
                 })
-            .RequireAuthorization(Policies.SuperAdmin);
+            .RequireAuthorization(Policies.StateAdmin);
     }
 }

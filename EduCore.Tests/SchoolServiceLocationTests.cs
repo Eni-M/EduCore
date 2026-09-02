@@ -6,6 +6,7 @@ using EduCore.Exceptions;
 using EduCore.Mapping;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
+using EduCore.Security;
 using EduCore.Services;
 using Xunit;
 
@@ -13,12 +14,34 @@ namespace EduCore.Tests;
 
 public class SchoolServiceLocationTests
 {
+    private sealed class FakeCurrentUser : ICurrentUser
+    {
+        public Guid UserId => Guid.NewGuid();
+        public UserRole? Role => UserRole.RegionalAdmin;
+        public Guid? SchoolId => null;
+        public Guid? TeacherId => null;
+        public Guid? StudentId => null;
+        public Guid? CityId { get; init; }
+        public Guid? StateId => null;
+        public Guid? GuardianId => null;
+        public bool IsStateAdmin => false;
+        public bool IsRegionalAdmin => true;
+        public bool IsDirectorate => false;
+        public bool IsTeacher => false;
+        public bool IsStudent => false;
+        public bool IsGuardian => false;
+    }
+
     private sealed class FakeSchoolRepository : ISchoolRepository
     {
         public School? Added;
         public Task<School?> GetByIdAsync(Guid id, CancellationToken ct) => Task.FromResult<School?>(Added);
         public Task<School?> GetWithLocationAsync(Guid schoolId, CancellationToken ct) => Task.FromResult<School?>(Added);
         public Task<IEnumerable<School>> GetAllOrderedAsync(bool activeOnly, CancellationToken ct) =>
+            Task.FromResult<IEnumerable<School>>([]);
+        public Task<IEnumerable<School>> GetByCityAsync(Guid cityId, bool activeOnly, CancellationToken ct) =>
+            Task.FromResult<IEnumerable<School>>([]);
+        public Task<IEnumerable<School>> GetByStateAsync(Guid stateId, bool activeOnly, CancellationToken ct) =>
             Task.FromResult<IEnumerable<School>>([]);
         public Task<bool> NameExistsAsync(string name, Guid? excludeSchoolId, CancellationToken ct) =>
             Task.FromResult(false);
@@ -75,6 +98,7 @@ public class SchoolServiceLocationTests
         var service = new SchoolService(
             new FakeSchoolRepository(),
             new FakeLocationRepository(cityA, zoneInCityB),
+            new FakeCurrentUser { CityId = cityA.Id },
             Mapper());
 
         var dto = new SchoolCreateDto("New School", SchoolType.HighSchool, cityA.Id, zoneInCityB.Id);
@@ -89,7 +113,8 @@ public class SchoolServiceLocationTests
         var zone = new Zone { Id = Guid.NewGuid(), Name = "Qendra", CityId = city.Id };
         var repo = new FakeSchoolRepository();
 
-        var service = new SchoolService(repo, new FakeLocationRepository(city, zone), Mapper());
+        var service = new SchoolService(
+            repo, new FakeLocationRepository(city, zone), new FakeCurrentUser { CityId = city.Id }, Mapper());
 
         var dto = new SchoolCreateDto("New School", SchoolType.HighSchool, city.Id, zone.Id);
 

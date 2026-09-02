@@ -11,6 +11,8 @@ public class StatisticsScopeResolver(
 {
     public async Task<StatisticsQuery> ResolveAsync(StatisticsFilter filter, CancellationToken ct)
     {
+        filter = ApplyTierScope(filter);
+
         var (schoolId, crossSchool) = ResolveSchool(filter);
         var (from, to) = await periods.ResolveAsync(filter, schoolId, ct);
 
@@ -27,12 +29,26 @@ public class StatisticsScopeResolver(
             filter.TeacherId,
             filter.CityId,
             filter.ZoneId,
-            filter.StateId);
+            filter.StateId,
+            currentUser.IsStateAdmin ? currentUser.RequireStateId() : null);
     }
+
+    private StatisticsFilter ApplyTierScope(StatisticsFilter filter) =>
+        currentUser switch
+        {
+            { IsRegionalAdmin: true } => filter with
+            {
+                SchoolId = null,
+                CityId = currentUser.RequireCityId(),
+                ZoneId = null,
+                StateId = null
+            },
+            _ => filter
+        };
 
     private (Guid? SchoolId, bool CrossSchool) ResolveSchool(StatisticsFilter filter)
     {
-        if (currentUser.IsSuperAdmin)
+        if (currentUser.IsStateAdmin || currentUser.IsRegionalAdmin)
             return (filter.SchoolId, filter.SchoolId is null);
 
         var ownSchoolId = currentUser.RequireSchoolId();

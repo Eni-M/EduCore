@@ -1,4 +1,4 @@
-using EduCore.Dtos.Parent;
+using EduCore.Dtos.Guardian;
 using EduCore.Enums;
 
 namespace EduCore.Dtos.Student;
@@ -15,4 +15,4 @@ public record StudentDetailDto(
     Guid? CityId,
     string? CityName,
     string? StateName,
-    IReadOnlyList<ParentListDto> Parents);
+    IReadOnlyList<GuardianContactDto> Guardians);

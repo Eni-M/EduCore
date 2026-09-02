@@ -21,6 +21,34 @@ public class SchoolRepository(AppDbContext context) : Repository<School>(context
         return await query.OrderBy(s => s.Name).ToListAsync(ct);
     }
 
+    public async Task<IEnumerable<School>> GetByCityAsync(Guid cityId, bool activeOnly, CancellationToken ct)
+    {
+        var query = _context.Schools
+            .AsNoTracking()
+            .Include(s => s.City).ThenInclude(c => c!.State)
+            .Include(s => s.Zone)
+            .Where(s => s.CityId == cityId);
+
+        if (activeOnly)
+            query = query.Where(s => s.DeactivatedAt == null);
+
+        return await query.OrderBy(s => s.Name).ToListAsync(ct);
+    }
+
+    public async Task<IEnumerable<School>> GetByStateAsync(Guid stateId, bool activeOnly, CancellationToken ct)
+    {
+        var query = _context.Schools
+            .AsNoTracking()
+            .Include(s => s.City).ThenInclude(c => c!.State)
+            .Include(s => s.Zone)
+            .Where(s => s.City != null && s.City.StateId == stateId);
+
+        if (activeOnly)
+            query = query.Where(s => s.DeactivatedAt == null);
+
+        return await query.OrderBy(s => s.Name).ToListAsync(ct);
+    }
+
     public async Task<School?> GetWithLocationAsync(Guid schoolId, CancellationToken ct) =>
         await _context.Schools
             .Include(s => s.City).ThenInclude(c => c!.State)

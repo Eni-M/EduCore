@@ -15,10 +15,5 @@ public class StudentCreateDtoValidator : AbstractValidator<StudentCreateDto>
         RuleFor(x => x.PersonalNumber).NotEmpty().MaximumLength(50);
         RuleFor(x => x.DateOfBirth).LessThan(_ => DateOnly.FromDateTime(DateTime.UtcNow));
         RuleFor(x => x.Gender).IsInEnum();
-
-        RuleFor(x => x.GuardianName).NotEmpty().MaximumLength(200)
-            .When(x => !string.IsNullOrWhiteSpace(x.GuardianPhone));
-        RuleFor(x => x.GuardianPhone).NotEmpty().MaximumLength(30)
-            .When(x => !string.IsNullOrWhiteSpace(x.GuardianName));
     }
 }

@@ -20,7 +20,7 @@ public class SubjectService(
 {
     public async Task<IEnumerable<SubjectListDto>> GetAllAsync(CancellationToken ct)
     {
-        if (currentUser.IsAdmin || currentUser.IsSuperAdmin)
+        if (currentUser.IsDirectorate)
             return mapper.Map<IEnumerable<SubjectListDto>>(await subjects.GetAllOrderedAsync(ct));
 
         if (currentUser.IsTeacher)

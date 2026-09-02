@@ -12,7 +12,7 @@ public static class LessonEndpoints
     public static void MapLessonEndpoints(this IEndpointRouteBuilder api)
     {
         var enrollments = api.MapGroup("/enrollments")
-            .RequireAuthorization(Policies.Admin)
+            .RequireAuthorization(Policies.Directorate)
             .WithTags("Enrollments");
 
         enrollments.MapPost("/", async (EnrollmentCreateDto dto, IEnrollmentService service, CancellationToken ct) =>
@@ -41,15 +41,15 @@ public static class LessonEndpoints
                 var entry = await service.CreateAsync(dto, ct);
                 return Results.Created($"/api/diary-entries/{entry.Id}", entry);
             })
-            .RequireAuthorization(Policies.AdminOrTeacher);
+            .RequireAuthorization(Policies.DirectorateOrTeacher);
 
         diary.MapPut("/{diaryEntryId:guid}",
                 async (Guid diaryEntryId, DiaryEntryEditDto dto, IDiaryEntryService service, CancellationToken ct) =>
                     Results.Ok(await service.UpdateAsync(diaryEntryId, dto, ct)))
-            .RequireAuthorization(Policies.AdminOrTeacher);
+            .RequireAuthorization(Policies.DirectorateOrTeacher);
 
         var attendance = api.MapGroup("/attendance")
-            .RequireAuthorization(Policies.AdminOrTeacher)
+            .RequireAuthorization(Policies.DirectorateOrTeacher)
             .WithTags("Attendance");
 
         attendance.MapPut("/{attendanceId:guid}",
@@ -60,7 +60,7 @@ public static class LessonEndpoints
             });
 
         var marks = api.MapGroup("/marks")
-            .RequireAuthorization(Policies.AdminOrTeacher)
+            .RequireAuthorization(Policies.DirectorateOrTeacher)
             .WithTags("Marks");
 
         marks.MapPost("/", async (MarkUpsertDto dto, IMarkService service, CancellationToken ct) =>
@@ -70,7 +70,7 @@ public static class LessonEndpoints
                     IAuditLogService service, CancellationToken ct) =>
                 Results.Ok(await service.GetPagedAsync(
                     new Dtos.Pagination.PaginationQueryDto(page ?? 1, pageSize ?? 20), userId, from, to, ct)))
-            .RequireAuthorization(Policies.SuperAdmin)
+            .RequireAuthorization(Policies.StateAdmin)
             .WithTags("Audit");
     }
 }

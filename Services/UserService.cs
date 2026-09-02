@@ -14,11 +14,26 @@ using PasswordGenerator;
 
 namespace EduCore.Services;
 
+public record ProfileScope(
+    Guid? SchoolId,
+    Guid? TeacherId,
+    Guid? StudentId,
+    Guid? CityId,
+    Guid? StateId,
+    Guid? GuardianId)
+{
+    public static readonly ProfileScope Empty = new(null, null, null, null, null, null);
+}
+
 public class UserService(
     IUserRepository userRepository,
     ITeacherRepository teacherRepository,
     IStudentRepository studentRepository,
-    IAdminRepository adminRepository,
+    IDirectorateRepository directorateRepository,
+    IRegionalAdminRepository regionalAdminRepository,
+    IStateAdminRepository stateAdminRepository,
+    IGuardianRepository guardianRepository,
+    ISchoolRepository schoolRepository,
     IPasswordHasher<User> passwordHasher,
     ICurrentUser currentUser,
     IConfiguration config) : IUserService
@@ -180,28 +195,50 @@ public class UserService(
 
     private async Task EnsureCanManageAsync(User target, CancellationToken ct)
     {
-        if (target.Role == UserRole.SuperAdmin && target.Id != currentUser.UserId)
-            throw new ForbiddenException(
-                "A super administrator's account cannot be managed through the API.");
-
-        if (currentUser.IsSuperAdmin)
+        if (target.Id == currentUser.UserId)
             return;
 
-        if (!currentUser.IsAdmin)
-            throw new ForbiddenException("You are not allowed to manage this account.");
+        if (target.Role == UserRole.StateAdmin)
+            throw new ForbiddenException(
+                "A state administrator's account cannot be managed through the API.");
 
-        if (target.Role is UserRole.Admin or UserRole.SuperAdmin)
-            throw new ForbiddenException("Administrator accounts are managed by the super administrator.");
+        if (currentUser.IsStateAdmin)
+            return;
 
-        var (targetSchoolId, _, _) = await ResolveProfileAsync(target, ct);
+        var scope = await ResolveProfileAsync(target, ct);
 
-        if (targetSchoolId is null || targetSchoolId != currentUser.SchoolId)
-            throw new ForbiddenException("You are not allowed to manage this account.");
+        if (currentUser.IsRegionalAdmin)
+        {
+            if (target.Role is UserRole.RegionalAdmin)
+                throw new ForbiddenException("You are not allowed to manage this account.");
+
+            if (scope.SchoolId is not { } regionSchoolId)
+                throw new ForbiddenException("You are not allowed to manage this account.");
+
+            var school = await schoolRepository.GetByIdAsync(regionSchoolId, ct);
+            if (school?.CityId is null || school.CityId != currentUser.CityId)
+                throw new ForbiddenException("You are not allowed to manage this account.");
+
+            return;
+        }
+
+        if (currentUser.IsDirectorate)
+        {
+            if (target.Role is UserRole.Directorate or UserRole.RegionalAdmin)
+                throw new ForbiddenException("You are not allowed to manage this account.");
+
+            if (scope.SchoolId is null || scope.SchoolId != currentUser.SchoolId)
+                throw new ForbiddenException("You are not allowed to manage this account.");
+
+            return;
+        }
+
+        throw new ForbiddenException("You are not allowed to manage this account.");
     }
 
     private async Task<AuthResultDto> BuildAuthResponseAsync(User user, CancellationToken ct)
     {
-        var (schoolId, teacherId, studentId) = await ResolveProfileAsync(user, ct);
+        var scope = await ResolveProfileAsync(user, ct);
 
         var expiresAt = DateTime.UtcNow.AddMinutes(config.GetValue("Jwt:ExpiryMinutes", 60));
 
@@ -214,14 +251,18 @@ public class UserService(
             new(ClaimTypes.Role, user.Role.ToString())
         };
 
-        if (schoolId is not null)
-            claims.Add(new Claim(ClaimNames.SchoolId, schoolId.Value.ToString()));
+        void Add(string name, Guid? value)
+        {
+            if (value is not null)
+                claims.Add(new Claim(name, value.Value.ToString()));
+        }
 
-        if (teacherId is not null)
-            claims.Add(new Claim(ClaimNames.TeacherId, teacherId.Value.ToString()));
-
-        if (studentId is not null)
-            claims.Add(new Claim(ClaimNames.StudentId, studentId.Value.ToString()));
+        Add(ClaimNames.SchoolId, scope.SchoolId);
+        Add(ClaimNames.TeacherId, scope.TeacherId);
+        Add(ClaimNames.StudentId, scope.StudentId);
+        Add(ClaimNames.CityId, scope.CityId);
+        Add(ClaimNames.StateId, scope.StateId);
+        Add(ClaimNames.GuardianId, scope.GuardianId);
 
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]!)),
@@ -239,9 +280,12 @@ public class UserService(
             User: new AuthResponseDto(
                 ExpiresAt: expiresAt,
                 UserId: user.Id,
-                SchoolId: schoolId,
-                TeacherId: teacherId,
-                StudentId: studentId,
+                SchoolId: scope.SchoolId,
+                TeacherId: scope.TeacherId,
+                StudentId: scope.StudentId,
+                CityId: scope.CityId,
+                StateId: scope.StateId,
+                GuardianId: scope.GuardianId,
                 Email: user.Email,
                 FirstName: user.FirstName,
                 LastName: user.LastName,
@@ -249,32 +293,58 @@ public class UserService(
                 MustChangePassword: user.MustChangePassword));
     }
 
-    private async Task<(Guid? SchoolId, Guid? TeacherId, Guid? StudentId)> ResolveProfileAsync(
-        User user,
-        CancellationToken ct)
+    private async Task<ProfileScope> ResolveProfileAsync(User user, CancellationToken ct)
     {
         switch (user.Role)
         {
             case UserRole.Teacher:
             {
                 var teacher = await teacherRepository.GetByUserIdAsync(user.Id, ct);
-                return (teacher?.SchoolId, teacher?.Id, null);
+                return ProfileScope.Empty with { SchoolId = teacher?.SchoolId, TeacherId = teacher?.Id };
             }
 
             case UserRole.Student:
             {
                 var student = await studentRepository.GetByUserIdAsync(user.Id, ct);
-                return (student?.SchoolId, null, student?.Id);
+                return ProfileScope.Empty with { SchoolId = student?.SchoolId, StudentId = student?.Id };
             }
 
-            case UserRole.Admin:
+            case UserRole.Directorate:
             {
-                var admin = await adminRepository.GetByUserIdAsync(user.Id, ct);
-                return (admin?.SchoolId, null, null);
+                var directorate = await directorateRepository.GetByUserIdAsync(user.Id, ct);
+                return ProfileScope.Empty with { SchoolId = directorate?.SchoolId };
+            }
+
+            case UserRole.RegionalAdmin:
+            {
+                var regional = await regionalAdminRepository.GetByUserIdAsync(user.Id, ct);
+                return ProfileScope.Empty with { CityId = regional?.CityId };
+            }
+
+            case UserRole.StateAdmin:
+            {
+                var state = await stateAdminRepository.GetByUserIdAsync(user.Id, ct);
+                return ProfileScope.Empty with { StateId = state?.StateId };
+            }
+
+            case UserRole.Guardian:
+            {
+                var guardian = await guardianRepository.GetByUserIdAsync(user.Id, ct);
+
+                if (guardian is null)
+                    return ProfileScope.Empty;
+
+                var schools = guardian.Children.Select(c => c.SchoolId).Distinct().ToList();
+
+                return ProfileScope.Empty with
+                {
+                    GuardianId = guardian.Id,
+                    SchoolId = schools.Count == 1 ? schools[0] : null
+                };
             }
 
             default:
-                return (null, null, null);
+                return ProfileScope.Empty;
         }
     }
 }

@@ -13,4 +13,5 @@ public record StatisticsQuery(
     Guid? TeacherId,
     Guid? CityId,
     Guid? ZoneId,
-    Guid? StateId);
+    Guid? StateId,
+    Guid? SchoolStateId = null);

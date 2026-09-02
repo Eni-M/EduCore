@@ -1,6 +1,11 @@
-﻿namespace EduCore.Enums;
+namespace EduCore.Enums;
 
 public enum UserRole
 {
-    Student, Teacher, Admin, SuperAdmin
+    Student = 0,
+    Guardian = 1,
+    Teacher = 2,
+    Directorate = 3,
+    RegionalAdmin = 4,
+    StateAdmin = 5
 }

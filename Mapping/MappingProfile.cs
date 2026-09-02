@@ -13,7 +13,7 @@ public class MappingProfile : Profile
         MapUsers();
         MapStudents();
         MapTeachers();
-        MapAdmins();
+        MapAccountTiers();
         MapClasses();
         MapLessonRecords();
     }
@@ -69,18 +69,21 @@ public class MappingProfile : Profile
     {
         CreateWriteMap<Dtos.Student.StudentCreateDto, User>();
         CreateWriteMap<Dtos.Teacher.TeacherCreateDto, User>();
-        CreateWriteMap<Dtos.Admin.AdminCreateDto, User>();
+        CreateWriteMap<Dtos.Directorate.DirectorateCreateDto, User>();
 
         CreateWriteMap<Dtos.Student.StudentEditDto, User>();
         CreateWriteMap<Dtos.Teacher.TeacherEditDto, User>();
-        CreateWriteMap<Dtos.Admin.AdminEditDto, User>();
+        CreateWriteMap<Dtos.Directorate.DirectorateEditDto, User>();
     }
 
     private void MapStudents()
     {
-        CreateMap<Parent, Dtos.Parent.ParentListDto>();
-        CreateWriteMap<Dtos.Parent.ParentCreateDto, Parent>();
-        CreateWriteMap<Dtos.Parent.ParentEditDto, Parent>();
+        CreateMap<GuardianStudent, Dtos.Guardian.GuardianContactDto>()
+            .ForCtorParam("Id", o => o.MapFrom(gs => gs.Guardian.Id))
+            .ForCtorParam("FirstName", o => o.MapFrom(gs => gs.Guardian.User.FirstName))
+            .ForCtorParam("LastName", o => o.MapFrom(gs => gs.Guardian.User.LastName))
+            .ForCtorParam("Email", o => o.MapFrom(gs => gs.Guardian.User.Email))
+            .ForCtorParam("PhoneNumber", o => o.MapFrom(gs => gs.Guardian.PhoneNumber));
 
         CreateMap<Student, Dtos.Student.StudentListDto>()
             .ForCtorParam("FirstName", o => o.MapFrom(s => s.User.FirstName))
@@ -95,7 +98,8 @@ public class MappingProfile : Profile
             .ForCtorParam("LastName", o => o.MapFrom(s => s.User.LastName))
             .ForCtorParam("Email", o => o.MapFrom(s => s.User.Email))
             .ForCtorParam("CityName", o => o.MapFrom(s => s.City != null ? s.City.Name : null))
-            .ForCtorParam("StateName", o => o.MapFrom(s => s.City != null ? s.City.State.Name : null));
+            .ForCtorParam("StateName", o => o.MapFrom(s => s.City != null ? s.City.State.Name : null))
+            .ForCtorParam("Guardians", o => o.MapFrom(s => s.Guardians));
 
         CreateWriteMap<Dtos.Student.StudentCreateDto, Student>();
         CreateWriteMap<Dtos.Student.StudentEditDto, Student>();
@@ -118,9 +122,9 @@ public class MappingProfile : Profile
             .ForCtorParam("Subjects", o => o.MapFrom(t => t.TeacherSubjects.Select(ts => ts.Subject.Name)));
     }
 
-    private void MapAdmins()
+    private void MapAccountTiers()
     {
-        CreateMap<Admin, Dtos.Admin.AdminListDto>()
+        CreateMap<Directorate, Dtos.Directorate.DirectorateListDto>()
             .ForCtorParam("FirstName", o => o.MapFrom(a => a.User.FirstName))
             .ForCtorParam("LastName", o => o.MapFrom(a => a.User.LastName))
             .ForCtorParam("Email", o => o.MapFrom(a => a.User.Email))
@@ -128,6 +132,22 @@ public class MappingProfile : Profile
             .ForCtorParam("Account", o => o.MapFrom(a =>
                 new Dtos.Account.AccountDto(a.UserId, a.User.DeactivatedAt)));
 
+        CreateMap<RegionalAdmin, Dtos.RegionalAdmin.RegionalAdminListDto>()
+            .ForCtorParam("FirstName", o => o.MapFrom(r => r.User.FirstName))
+            .ForCtorParam("LastName", o => o.MapFrom(r => r.User.LastName))
+            .ForCtorParam("Email", o => o.MapFrom(r => r.User.Email))
+            .ForCtorParam("CityName", o => o.MapFrom(r => r.City.Name))
+            .ForCtorParam("StateName", o => o.MapFrom(r => r.City.State.Name))
+            .ForCtorParam("Account", o => o.MapFrom(r =>
+                new Dtos.Account.AccountDto(r.UserId, r.User.DeactivatedAt)));
+
+        CreateMap<StateAdmin, Dtos.StateAdmin.StateAdminListDto>()
+            .ForCtorParam("FirstName", o => o.MapFrom(s => s.User.FirstName))
+            .ForCtorParam("LastName", o => o.MapFrom(s => s.User.LastName))
+            .ForCtorParam("Email", o => o.MapFrom(s => s.User.Email))
+            .ForCtorParam("StateName", o => o.MapFrom(s => s.State.Name))
+            .ForCtorParam("Account", o => o.MapFrom(s =>
+                new Dtos.Account.AccountDto(s.UserId, s.User.DeactivatedAt)));
     }
 
     private void MapClasses()

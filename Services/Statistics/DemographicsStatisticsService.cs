@@ -13,7 +13,7 @@ public class DemographicsStatisticsService(
 {
     public async Task<DemographicsOverviewDto> GetOverviewAsync(CancellationToken ct)
     {
-        EnsureSuperAdmin();
+        EnsureStateAdmin();
 
         var cities = await demographics.GetByCityAsync(ct);
         var zones = await demographics.GetByZoneAsync(null, ct);
@@ -41,7 +41,7 @@ public class DemographicsStatisticsService(
     public async Task<IReadOnlyList<ZoneDemographicsDto>> GetByZoneAsync(
         string? city, CancellationToken ct)
     {
-        EnsureSuperAdmin();
+        EnsureStateAdmin();
 
         var zones = await demographics.GetByZoneAsync(city, ct);
 
@@ -59,9 +59,10 @@ public class DemographicsStatisticsService(
             .ToList();
     }
 
-    private void EnsureSuperAdmin()
+    private void EnsureStateAdmin()
     {
-        if (!currentUser.IsSuperAdmin)
-            throw new ForbiddenException("Demographic statistics span every school and are SuperAdmin only.");
+        if (!currentUser.IsStateAdmin)
+            throw new ForbiddenException(
+                "Demographic statistics span every school and are state administrator only.");
     }
 }

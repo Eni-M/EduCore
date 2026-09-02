@@ -20,5 +20,5 @@ public class Student : ISchoolScoped
     public User User { get; set; } = null!;
     public School School { get; set; } = null!;
     public ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
-    public ICollection<Parent> Parents { get; set; } = new List<Parent>();
+    public ICollection<GuardianStudent> Guardians { get; set; } = new List<GuardianStudent>();
 }

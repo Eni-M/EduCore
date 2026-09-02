@@ -25,7 +25,12 @@ public class SchoolScopeInterceptor(ICurrentUser currentUser) : SaveChangesInter
 
     private void Validate(DbContext? context)
     {
-        if (context is null || currentUser.IsSuperAdmin)
+        if (context is null)
+            return;
+
+        // StateAdmin acts platform-wide; RegionalAdmin creates school-scoped rows (e.g. a Directorate)
+        // for schools in its city, and that city ownership is verified in the service layer.
+        if (currentUser.IsStateAdmin || currentUser.IsRegionalAdmin)
             return;
 
         var schoolId = currentUser.SchoolId;

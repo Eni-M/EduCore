@@ -9,9 +9,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<Student> Students => Set<Student>();
-    public DbSet<Parent> Parents => Set<Parent>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
-    public DbSet<Admin> Admins => Set<Admin>();
+    public DbSet<Directorate> Directorates => Set<Directorate>();
+    public DbSet<RegionalAdmin> RegionalAdmins => Set<RegionalAdmin>();
+    public DbSet<StateAdmin> StateAdmins => Set<StateAdmin>();
+    public DbSet<Guardian> Guardians => Set<Guardian>();
+    public DbSet<GuardianStudent> GuardianStudents => Set<GuardianStudent>();
     public DbSet<School> Schools => Set<School>();
     public DbSet<AcademicYear> AcademicYears => Set<AcademicYear>();
     public DbSet<GradingPeriod> GradingPeriods => Set<GradingPeriod>();
@@ -67,15 +70,26 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         modelBuilder.Entity<Student>().Property<uint>("Version").IsRowVersion();
         ScopeToSchool<Student>(modelBuilder);
 
-        modelBuilder.Entity<Parent>()
-            .HasOne<Student>().WithMany(s => s.Parents)
-            .HasForeignKey(p => new { p.StudentId, p.SchoolId })
+        modelBuilder.Entity<Guardian>()
+            .HasOne(g => g.User).WithOne()
+            .HasForeignKey<Guardian>(g => g.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Guardian>().HasIndex(g => g.UserId).IsUnique();
+        modelBuilder.Entity<Guardian>().Property(g => g.PhoneNumber).HasMaxLength(30);
+        modelBuilder.Entity<Guardian>().Property<uint>("Version").IsRowVersion();
+
+        modelBuilder.Entity<GuardianStudent>()
+            .HasOne(gs => gs.Guardian).WithMany(g => g.Children)
+            .HasForeignKey(gs => gs.GuardianId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<GuardianStudent>()
+            .HasOne(gs => gs.Student).WithMany(s => s.Guardians)
+            .HasForeignKey(gs => new { gs.StudentId, gs.SchoolId })
             .HasPrincipalKey(s => new { s.Id, s.SchoolId })
             .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<Parent>().Property(p => p.Name).HasMaxLength(200);
-        modelBuilder.Entity<Parent>().Property(p => p.PhoneNumber).HasMaxLength(30);
-        modelBuilder.Entity<Parent>().Property<uint>("Version").IsRowVersion();
-        ScopeToSchool<Parent>(modelBuilder);
+        modelBuilder.Entity<GuardianStudent>().HasIndex(gs => new { gs.GuardianId, gs.StudentId }).IsUnique();
+        modelBuilder.Entity<GuardianStudent>().Property<uint>("Version").IsRowVersion();
+        ScopeToSchool<GuardianStudent>(modelBuilder);
 
         modelBuilder.Entity<Teacher>()
             .HasOne(t => t.User).WithOne()
@@ -90,17 +104,39 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         modelBuilder.Entity<Teacher>().Property<uint>("Version").IsRowVersion();
         ScopeToSchool<Teacher>(modelBuilder);
 
-        modelBuilder.Entity<Admin>()
+        modelBuilder.Entity<Directorate>()
             .HasOne(a => a.User).WithOne()
-            .HasForeignKey<Admin>(a => a.UserId)
+            .HasForeignKey<Directorate>(a => a.UserId)
             .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<Admin>().HasIndex(a => a.UserId).IsUnique();
-        modelBuilder.Entity<Admin>()
+        modelBuilder.Entity<Directorate>().HasIndex(a => a.UserId).IsUnique();
+        modelBuilder.Entity<Directorate>()
             .HasOne(a => a.School).WithMany()
             .HasForeignKey(a => a.SchoolId)
             .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<Admin>().Property<uint>("Version").IsRowVersion();
-        ScopeToSchool<Admin>(modelBuilder);
+        modelBuilder.Entity<Directorate>().Property<uint>("Version").IsRowVersion();
+        ScopeToSchool<Directorate>(modelBuilder);
+
+        modelBuilder.Entity<RegionalAdmin>()
+            .HasOne(r => r.User).WithOne()
+            .HasForeignKey<RegionalAdmin>(r => r.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<RegionalAdmin>().HasIndex(r => r.UserId).IsUnique();
+        modelBuilder.Entity<RegionalAdmin>()
+            .HasOne(r => r.City).WithMany()
+            .HasForeignKey(r => r.CityId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<RegionalAdmin>().Property<uint>("Version").IsRowVersion();
+
+        modelBuilder.Entity<StateAdmin>()
+            .HasOne(s => s.User).WithOne()
+            .HasForeignKey<StateAdmin>(s => s.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<StateAdmin>().HasIndex(s => s.UserId).IsUnique();
+        modelBuilder.Entity<StateAdmin>()
+            .HasOne(s => s.State).WithMany()
+            .HasForeignKey(s => s.StateId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<StateAdmin>().Property<uint>("Version").IsRowVersion();
     }
 
     private void ConfigureSchoolCalendar(ModelBuilder modelBuilder)

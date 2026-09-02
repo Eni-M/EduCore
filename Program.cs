@@ -51,8 +51,10 @@ builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IStudentRepository, StudentRepository>();
 builder.Services.AddScoped<ITeacherRepository, TeacherRepository>();
-builder.Services.AddScoped<IAdminRepository, AdminRepository>();
-builder.Services.AddScoped<IParentRepository, ParentRepository>();
+builder.Services.AddScoped<IDirectorateRepository, DirectorateRepository>();
+builder.Services.AddScoped<IRegionalAdminRepository, RegionalAdminRepository>();
+builder.Services.AddScoped<IStateAdminRepository, StateAdminRepository>();
+builder.Services.AddScoped<IGuardianRepository, GuardianRepository>();
 builder.Services.AddScoped<ISchoolRepository, SchoolRepository>();
 builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
 builder.Services.AddScoped<ILocationRepository, LocationRepository>();
@@ -122,14 +124,16 @@ builder.Services.AddScoped<IStatisticsOverviewService, StatisticsOverviewService
 builder.Services.AddScoped<IAccessGuard, AccessGuard>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ISchoolService, SchoolService>();
-builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<IDirectorateService, DirectorateService>();
+builder.Services.AddScoped<IRegionalAdminService, RegionalAdminService>();
+builder.Services.AddScoped<IStateAdminService, StateAdminService>();
 builder.Services.AddScoped<ISubjectService, SubjectService>();
 builder.Services.AddScoped<ILocationService, LocationService>();
 builder.Services.AddScoped<IAcademicYearService, AcademicYearService>();
 builder.Services.AddScoped<IClassService, ClassService>();
 builder.Services.AddScoped<IClassSubjectTeacherService, ClassSubjectTeacherService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
-builder.Services.AddScoped<IParentService, ParentService>();
+builder.Services.AddScoped<IGuardianService, GuardianService>();
 builder.Services.AddScoped<ITeacherService, TeacherService>();
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IDiaryEntryService, DiaryEntryService>();
@@ -243,7 +247,7 @@ if (app.Environment.IsDevelopment())
         await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
 }
 
-await SuperAdminSeeder.SeedAsync(app.Services, app.Configuration);
+await PlatformOwnerSeeder.SeedAsync(app.Services, app.Configuration);
 
 app.UseExceptionHandler();
 if (!app.Environment.IsDevelopment())
@@ -274,6 +278,8 @@ api.MapClassEndpoints();
 api.MapStudentEndpoints();
 api.MapTeacherEndpoints();
 api.MapLessonEndpoints();
+api.MapGuardianEndpoints();
+api.MapAccountTierEndpoints();
 api.MapStatisticsEndpoints();
 
 app.Run();

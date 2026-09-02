@@ -8,7 +8,7 @@ public static class DemographicsStatisticsEndpoints
     public static void MapDemographicsStatisticsEndpoints(this RouteGroupBuilder group)
     {
         var demographics = group.MapGroup("/demographics")
-            .RequireAuthorization(Policies.SuperAdmin);
+            .RequireAuthorization(Policies.StateAdmin);
 
         demographics.MapGet("/", async (IDemographicsStatisticsService service, CancellationToken ct) =>
             Results.Ok(await service.GetOverviewAsync(ct)));

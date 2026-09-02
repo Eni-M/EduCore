@@ -15,6 +15,6 @@ public static class StatisticsOverviewEndpoints
         group.MapGet("/platform-overview", async (
                 [AsParameters] StatisticsFilter filter, IStatisticsOverviewService service, CancellationToken ct) =>
                 Results.Ok(await service.GetPlatformOverviewAsync(filter, ct)))
-            .RequireAuthorization(Policies.SuperAdmin);
+            .RequireAuthorization(Policies.StateAdmin);
     }
 }

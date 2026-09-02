@@ -20,21 +20,26 @@ public class EnrollmentServiceTests
     private sealed class FakeCurrentUser : ICurrentUser
     {
         public Guid UserId => Guid.NewGuid();
-        public UserRole? Role => UserRole.Admin;
+        public UserRole? Role => UserRole.Directorate;
         public Guid? SchoolId => EnrollmentServiceTests.SchoolId;
         public Guid? TeacherId => null;
         public Guid? StudentId => null;
-        public bool IsSuperAdmin => false;
-        public bool IsAdmin => true;
+        public Guid? CityId => null;
+        public Guid? StateId => null;
+        public Guid? GuardianId => null;
+        public bool IsStateAdmin => false;
+        public bool IsRegionalAdmin => false;
+        public bool IsDirectorate => true;
         public bool IsTeacher => false;
         public bool IsStudent => false;
+        public bool IsGuardian => false;
     }
 
     private sealed class FakeStudentRepository(Student? student) : IStudentRepository
     {
         public Task<Student?> GetByIdAsync(Guid id, CancellationToken ct) => Task.FromResult(student);
         public Task<Student?> GetByUserIdAsync(Guid userId, CancellationToken ct) => Task.FromResult<Student?>(null);
-        public Task<Student?> GetWithParentsAsync(Guid studentId, CancellationToken ct) => Task.FromResult<Student?>(null);
+        public Task<Student?> GetWithGuardiansAsync(Guid studentId, CancellationToken ct) => Task.FromResult<Student?>(null);
         public Task<bool> PersonalNumberExistsAsync(string personalNumber, Guid? excludeStudentId, CancellationToken ct) =>
             Task.FromResult(false);
         public Task<(IReadOnlyList<Student> Items, int TotalCount)> GetPagedAsync(

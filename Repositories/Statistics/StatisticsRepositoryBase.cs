@@ -22,12 +22,14 @@ public abstract class StatisticsRepositoryBase(AppDbContext context)
         if (ctx.SchoolId is not null)
             query = query.Where(e => e.SchoolId == ctx.SchoolId);
 
-        if (ctx.CityId is not null || ctx.ZoneId is not null)
+        if (ctx.CityId is not null || ctx.ZoneId is not null || ctx.SchoolStateId is not null)
         {
             var schoolIds = _context.Schools
                 .AsNoTracking()
                 .Where(s => ctx.CityId == null || s.CityId == ctx.CityId)
                 .Where(s => ctx.ZoneId == null || s.ZoneId == ctx.ZoneId)
+                .Where(s => ctx.SchoolStateId == null
+                            || (s.City != null && s.City.StateId == ctx.SchoolStateId))
                 .Select(s => s.Id);
 
             query = query.Where(e => schoolIds.Contains(e.SchoolId));

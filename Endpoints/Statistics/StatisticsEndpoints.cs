@@ -7,7 +7,7 @@ public static class StatisticsEndpoints
     public static void MapStatisticsEndpoints(this RouteGroupBuilder api)
     {
         var group = api.MapGroup("/statistics")
-            .RequireAuthorization(Policies.AdminOrSuperAdmin)
+            .RequireAuthorization(Policies.StatisticsViewer)
             .WithTags("Statistics");
 
         group.MapStudentStatisticsEndpoints();

@@ -64,7 +64,7 @@ public static class AuthEndpoints
             .RequireAuthorization();
 
         var accounts = group.MapGroup("/users")
-            .RequireAuthorization(Policies.AdminOrSuperAdmin)
+            .RequireAuthorization(Policies.ManageAccounts)
             .AddEndpointFilter<AccountStatusEndpointFilter>();
 
         accounts.MapPost("/{userId:guid}/reset-password",

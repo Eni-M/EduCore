@@ -23,18 +23,18 @@ public static class SubjectEndpoints
                 var subject = await service.CreateAsync(dto, ct);
                 return Results.Created($"/api/subjects/{subject.Id}", subject);
             })
-            .RequireAuthorization(Policies.Admin);
+            .RequireAuthorization(Policies.Directorate);
 
         group.MapPut("/{subjectId:guid}",
                 async (Guid subjectId, SubjectEditDto dto, ISubjectService service, CancellationToken ct) =>
                     Results.Ok(await service.UpdateAsync(subjectId, dto, ct)))
-            .RequireAuthorization(Policies.Admin);
+            .RequireAuthorization(Policies.Directorate);
 
         group.MapDelete("/{subjectId:guid}", async (Guid subjectId, ISubjectService service, CancellationToken ct) =>
             {
                 await service.DeleteAsync(subjectId, ct);
                 return Results.NoContent();
             })
-            .RequireAuthorization(Policies.Admin);
+            .RequireAuthorization(Policies.Directorate);
     }
 }

@@ -13,7 +13,7 @@ public static class AcademicYearEndpoints
 
         group.MapGet("/", async (Guid? schoolId, IAcademicYearService service, CancellationToken ct) =>
                 Results.Ok(await service.GetAllAsync(schoolId, ct)))
-            .RequireAuthorization(Policies.AdminOrSuperAdmin);
+            .RequireAuthorization(Policies.Directorate);
 
         group.MapGet("/{academicYearId:guid}",
                 async (Guid academicYearId, IAcademicYearService service, CancellationToken ct) =>
@@ -25,7 +25,7 @@ public static class AcademicYearEndpoints
                 var year = await service.CreateAsync(dto, ct);
                 return Results.Created($"/api/academic-years/{year.Id}", year);
             })
-            .RequireAuthorization(Policies.Admin);
+            .RequireAuthorization(Policies.Directorate);
 
         group.MapGet("/{academicYearId:guid}/grading-periods",
                 async (Guid academicYearId, IAcademicYearService service, CancellationToken ct) =>
@@ -35,6 +35,6 @@ public static class AcademicYearEndpoints
         group.MapPut("/grading-periods/{gradingPeriodId:guid}",
                 async (Guid gradingPeriodId, GradingPeriodEditDto dto, IAcademicYearService service, CancellationToken ct) =>
                     Results.Ok(await service.EditGradingPeriodAsync(gradingPeriodId, dto, ct)))
-            .RequireAuthorization(Policies.Admin);
+            .RequireAuthorization(Policies.Directorate);
     }
 }

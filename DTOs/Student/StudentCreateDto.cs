@@ -10,6 +10,4 @@ public record StudentCreateDto(
     DateOnly DateOfBirth,
     string PersonalNumber,
     Gender Gender,
-    Guid? CityId,
-    string? GuardianName,
-    string? GuardianPhone);
+    Guid? CityId);

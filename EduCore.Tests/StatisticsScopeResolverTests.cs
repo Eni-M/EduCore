@@ -12,18 +12,26 @@ public class StatisticsScopeResolverTests
 {
     private static readonly Guid SchoolA = Guid.NewGuid();
     private static readonly Guid SchoolB = Guid.NewGuid();
+    private static readonly Guid CityId = Guid.NewGuid();
+    private static readonly Guid StateId = Guid.NewGuid();
 
-    private sealed class FakeCurrentUser(UserRole role, Guid? schoolId) : ICurrentUser
+    private sealed class FakeCurrentUser(
+        UserRole role, Guid? schoolId = null, Guid? cityId = null, Guid? stateId = null) : ICurrentUser
     {
         public Guid UserId => Guid.NewGuid();
         public UserRole? Role => role;
         public Guid? SchoolId => schoolId;
         public Guid? TeacherId => null;
         public Guid? StudentId => null;
-        public bool IsSuperAdmin => role == UserRole.SuperAdmin;
-        public bool IsAdmin => role == UserRole.Admin;
+        public Guid? CityId => cityId;
+        public Guid? StateId => stateId;
+        public Guid? GuardianId => null;
+        public bool IsStateAdmin => role == UserRole.StateAdmin;
+        public bool IsRegionalAdmin => role == UserRole.RegionalAdmin;
+        public bool IsDirectorate => role == UserRole.Directorate;
         public bool IsTeacher => role == UserRole.Teacher;
         public bool IsStudent => role == UserRole.Student;
+        public bool IsGuardian => role == UserRole.Guardian;
     }
 
     private sealed class StubPeriodResolver : IStatisticsPeriodResolver
@@ -38,13 +46,16 @@ public class StatisticsScopeResolverTests
         }
     }
 
-    private static StatisticsScopeResolver Resolver(UserRole role, Guid? schoolId, StubPeriodResolver periods) =>
-        new(new FakeCurrentUser(role, schoolId), periods);
+    private static StatisticsScopeResolver Resolver(ICurrentUser user, StubPeriodResolver periods) =>
+        new(user, periods);
+
+    private static StatisticsScopeResolver Directorate(Guid schoolId, StubPeriodResolver periods) =>
+        Resolver(new FakeCurrentUser(UserRole.Directorate, schoolId: schoolId), periods);
 
     [Fact]
-    public async Task Admin_WithNoSchoolId_IsScopedToTheirOwnSchool()
+    public async Task Directorate_WithNoSchoolId_IsScopedToTheirOwnSchool()
     {
-        var context = await Resolver(UserRole.Admin, SchoolA, new StubPeriodResolver())
+        var context = await Directorate(SchoolA, new StubPeriodResolver())
             .ResolveAsync(new StatisticsFilter(), CancellationToken.None);
 
         Assert.Equal(SchoolA, context.SchoolId);
@@ -52,38 +63,43 @@ public class StatisticsScopeResolverTests
     }
 
     [Fact]
-    public async Task Admin_AskingForTheirOwnSchool_IsAllowed()
+    public async Task Directorate_AskingForTheirOwnSchool_IsAllowed()
     {
-        var context = await Resolver(UserRole.Admin, SchoolA, new StubPeriodResolver())
+        var context = await Directorate(SchoolA, new StubPeriodResolver())
             .ResolveAsync(new StatisticsFilter { SchoolId = SchoolA }, CancellationToken.None);
 
         Assert.Equal(SchoolA, context.SchoolId);
     }
 
     [Fact]
-    public async Task Admin_AskingForAnotherSchool_IsRefused() =>
+    public async Task Directorate_AskingForAnotherSchool_IsRefused() =>
         await Assert.ThrowsAsync<ForbiddenException>(() =>
-            Resolver(UserRole.Admin, SchoolA, new StubPeriodResolver())
+            Directorate(SchoolA, new StubPeriodResolver())
                 .ResolveAsync(new StatisticsFilter { SchoolId = SchoolB }, CancellationToken.None));
 
     [Fact]
-    public async Task SuperAdmin_WithNoSchoolId_GetsACrossSchoolContext()
+    public async Task RegionalAdmin_IsForcedToTheirCity_AndGoesCrossSchool()
     {
-        var context = await Resolver(UserRole.SuperAdmin, null, new StubPeriodResolver())
+        var context = await Resolver(
+                new FakeCurrentUser(UserRole.RegionalAdmin, cityId: CityId), new StubPeriodResolver())
+            .ResolveAsync(new StatisticsFilter { SchoolId = SchoolB, CityId = Guid.NewGuid() },
+                CancellationToken.None);
+
+        Assert.Null(context.SchoolId);
+        Assert.True(context.CrossSchool);
+        Assert.Equal(CityId, context.CityId);
+    }
+
+    [Fact]
+    public async Task StateAdmin_IsScopedToTheirStateSchools()
+    {
+        var context = await Resolver(
+                new FakeCurrentUser(UserRole.StateAdmin, stateId: StateId), new StubPeriodResolver())
             .ResolveAsync(new StatisticsFilter(), CancellationToken.None);
 
         Assert.Null(context.SchoolId);
         Assert.True(context.CrossSchool);
-    }
-
-    [Fact]
-    public async Task SuperAdmin_CanPickAnySchool()
-    {
-        var context = await Resolver(UserRole.SuperAdmin, null, new StubPeriodResolver())
-            .ResolveAsync(new StatisticsFilter { SchoolId = SchoolB }, CancellationToken.None);
-
-        Assert.Equal(SchoolB, context.SchoolId);
-        Assert.False(context.CrossSchool);
+        Assert.Equal(StateId, context.SchoolStateId);
     }
 
     [Fact]
@@ -91,8 +107,7 @@ public class StatisticsScopeResolverTests
     {
         var periods = new StubPeriodResolver();
 
-        await Resolver(UserRole.Admin, SchoolA, periods)
-            .ResolveAsync(new StatisticsFilter(), CancellationToken.None);
+        await Directorate(SchoolA, periods).ResolveAsync(new StatisticsFilter(), CancellationToken.None);
 
         Assert.Equal(SchoolA, periods.LastSchoolId);
     }
@@ -102,7 +117,7 @@ public class StatisticsScopeResolverTests
     {
         var classId = Guid.NewGuid();
 
-        var context = await Resolver(UserRole.Admin, SchoolA, new StubPeriodResolver())
+        var context = await Directorate(SchoolA, new StubPeriodResolver())
             .ResolveAsync(new StatisticsFilter { ClassId = classId, Grade = 9 }, CancellationToken.None);
 
         Assert.Equal(classId, context.ClassId);
@@ -110,13 +125,13 @@ public class StatisticsScopeResolverTests
     }
 
     [Fact]
-    public async Task LocationDimensions_AreCarriedThrough()
+    public async Task LocationDimensions_AreCarriedThrough_ForADirectorate()
     {
         var cityId = Guid.NewGuid();
         var zoneId = Guid.NewGuid();
         var stateId = Guid.NewGuid();
 
-        var context = await Resolver(UserRole.Admin, SchoolA, new StubPeriodResolver())
+        var context = await Directorate(SchoolA, new StubPeriodResolver())
             .ResolveAsync(
                 new StatisticsFilter { CityId = cityId, ZoneId = zoneId, StateId = stateId },
                 CancellationToken.None);

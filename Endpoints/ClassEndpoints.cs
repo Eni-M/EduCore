@@ -13,7 +13,7 @@ public static class ClassEndpoints
 
         group.MapGet("/", async (Guid? academicYearId, IClassService service, CancellationToken ct) =>
                 Results.Ok(await service.GetAllAsync(academicYearId, ct)))
-            .RequireAuthorization(Policies.AdminOrTeacher);
+            .RequireAuthorization(Policies.DirectorateOrTeacher);
 
         group.MapGet("/mine", async (IClassService service, CancellationToken ct) =>
                 Results.Ok(await service.GetMineAsync(ct)))
@@ -28,27 +28,27 @@ public static class ClassEndpoints
                 var @class = await service.CreateAsync(dto, ct);
                 return Results.Created($"/api/classes/{@class.Id}", @class);
             })
-            .RequireAuthorization(Policies.Admin);
+            .RequireAuthorization(Policies.Directorate);
 
         group.MapPut("/{classId:guid}",
                 async (Guid classId, ClassEditDto dto, IClassService service, CancellationToken ct) =>
                     Results.Ok(await service.UpdateAsync(classId, dto, ct)))
-            .RequireAuthorization(Policies.Admin);
+            .RequireAuthorization(Policies.Directorate);
 
         group.MapPut("/{classId:guid}/homeroom-teacher",
                 async (Guid classId, ClassAssignHomeroomTeacherDto dto, IClassService service, CancellationToken ct) =>
                     Results.Ok(await service.AssignHomeroomTeacherAsync(classId, dto, ct)))
-            .RequireAuthorization(Policies.Admin);
+            .RequireAuthorization(Policies.Directorate);
 
         group.MapGet("/{classId:guid}/students",
                 async (Guid classId, IStudentService service, CancellationToken ct) =>
                     Results.Ok(await service.GetByClassAsync(classId, ct)))
-            .RequireAuthorization(Policies.AdminOrTeacher);
+            .RequireAuthorization(Policies.DirectorateOrTeacher);
 
         group.MapGet("/{classId:guid}/enrollments",
                 async (Guid classId, bool? includeLeft, IEnrollmentService service, CancellationToken ct) =>
                     Results.Ok(await service.GetByClassAsync(classId, includeLeft ?? false, ct)))
-            .RequireAuthorization(Policies.AdminOrTeacher);
+            .RequireAuthorization(Policies.DirectorateOrTeacher);
 
         group.MapGet("/{classId:guid}/subject-teachers",
                 async (Guid classId, bool? includeEnded, IClassSubjectTeacherService service, CancellationToken ct) =>
@@ -64,10 +64,10 @@ public static class ClassEndpoints
                 async (Guid classId, Guid? subjectId, Guid? gradingPeriodId, IMarkService service,
                     CancellationToken ct) =>
                     Results.Ok(await service.GetByClassAsync(classId, subjectId, gradingPeriodId, ct)))
-            .RequireAuthorization(Policies.AdminOrTeacher);
+            .RequireAuthorization(Policies.DirectorateOrTeacher);
 
         var assignments = api.MapGroup("/class-subject-teachers")
-            .RequireAuthorization(Policies.Admin)
+            .RequireAuthorization(Policies.Directorate)
             .WithTags("Teaching assignments");
 
         assignments.MapPost("/",

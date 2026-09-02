@@ -56,34 +56,6 @@ namespace EduCore.Migrations
                     b.ToTable("AcademicYears");
                 });
 
-            modelBuilder.Entity("EduCore.Models.Admin", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("SchoolId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<uint>("Version")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SchoolId");
-
-                    b.HasIndex("UserId")
-                        .IsUnique();
-
-                    b.ToTable("Admins");
-                });
-
             modelBuilder.Entity("EduCore.Models.Attendance", b =>
                 {
                     b.Property<Guid>("Id")
@@ -324,6 +296,34 @@ namespace EduCore.Migrations
                     b.ToTable("DiaryEntries");
                 });
 
+            modelBuilder.Entity("EduCore.Models.Directorate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchoolId");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("Directorates");
+                });
+
             modelBuilder.Entity("EduCore.Models.Enrollment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -408,6 +408,65 @@ namespace EduCore.Migrations
                     b.ToTable("GradingPeriods");
                 });
 
+            modelBuilder.Entity("EduCore.Models.Guardian", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("Guardians");
+                });
+
+            modelBuilder.Entity("EduCore.Models.GuardianStudent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GuardianId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GuardianId", "StudentId")
+                        .IsUnique();
+
+                    b.HasIndex("StudentId", "SchoolId");
+
+                    b.ToTable("GuardianStudents");
+                });
+
             modelBuilder.Entity("EduCore.Models.Mark", b =>
                 {
                     b.Property<Guid>("Id")
@@ -472,26 +531,16 @@ namespace EduCore.Migrations
                     b.ToTable("Marks");
                 });
 
-            modelBuilder.Entity("EduCore.Models.Parent", b =>
+            modelBuilder.Entity("EduCore.Models.RegionalAdmin", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("PhoneNumber")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<Guid>("SchoolId")
+                    b.Property<Guid>("CityId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("StudentId")
+                    b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.Property<uint>("Version")
@@ -502,9 +551,12 @@ namespace EduCore.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("StudentId", "SchoolId");
+                    b.HasIndex("CityId");
 
-                    b.ToTable("Parents");
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("RegionalAdmins");
                 });
 
             modelBuilder.Entity("EduCore.Models.School", b =>
@@ -562,6 +614,34 @@ namespace EduCore.Migrations
                         .IsUnique();
 
                     b.ToTable("States");
+                });
+
+            modelBuilder.Entity("EduCore.Models.StateAdmin", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StateId");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("StateAdmins");
                 });
 
             modelBuilder.Entity("EduCore.Models.Student", b =>
@@ -780,25 +860,6 @@ namespace EduCore.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("EduCore.Models.Admin", b =>
-                {
-                    b.HasOne("EduCore.Models.School", "School")
-                        .WithMany()
-                        .HasForeignKey("SchoolId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("EduCore.Models.User", "User")
-                        .WithOne()
-                        .HasForeignKey("EduCore.Models.Admin", "UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("School");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("EduCore.Models.Attendance", b =>
                 {
                     b.HasOne("EduCore.Models.Class", null)
@@ -896,6 +957,25 @@ namespace EduCore.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("EduCore.Models.Directorate", b =>
+                {
+                    b.HasOne("EduCore.Models.School", "School")
+                        .WithMany()
+                        .HasForeignKey("SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduCore.Models.User", "User")
+                        .WithOne()
+                        .HasForeignKey("EduCore.Models.Directorate", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("School");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("EduCore.Models.Enrollment", b =>
                 {
                     b.HasOne("EduCore.Models.Class", null)
@@ -921,6 +1001,37 @@ namespace EduCore.Migrations
                         .HasPrincipalKey("Id", "SchoolId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("EduCore.Models.Guardian", b =>
+                {
+                    b.HasOne("EduCore.Models.User", "User")
+                        .WithOne()
+                        .HasForeignKey("EduCore.Models.Guardian", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("EduCore.Models.GuardianStudent", b =>
+                {
+                    b.HasOne("EduCore.Models.Guardian", "Guardian")
+                        .WithMany("Children")
+                        .HasForeignKey("GuardianId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduCore.Models.Student", "Student")
+                        .WithMany("Guardians")
+                        .HasForeignKey("StudentId", "SchoolId")
+                        .HasPrincipalKey("Id", "SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Guardian");
+
+                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("EduCore.Models.Mark", b =>
@@ -961,14 +1072,23 @@ namespace EduCore.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("EduCore.Models.Parent", b =>
+            modelBuilder.Entity("EduCore.Models.RegionalAdmin", b =>
                 {
-                    b.HasOne("EduCore.Models.Student", null)
-                        .WithMany("Parents")
-                        .HasForeignKey("StudentId", "SchoolId")
-                        .HasPrincipalKey("Id", "SchoolId")
+                    b.HasOne("EduCore.Models.City", "City")
+                        .WithMany()
+                        .HasForeignKey("CityId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("EduCore.Models.User", "User")
+                        .WithOne()
+                        .HasForeignKey("EduCore.Models.RegionalAdmin", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("City");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("EduCore.Models.School", b =>
@@ -986,6 +1106,25 @@ namespace EduCore.Migrations
                     b.Navigation("City");
 
                     b.Navigation("Zone");
+                });
+
+            modelBuilder.Entity("EduCore.Models.StateAdmin", b =>
+                {
+                    b.HasOne("EduCore.Models.State", "State")
+                        .WithMany()
+                        .HasForeignKey("StateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduCore.Models.User", "User")
+                        .WithOne()
+                        .HasForeignKey("EduCore.Models.StateAdmin", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("State");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("EduCore.Models.Student", b =>
@@ -1072,6 +1211,11 @@ namespace EduCore.Migrations
                     b.Navigation("City");
                 });
 
+            modelBuilder.Entity("EduCore.Models.Guardian", b =>
+                {
+                    b.Navigation("Children");
+                });
+
             modelBuilder.Entity("EduCore.Models.State", b =>
                 {
                     b.Navigation("Cities");
@@ -1081,7 +1225,7 @@ namespace EduCore.Migrations
                 {
                     b.Navigation("Enrollments");
 
-                    b.Navigation("Parents");
+                    b.Navigation("Guardians");
                 });
 
             modelBuilder.Entity("EduCore.Models.Teacher", b =>

@@ -18,11 +18,16 @@ public class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUse
     public Guid? SchoolId => ReadGuid(ClaimNames.SchoolId);
     public Guid? TeacherId => ReadGuid(ClaimNames.TeacherId);
     public Guid? StudentId => ReadGuid(ClaimNames.StudentId);
+    public Guid? CityId => ReadGuid(ClaimNames.CityId);
+    public Guid? StateId => ReadGuid(ClaimNames.StateId);
+    public Guid? GuardianId => ReadGuid(ClaimNames.GuardianId);
 
-    public bool IsSuperAdmin => Role == UserRole.SuperAdmin;
-    public bool IsAdmin => Role == UserRole.Admin;
+    public bool IsStateAdmin => Role == UserRole.StateAdmin;
+    public bool IsRegionalAdmin => Role == UserRole.RegionalAdmin;
+    public bool IsDirectorate => Role == UserRole.Directorate;
     public bool IsTeacher => Role == UserRole.Teacher;
     public bool IsStudent => Role == UserRole.Student;
+    public bool IsGuardian => Role == UserRole.Guardian;
 
     private Guid? ReadGuid(string claimType) =>
         Guid.TryParse(Principal?.FindFirst(claimType)?.Value, out var value) ? value : null;

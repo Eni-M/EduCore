@@ -9,6 +9,7 @@ public class AccessGuard(
     IClassRepository classes,
     IEnrollmentRepository enrollments,
     IClassSubjectTeacherRepository assignments,
+    IGuardianRepository guardians,
     ICurrentUser currentUser) : IAccessGuard
 {
     public async Task EnsureCanViewClassAsync(Guid classId, CancellationToken ct)
@@ -16,7 +17,7 @@ public class AccessGuard(
         var @class = await classes.GetByIdAsync(classId, ct)
                      ?? throw new NotFoundException("Class", classId);
 
-        if (currentUser.IsAdmin || currentUser.IsSuperAdmin)
+        if (currentUser.IsDirectorate)
             return;
 
         if (currentUser.IsTeacher)
@@ -36,6 +37,10 @@ public class AccessGuard(
                 return;
         }
 
+        if (currentUser.IsGuardian
+            && await guardians.HasChildInClassAsync(currentUser.RequireGuardianId(), classId, ct))
+            return;
+
         throw new ForbiddenException("You do not have access to this class.");
     }
 
@@ -43,7 +48,7 @@ public class AccessGuard(
     {
         _ = await classes.GetByIdAsync(classId, ct) ?? throw new NotFoundException("Class", classId);
 
-        if (currentUser.IsAdmin || currentUser.IsSuperAdmin)
+        if (currentUser.IsDirectorate)
             return;
 
         if (currentUser.IsTeacher
@@ -55,7 +60,7 @@ public class AccessGuard(
 
     public async Task EnsureCanViewStudentAsync(Guid studentId, CancellationToken ct)
     {
-        if (currentUser.IsAdmin || currentUser.IsSuperAdmin)
+        if (currentUser.IsDirectorate)
             return;
 
         if (currentUser.IsStudent)
@@ -64,6 +69,14 @@ public class AccessGuard(
                 return;
 
             throw new ForbiddenException("You can only view your own record.");
+        }
+
+        if (currentUser.IsGuardian)
+        {
+            if (await guardians.LinkExistsAsync(currentUser.RequireGuardianId(), studentId, ct))
+                return;
+
+            throw new ForbiddenException("You can only view the record of a student in your care.");
         }
 
         if (currentUser.IsTeacher)

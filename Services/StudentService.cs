@@ -1,6 +1,6 @@
 using AutoMapper;
+using EduCore.Dtos.Guardian;
 using EduCore.Dtos.Pagination;
-using EduCore.Dtos.Parent;
 using EduCore.Dtos.Student;
 using EduCore.Enums;
 using EduCore.Exceptions;
@@ -56,7 +56,7 @@ public class StudentService(
     {
         await access.EnsureCanViewStudentAsync(studentId, ct);
 
-        var student = await students.GetWithParentsAsync(studentId, ct)
+        var student = await students.GetWithGuardiansAsync(studentId, ct)
                       ?? throw new NotFoundException("Student", studentId);
 
         return mapper.Map<StudentDetailDto>(student);
@@ -66,7 +66,7 @@ public class StudentService(
     {
         await access.EnsureCanViewStudentAsync(studentId, ct);
 
-        var student = await students.GetWithParentsAsync(studentId, ct)
+        var student = await students.GetWithGuardiansAsync(studentId, ct)
                       ?? throw new NotFoundException("Student", studentId);
 
         var enrollment = await enrollments.GetActiveForStudentAsync(studentId, ct);
@@ -81,7 +81,14 @@ public class StudentService(
             student.PersonalNumber,
             student.GraduationDate,
             student.Gender,
-            mapper.Map<List<ParentListDto>>(student.Parents),
+            student.Guardians
+                .Select(gs => new GuardianContactDto(
+                    gs.Guardian.Id,
+                    gs.Guardian.User.FirstName,
+                    gs.Guardian.User.LastName,
+                    gs.Guardian.User.Email,
+                    gs.Guardian.PhoneNumber))
+                .ToList(),
             currentClass?.Id,
             currentClass?.Name,
             currentClass?.Grade,
@@ -105,18 +112,6 @@ public class StudentService(
         student.SchoolId = currentUser.RequireSchoolId();
 
         await students.AddAsync(student);
-
-        if (!string.IsNullOrWhiteSpace(dto.GuardianName)
-            && !string.IsNullOrWhiteSpace(dto.GuardianPhone))
-        {
-            student.Parents.Add(new Parent
-            {
-                Name = dto.GuardianName.Trim(),
-                PhoneNumber = dto.GuardianPhone.Trim(),
-                SchoolId = student.SchoolId
-            });
-        }
-
         await students.SaveChangesAsync(ct);
 
         return await GetByIdAsync(student.Id, ct);

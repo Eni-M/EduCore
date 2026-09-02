@@ -21,7 +21,7 @@ public class ClassService(
 {
     public async Task<IEnumerable<ClassListDto>> GetAllAsync(Guid? academicYearId, CancellationToken ct)
     {
-        if (currentUser.IsAdmin || currentUser.IsSuperAdmin)
+        if (currentUser.IsDirectorate)
             return await classes.GetAllAsync(academicYearId, ct);
 
         var mine = await classes.GetByTeacherAsync(currentUser.RequireTeacherId(), ct);

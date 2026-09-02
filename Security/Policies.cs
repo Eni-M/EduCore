@@ -5,28 +5,35 @@ namespace EduCore.Security;
 
 public static class Policies
 {
-    public const string SuperAdmin = nameof(SuperAdmin);
-    public const string Admin = nameof(Admin);
+    public const string StateAdmin = nameof(StateAdmin);
+    public const string RegionalAdmin = nameof(RegionalAdmin);
+    public const string Directorate = nameof(Directorate);
     public const string Teacher = nameof(Teacher);
-    public const string AdminOrSuperAdmin = nameof(AdminOrSuperAdmin);
-    public const string AdminOrTeacher = nameof(AdminOrTeacher);
+    public const string Guardian = nameof(Guardian);
+
+    public const string RegionalOrState = nameof(RegionalOrState);
+    public const string DirectorateOrTeacher = nameof(DirectorateOrTeacher);
+    public const string ManageAccounts = nameof(ManageAccounts);
+    public const string StatisticsViewer = nameof(StatisticsViewer);
     public const string AnySchoolUser = nameof(AnySchoolUser);
+    public const string StudentReadable = nameof(StudentReadable);
 
     public static void AddEduCorePolicies(this AuthorizationOptions options)
     {
-        options.AddPolicy(SuperAdmin, p => p.RequireRole(Role(UserRole.SuperAdmin)));
-        options.AddPolicy(Admin, p => p.RequireRole(Role(UserRole.Admin)));
-        options.AddPolicy(Teacher, p => p.RequireRole(Role(UserRole.Teacher)));
+        void Policy(string name, params UserRole[] roles) =>
+            options.AddPolicy(name, p => p.RequireRole(roles.Select(r => r.ToString()).ToArray()));
 
-        options.AddPolicy(AdminOrSuperAdmin, p =>
-            p.RequireRole(Role(UserRole.Admin), Role(UserRole.SuperAdmin)));
+        Policy(StateAdmin, UserRole.StateAdmin);
+        Policy(RegionalAdmin, UserRole.RegionalAdmin);
+        Policy(Directorate, UserRole.Directorate);
+        Policy(Teacher, UserRole.Teacher);
+        Policy(Guardian, UserRole.Guardian);
 
-        options.AddPolicy(AdminOrTeacher, p =>
-            p.RequireRole(Role(UserRole.Admin), Role(UserRole.Teacher)));
-
-        options.AddPolicy(AnySchoolUser, p =>
-            p.RequireRole(Role(UserRole.Admin), Role(UserRole.Teacher), Role(UserRole.Student)));
+        Policy(RegionalOrState, UserRole.RegionalAdmin, UserRole.StateAdmin);
+        Policy(DirectorateOrTeacher, UserRole.Directorate, UserRole.Teacher);
+        Policy(ManageAccounts, UserRole.Directorate, UserRole.RegionalAdmin, UserRole.StateAdmin);
+        Policy(StatisticsViewer, UserRole.Directorate, UserRole.RegionalAdmin, UserRole.StateAdmin);
+        Policy(AnySchoolUser, UserRole.Directorate, UserRole.Teacher, UserRole.Student);
+        Policy(StudentReadable, UserRole.Directorate, UserRole.Teacher, UserRole.Student, UserRole.Guardian);
     }
-
-    private static string Role(UserRole role) => role.ToString();
 }

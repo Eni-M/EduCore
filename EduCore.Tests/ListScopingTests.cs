@@ -32,10 +32,15 @@ public class ListScopingTests
         public Guid? SchoolId => SchoolId;
         public Guid? TeacherId => role == UserRole.Teacher ? ListScopingTests.TeacherId : null;
         public Guid? StudentId => role == UserRole.Student ? ListScopingTests.StudentId : null;
-        public bool IsSuperAdmin => role == UserRole.SuperAdmin;
-        public bool IsAdmin => role == UserRole.Admin;
+        public Guid? CityId => null;
+        public Guid? StateId => null;
+        public Guid? GuardianId => null;
+        public bool IsStateAdmin => role == UserRole.StateAdmin;
+        public bool IsRegionalAdmin => role == UserRole.RegionalAdmin;
+        public bool IsDirectorate => role == UserRole.Directorate;
         public bool IsTeacher => role == UserRole.Teacher;
         public bool IsStudent => role == UserRole.Student;
+        public bool IsGuardian => role == UserRole.Guardian;
     }
 
     private static ClassListDto Class(Guid id, string name) =>
@@ -180,7 +185,7 @@ public class ListScopingTests
     {
         var service = new ClassService(
             new FakeClassRepository(), null!, null!, null!, null!, new NoopElementarySync(),
-            new FakeCurrentUser(UserRole.Admin), Mapper());
+            new FakeCurrentUser(UserRole.Directorate), Mapper());
 
         var result = await service.GetAllAsync(null, CancellationToken.None);
 
@@ -213,7 +218,7 @@ public class ListScopingTests
     [Fact]
     public async Task Admin_listing_subjects_sees_the_whole_catalogue()
     {
-        Assert.Equal(2, (await Subjects(UserRole.Admin).GetAllAsync(CancellationToken.None)).Count());
+        Assert.Equal(2, (await Subjects(UserRole.Directorate).GetAllAsync(CancellationToken.None)).Count());
     }
 
     [Fact]

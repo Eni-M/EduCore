@@ -13,12 +13,12 @@ public class StudentRepository(AppDbContext context) : Repository<Student>(conte
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(s => s.UserId == userId, ct);
 
-    public async Task<Student?> GetWithParentsAsync(Guid studentId, CancellationToken ct) =>
+    public async Task<Student?> GetWithGuardiansAsync(Guid studentId, CancellationToken ct) =>
         await _context.Students
             .AsNoTracking()
             .Include(s => s.User)
             .Include(s => s.City).ThenInclude(c => c!.State)
-            .Include(s => s.Parents)
+            .Include(s => s.Guardians).ThenInclude(gs => gs.Guardian).ThenInclude(g => g.User)
             .FirstOrDefaultAsync(s => s.Id == studentId, ct);
 
     public async Task<bool> PersonalNumberExistsAsync(

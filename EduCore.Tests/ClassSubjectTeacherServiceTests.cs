@@ -21,14 +21,19 @@ public class ClassSubjectTeacherServiceTests
     private sealed class FakeCurrentUser : ICurrentUser
     {
         public Guid UserId => Guid.NewGuid();
-        public UserRole? Role => UserRole.Admin;
+        public UserRole? Role => UserRole.Directorate;
         public Guid? SchoolId => ClassSubjectTeacherServiceTests.SchoolId;
         public Guid? TeacherId => null;
         public Guid? StudentId => null;
-        public bool IsSuperAdmin => false;
-        public bool IsAdmin => true;
+        public Guid? CityId => null;
+        public Guid? StateId => null;
+        public Guid? GuardianId => null;
+        public bool IsStateAdmin => false;
+        public bool IsRegionalAdmin => false;
+        public bool IsDirectorate => true;
         public bool IsTeacher => false;
         public bool IsStudent => false;
+        public bool IsGuardian => false;
     }
 
     private sealed class FakeClassRepository(Class classEntity) : IClassRepository
@@ -55,6 +60,10 @@ public class ClassSubjectTeacherServiceTests
         public Task<School?> GetByIdAsync(Guid id, CancellationToken ct) => Task.FromResult<School?>(school);
         public Task<School?> GetWithLocationAsync(Guid schoolId, CancellationToken ct) => Task.FromResult<School?>(school);
         public Task<IEnumerable<School>> GetAllOrderedAsync(bool activeOnly, CancellationToken ct) =>
+            Task.FromResult<IEnumerable<School>>([]);
+        public Task<IEnumerable<School>> GetByCityAsync(Guid cityId, bool activeOnly, CancellationToken ct) =>
+            Task.FromResult<IEnumerable<School>>([]);
+        public Task<IEnumerable<School>> GetByStateAsync(Guid stateId, bool activeOnly, CancellationToken ct) =>
             Task.FromResult<IEnumerable<School>>([]);
         public Task<bool> NameExistsAsync(string name, Guid? excludeSchoolId, CancellationToken ct) =>
             Task.FromResult(false);

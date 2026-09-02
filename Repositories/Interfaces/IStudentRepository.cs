@@ -5,7 +5,7 @@ namespace EduCore.Repositories.Interfaces;
 public interface IStudentRepository : IRepository<Student>
 {
     Task<Student?> GetByUserIdAsync(Guid userId, CancellationToken ct);
-    Task<Student?> GetWithParentsAsync(Guid studentId, CancellationToken ct);
+    Task<Student?> GetWithGuardiansAsync(Guid studentId, CancellationToken ct);
 
     Task<bool> PersonalNumberExistsAsync(string personalNumber, Guid? excludeStudentId, CancellationToken ct);
 

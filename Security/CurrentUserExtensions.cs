@@ -16,6 +16,18 @@ public static class CurrentUserExtensions
         user.StudentId
         ?? throw new ForbiddenException("This action can only be performed by a student.");
 
+    public static Guid RequireCityId(this ICurrentUser user) =>
+        user.CityId
+        ?? throw new ForbiddenException("This action can only be performed by a regional administrator.");
+
+    public static Guid RequireStateId(this ICurrentUser user) =>
+        user.StateId
+        ?? throw new ForbiddenException("This action can only be performed by a state administrator.");
+
+    public static Guid RequireGuardianId(this ICurrentUser user) =>
+        user.GuardianId
+        ?? throw new ForbiddenException("This action can only be performed by a guardian.");
+
     public static bool CanManageAccounts(this ICurrentUser user) =>
-        user.IsSuperAdmin || user.IsAdmin;
+        user.IsStateAdmin || user.IsRegionalAdmin || user.IsDirectorate;
 }

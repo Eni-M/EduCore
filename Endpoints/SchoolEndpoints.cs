@@ -1,4 +1,4 @@
-using EduCore.Dtos.Admin;
+using EduCore.Dtos.Directorate;
 using EduCore.Dtos.School;
 using EduCore.Security;
 using EduCore.Services.Interfaces;
@@ -15,56 +15,57 @@ public static class SchoolEndpoints
                 Results.Ok(await service.GetByIdAsync(currentUser.RequireSchoolId(), ct)))
             .RequireAuthorization(Policies.AnySchoolUser);
 
-        var superAdminSchools = schools.RequireAuthorization(Policies.SuperAdmin);
+        var managedSchools = schools.RequireAuthorization(Policies.RegionalOrState);
 
-        superAdminSchools.MapGet("/", async (bool? activeOnly, ISchoolService service, CancellationToken ct) =>
+        managedSchools.MapGet("/", async (bool? activeOnly, ISchoolService service, CancellationToken ct) =>
             Results.Ok(await service.GetAllAsync(activeOnly ?? false, ct)));
 
-        superAdminSchools.MapGet("/{schoolId:guid}", async (Guid schoolId, ISchoolService service, CancellationToken ct) =>
+        managedSchools.MapGet("/{schoolId:guid}", async (Guid schoolId, ISchoolService service, CancellationToken ct) =>
             Results.Ok(await service.GetByIdAsync(schoolId, ct)));
 
-        superAdminSchools.MapPost("/", async (SchoolCreateDto dto, ISchoolService service, CancellationToken ct) =>
+        managedSchools.MapPost("/", async (SchoolCreateDto dto, ISchoolService service, CancellationToken ct) =>
         {
             var school = await service.CreateAsync(dto, ct);
             return Results.Created($"/api/schools/{school.Id}", school);
         });
 
-        superAdminSchools.MapPut("/{schoolId:guid}",
+        managedSchools.MapPut("/{schoolId:guid}",
             async (Guid schoolId, SchoolEditDto dto, ISchoolService service, CancellationToken ct) =>
                 Results.Ok(await service.UpdateAsync(schoolId, dto, ct)));
 
-        superAdminSchools.MapPost("/{schoolId:guid}/deactivate",
+        managedSchools.MapPost("/{schoolId:guid}/deactivate",
             async (Guid schoolId, ISchoolService service, CancellationToken ct) =>
             {
                 await service.SetActiveAsync(schoolId, false, ct);
                 return Results.NoContent();
             });
 
-        superAdminSchools.MapPost("/{schoolId:guid}/activate",
+        managedSchools.MapPost("/{schoolId:guid}/activate",
             async (Guid schoolId, ISchoolService service, CancellationToken ct) =>
             {
                 await service.SetActiveAsync(schoolId, true, ct);
                 return Results.NoContent();
             });
 
-        var admins = api.MapGroup("/admins")
-            .RequireAuthorization(Policies.SuperAdmin)
-            .WithTags("Admins");
+        var directorates = api.MapGroup("/directorates")
+            .RequireAuthorization(Policies.RegionalAdmin)
+            .WithTags("Directorates");
 
-        admins.MapGet("/", async (Guid? schoolId, IAdminService service, CancellationToken ct) =>
-            Results.Ok(await service.GetAllAsync(schoolId, ct)));
+        directorates.MapGet("/", async (IDirectorateService service, CancellationToken ct) =>
+            Results.Ok(await service.GetAllAsync(ct)));
 
-        admins.MapGet("/{adminId:guid}", async (Guid adminId, IAdminService service, CancellationToken ct) =>
-            Results.Ok(await service.GetByIdAsync(adminId, ct)));
+        directorates.MapGet("/{directorateId:guid}",
+            async (Guid directorateId, IDirectorateService service, CancellationToken ct) =>
+                Results.Ok(await service.GetByIdAsync(directorateId, ct)));
 
-        admins.MapPost("/", async (AdminCreateDto dto, IAdminService service, CancellationToken ct) =>
+        directorates.MapPost("/", async (DirectorateCreateDto dto, IDirectorateService service, CancellationToken ct) =>
         {
-            var admin = await service.CreateAsync(dto, ct);
-            return Results.Created($"/api/admins/{admin.Id}", admin);
+            var directorate = await service.CreateAsync(dto, ct);
+            return Results.Created($"/api/directorates/{directorate.Id}", directorate);
         });
 
-        admins.MapPut("/{adminId:guid}",
-            async (Guid adminId, AdminEditDto dto, IAdminService service, CancellationToken ct) =>
-                Results.Ok(await service.UpdateAsync(adminId, dto, ct)));
+        directorates.MapPut("/{directorateId:guid}",
+            async (Guid directorateId, DirectorateEditDto dto, IDirectorateService service, CancellationToken ct) =>
+                Results.Ok(await service.UpdateAsync(directorateId, dto, ct)));
     }
 }
