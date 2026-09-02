@@ -17,6 +17,7 @@ public class MappingProfile : Profile
         MapClasses();
         MapLessonRecords();
         MapStudentRecords();
+        MapCommunication();
     }
 
     private IMappingExpression<TSource, TDestination> CreateWriteMap<TSource, TDestination>()
@@ -176,5 +177,12 @@ public class MappingProfile : Profile
 
         CreateMap<StudentMedicalRecord, Dtos.Medical.StudentMedicalRecordDto>();
         CreateWriteMap<Dtos.Medical.StudentMedicalRecordUpsertDto, StudentMedicalRecord>();
+    }
+    private void MapCommunication()
+    {
+        // The list DTOs are built by their repositories (they join for author/class/student
+        // names), so only the write maps live here.
+        CreateWriteMap<Dtos.Calendar.CalendarEventCreateDto, CalendarEvent>();
+        CreateWriteMap<Dtos.Calendar.CalendarEventEditDto, CalendarEvent>();
     }
 }

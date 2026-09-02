@@ -28,6 +28,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<SchoolingHistory> SchoolingHistories => Set<SchoolingHistory>();
     public DbSet<StudentDocument> StudentDocuments => Set<StudentDocument>();
     public DbSet<StudentMedicalRecord> StudentMedicalRecords => Set<StudentMedicalRecord>();
+    public DbSet<Notice> Notices => Set<Notice>();
+    public DbSet<CalendarEvent> CalendarEvents => Set<CalendarEvent>();
 
     public DbSet<State> States => Set<State>();
     public DbSet<City> Cities => Set<City>();
@@ -49,6 +51,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         ConfigureLessons(modelBuilder);
         ConfigureScheduling(modelBuilder);
         ConfigureStudentRecords(modelBuilder);
+        ConfigureCommunication(modelBuilder);
 
         modelBuilder.Entity<AuditLog>().Property(a => a.Action).HasMaxLength(1000);
         modelBuilder.Entity<AuditLog>().Property(a => a.TraceId).HasMaxLength(200);
@@ -494,5 +497,43 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.Notes).HasMaxLength(4000);
         modelBuilder.Entity<StudentMedicalRecord>().Property<uint>("Version").IsRowVersion();
         ScopeToSchool<StudentMedicalRecord>(modelBuilder);
+    }
+
+    // The notice board and the shared calendar. Both are school-scoped; AuthorUserId/CreatedByUserId
+    // are plain columns (resolved to a name by a join when listing) so a post outlives its author.
+    private void ConfigureCommunication(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Notice>()
+            .HasOne<School>().WithMany()
+            .HasForeignKey(n => n.SchoolId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Notice>().HasIndex(n => new { n.SchoolId, n.Pinned, n.CreatedAt });
+        modelBuilder.Entity<Notice>().Property(n => n.Title).HasMaxLength(200);
+        modelBuilder.Entity<Notice>().Property(n => n.Body).HasMaxLength(8000);
+        modelBuilder.Entity<Notice>().Property<uint>("Version").IsRowVersion();
+        ScopeToSchool<Notice>(modelBuilder);
+
+        // ClassId and StudentId are nullable, which makes their composite FKs optional -- a
+        // School event names neither, a Class event only the class, a Student event only the
+        // student. The SchoolId in each composite forces the target into the event's own school.
+        modelBuilder.Entity<CalendarEvent>()
+            .HasOne<School>().WithMany()
+            .HasForeignKey(e => e.SchoolId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<CalendarEvent>()
+            .HasOne<Class>().WithMany()
+            .HasForeignKey(e => new { e.ClassId, e.SchoolId })
+            .HasPrincipalKey(c => new { c.Id, c.SchoolId })
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<CalendarEvent>()
+            .HasOne<Student>().WithMany()
+            .HasForeignKey(e => new { e.StudentId, e.SchoolId })
+            .HasPrincipalKey(s => new { s.Id, s.SchoolId })
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<CalendarEvent>().HasIndex(e => new { e.SchoolId, e.Date });
+        modelBuilder.Entity<CalendarEvent>().Property(e => e.Title).HasMaxLength(200);
+        modelBuilder.Entity<CalendarEvent>().Property(e => e.Description).HasMaxLength(4000);
+        modelBuilder.Entity<CalendarEvent>().Property<uint>("Version").IsRowVersion();
+        ScopeToSchool<CalendarEvent>(modelBuilder);
     }
 }

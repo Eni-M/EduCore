@@ -76,6 +76,8 @@ builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 builder.Services.AddScoped<ISchoolingHistoryRepository, SchoolingHistoryRepository>();
 builder.Services.AddScoped<IStudentDocumentRepository, StudentDocumentRepository>();
 builder.Services.AddScoped<IStudentMedicalRecordRepository, StudentMedicalRecordRepository>();
+builder.Services.AddScoped<INoticeRepository, NoticeRepository>();
+builder.Services.AddScoped<ICalendarEventRepository, CalendarEventRepository>();
 
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
@@ -174,6 +176,8 @@ builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<ISchoolingHistoryService, SchoolingHistoryService>();
 builder.Services.AddScoped<IStudentDocumentService, StudentDocumentService>();
 builder.Services.AddScoped<IStudentMedicalRecordService, StudentMedicalRecordService>();
+builder.Services.AddScoped<INoticeService, NoticeService>();
+builder.Services.AddScoped<ICalendarService, CalendarService>();
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
@@ -335,6 +339,8 @@ api.MapAcademicYearEndpoints();
 api.MapClassEndpoints();
 api.MapStudentEndpoints();
 api.MapStudentRecordsEndpoints();
+api.MapNoticeEndpoints();
+api.MapCalendarEndpoints();
 api.MapTeacherEndpoints();
 api.MapLessonEndpoints();
 api.MapScheduleEndpoints();

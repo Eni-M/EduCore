@@ -135,6 +135,71 @@ namespace EduCore.Migrations
                     b.ToTable("AuditLogs");
                 });
 
+            modelBuilder.Entity("EduCore.Models.CalendarEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Audience")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ClassId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<TimeOnly?>("EndTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<TimeOnly?>("StartTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<Guid?>("StudentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClassId", "SchoolId");
+
+                    b.HasIndex("SchoolId", "Date");
+
+                    b.HasIndex("StudentId", "SchoolId");
+
+                    b.ToTable("CalendarEvents");
+                });
+
             modelBuilder.Entity("EduCore.Models.City", b =>
                 {
                     b.Property<Guid>("Id")
@@ -537,6 +602,50 @@ namespace EduCore.Migrations
                     b.HasIndex("ClassSubjectTeacherId", "ClassId", "SubjectId", "TeacherId", "SchoolId");
 
                     b.ToTable("Marks");
+                });
+
+            modelBuilder.Entity("EduCore.Models.Notice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AuthorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Pinned")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchoolId", "Pinned", "CreatedAt");
+
+                    b.ToTable("Notices");
                 });
 
             modelBuilder.Entity("EduCore.Models.RegionalAdmin", b =>
@@ -1186,6 +1295,27 @@ namespace EduCore.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("EduCore.Models.CalendarEvent", b =>
+                {
+                    b.HasOne("EduCore.Models.School", null)
+                        .WithMany()
+                        .HasForeignKey("SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduCore.Models.Class", null)
+                        .WithMany()
+                        .HasForeignKey("ClassId", "SchoolId")
+                        .HasPrincipalKey("Id", "SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EduCore.Models.Student", null)
+                        .WithMany()
+                        .HasForeignKey("StudentId", "SchoolId")
+                        .HasPrincipalKey("Id", "SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("EduCore.Models.City", b =>
                 {
                     b.HasOne("EduCore.Models.State", "State")
@@ -1370,6 +1500,15 @@ namespace EduCore.Migrations
                         .WithMany()
                         .HasForeignKey("ClassSubjectTeacherId", "ClassId", "SubjectId", "TeacherId", "SchoolId")
                         .HasPrincipalKey("Id", "ClassId", "SubjectId", "TeacherId", "SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EduCore.Models.Notice", b =>
+                {
+                    b.HasOne("EduCore.Models.School", null)
+                        .WithMany()
+                        .HasForeignKey("SchoolId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
