@@ -26,7 +26,15 @@ public class StudentDocumentService(
     {
         await access.EnsureCanViewStudentAsync(studentId, ct);
 
-        return mapper.Map<IEnumerable<StudentDocumentListDto>>(await documents.GetByStudentAsync(studentId, ct));
+        var records = await documents.GetByStudentAsync(studentId, ct);
+
+        // A document filed under Medical is as sensitive as the medical record itself. Someone who
+        // may see the student but not their medical record (a subject teacher who is not the
+        // homeroom teacher) must not even learn such a file exists, so drop it from the listing.
+        if (!await access.CanViewStudentMedicalAsync(studentId, ct))
+            records = records.Where(d => d.Category != DocumentCategory.Medical).ToList();
+
+        return mapper.Map<IEnumerable<StudentDocumentListDto>>(records);
     }
 
     public async Task<StudentDocumentListDto> UploadAsync(
@@ -86,6 +94,12 @@ public class StudentDocumentService(
         await access.EnsureCanViewStudentAsync(studentId, ct);
 
         var document = await OwnedAsync(studentId, documentId, ct);
+
+        // Same rule as the listing: a medical-category file needs the stricter medical clearance,
+        // otherwise being able to view the student would be a way around the medical guard.
+        if (document.Category == DocumentCategory.Medical)
+            await access.EnsureCanViewStudentMedicalAsync(studentId, ct);
+
         var stream = await storage.OpenReadAsync(document.StorageKey, ct);
 
         return (stream, document.ContentType, document.FileName);

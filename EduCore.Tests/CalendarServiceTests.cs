@@ -62,6 +62,8 @@ public class CalendarServiceTests
             e.Id, e.Title, e.Description, e.Type, e.Audience, e.ClassId, null, e.StudentId, null,
             e.Date, e.StartTime, e.EndTime, e.CreatedByUserId, "");
 
+        public Task<CalendarEventListDto?> GetDtoAsync(Guid eventId, CancellationToken ct) =>
+            Task.FromResult<CalendarEventListDto?>(Added.Where(e => e.Id == eventId).Select(ToDto).FirstOrDefault());
         public Task<CalendarEvent?> GetByIdAsync(Guid id, CancellationToken ct) =>
             Task.FromResult(Added.FirstOrDefault(e => e.Id == id));
         public Task AddAsync(CalendarEvent entity)
@@ -148,14 +150,34 @@ public class CalendarServiceTests
         public Task EnsureCanTeachClassAsync(Guid classId, CancellationToken ct) => Task.CompletedTask;
         public Task EnsureCanViewStudentAsync(Guid studentId, CancellationToken ct) => Task.CompletedTask;
         public Task EnsureCanViewStudentMedicalAsync(Guid studentId, CancellationToken ct) => Task.CompletedTask;
+        public Task<bool> CanViewStudentMedicalAsync(Guid studentId, CancellationToken ct) => Task.FromResult(true);
+    }
+
+    private sealed class FakeStudentRepo : IStudentRepository
+    {
+        public Task<Student?> GetByIdAsync(Guid id, CancellationToken ct) =>
+            Task.FromResult<Student?>(new Student { Id = id, SchoolId = SchoolId });
+        public Task<Student?> GetByUserIdAsync(Guid userId, CancellationToken ct) => Task.FromResult<Student?>(null);
+        public Task<Student?> GetWithGuardiansAsync(Guid studentId, CancellationToken ct) => Task.FromResult<Student?>(null);
+        public Task<bool> PersonalNumberExistsAsync(string personalNumber, Guid? excludeStudentId, CancellationToken ct) =>
+            Task.FromResult(false);
+        public Task<(IReadOnlyList<Student> Items, int TotalCount)> GetPagedAsync(
+            int page, int pageSize, string? search, bool includeGraduated, CancellationToken ct) =>
+            Task.FromResult<(IReadOnlyList<Student>, int)>(([], 0));
+        public Task<IEnumerable<Student>> GetByClassAsync(Guid classId, CancellationToken ct) =>
+            Task.FromResult<IEnumerable<Student>>([]);
+        public Task AddAsync(Student entity) => Task.CompletedTask;
+        public void Update(Student entity) { }
+        public void Remove(Student entity) { }
+        public Task<bool> SaveChangesAsync(CancellationToken ct) => Task.FromResult(true);
     }
 
     private static IMapper Mapper() =>
         new MapperConfiguration(c => c.AddProfile<MappingProfile>(), NullLoggerFactory.Instance).CreateMapper();
 
     private static CalendarService Service(ICurrentUser user, FakeCalendarRepo repo, IReadOnlyList<Guid>? taught = null) =>
-        new(repo, new FakeClassRepo(taught ?? []), new FakeEnrollmentRepo(), new FakeGuardianRepo(),
-            new FakeAccessGuard(), user, Mapper());
+        new(repo, new FakeClassRepo(taught ?? []), new FakeStudentRepo(), new FakeEnrollmentRepo(),
+            new FakeGuardianRepo(), new FakeAccessGuard(), user, Mapper());
 
     private static CalendarEventCreateDto Create(CalendarAudience audience, Guid? classId = null, Guid? studentId = null) =>
         new("Midterm", null, CalendarEventType.Exam, audience, classId, studentId,

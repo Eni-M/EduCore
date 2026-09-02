@@ -16,4 +16,7 @@ public interface ICalendarEventRepository : IRepository<CalendarEvent>
         DateOnly? from,
         DateOnly? to,
         CancellationToken ct);
+
+    // A single event as a list row (same projection), used to read one back after a write.
+    Task<CalendarEventListDto?> GetDtoAsync(Guid eventId, CancellationToken ct);
 }

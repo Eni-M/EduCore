@@ -12,6 +12,7 @@ namespace EduCore.Services;
 public class CalendarService(
     ICalendarEventRepository events,
     IClassRepository classes,
+    IStudentRepository students,
     IEnrollmentRepository enrollments,
     IGuardianRepository guardians,
     IAccessGuard access,
@@ -83,6 +84,10 @@ public class CalendarService(
 
             case CalendarAudience.Student:
                 studentId = dto.StudentId ?? throw new BusinessException("Choose the student this event is for.");
+                // School-filtered read: a student in another school reads back as null and is
+                // refused here, cleanly, rather than surfacing later as a foreign-key error.
+                _ = await students.GetByIdAsync(studentId.Value, ct)
+                    ?? throw new NotFoundException("Student", studentId.Value);
                 // A Directorate passes; a teacher must teach a class the student is enrolled in.
                 await access.EnsureCanViewStudentAsync(studentId.Value, ct);
                 break;
@@ -104,7 +109,7 @@ public class CalendarService(
         await events.AddAsync(ev);
         await events.SaveChangesAsync(ct);
 
-        return await SingleAsync(ev.Id, ev.Date, ct);
+        return await SingleAsync(ev.Id, ct);
     }
 
     public async Task<CalendarEventListDto> UpdateAsync(
@@ -120,7 +125,7 @@ public class CalendarService(
         events.Update(ev);
         await events.SaveChangesAsync(ct);
 
-        return await SingleAsync(eventId, ev.Date, ct);
+        return await SingleAsync(eventId, ct);
     }
 
     public async Task DeleteAsync(Guid eventId, CancellationToken ct)
@@ -147,10 +152,8 @@ public class CalendarService(
             throw new ForbiddenException("You can only change events you created.");
     }
 
-    // Reads a single event back through the list projection (which resolves class/student/author
-    // names). seeAll is safe here: the result is filtered to the one id, narrowed to its own day.
-    private async Task<CalendarEventListDto> SingleAsync(Guid eventId, DateOnly date, CancellationToken ct) =>
-        (await events.GetForViewerAsync(true, [], [], currentUser.UserId, date, date, ct))
-            .FirstOrDefault(e => e.Id == eventId)
-        ?? throw new NotFoundException("Calendar event", eventId);
+    // Reads a single event back through the same projection the listing uses (which resolves the
+    // class/student/author names), scoped to the caller's school by the query filter.
+    private async Task<CalendarEventListDto> SingleAsync(Guid eventId, CancellationToken ct) =>
+        await events.GetDtoAsync(eventId, ct) ?? throw new NotFoundException("Calendar event", eventId);
 }

@@ -42,7 +42,7 @@ public class StudentDocumentServiceTests
     {
         public StudentDocument? Added;
         public Task<IEnumerable<StudentDocument>> GetByStudentAsync(Guid studentId, CancellationToken ct) =>
-            Task.FromResult<IEnumerable<StudentDocument>>([]);
+            Task.FromResult<IEnumerable<StudentDocument>>(Added is null ? [] : [Added]);
         public Task<StudentDocument?> GetByIdAsync(Guid id, CancellationToken ct) => Task.FromResult(Added);
         public Task AddAsync(StudentDocument entity) { Added = entity; return Task.CompletedTask; }
         public void Update(StudentDocument entity) { }
@@ -62,12 +62,14 @@ public class StudentDocumentServiceTests
         public Task DeleteAsync(string key, CancellationToken ct) => Task.CompletedTask;
     }
 
-    private sealed class FakeAccessGuard : IAccessGuard
+    private sealed class FakeAccessGuard(bool canMedical = true) : IAccessGuard
     {
         public Task EnsureCanViewClassAsync(Guid classId, CancellationToken ct) => Task.CompletedTask;
         public Task EnsureCanTeachClassAsync(Guid classId, CancellationToken ct) => Task.CompletedTask;
         public Task EnsureCanViewStudentAsync(Guid studentId, CancellationToken ct) => Task.CompletedTask;
-        public Task EnsureCanViewStudentMedicalAsync(Guid studentId, CancellationToken ct) => Task.CompletedTask;
+        public Task EnsureCanViewStudentMedicalAsync(Guid studentId, CancellationToken ct) =>
+            canMedical ? Task.CompletedTask : throw new ForbiddenException("No medical access.");
+        public Task<bool> CanViewStudentMedicalAsync(Guid studentId, CancellationToken ct) => Task.FromResult(canMedical);
     }
 
     private sealed class FakeCurrentUser : ICurrentUser
@@ -92,7 +94,8 @@ public class StudentDocumentServiceTests
     private static IMapper Mapper() =>
         new MapperConfiguration(c => c.AddProfile<MappingProfile>(), NullLoggerFactory.Instance).CreateMapper();
 
-    private static (StudentDocumentService Service, FakeFileStorage Storage, FakeDocumentRepository Docs) Build()
+    private static (StudentDocumentService Service, FakeFileStorage Storage, FakeDocumentRepository Docs) Build(
+        bool canMedical = true)
     {
         var storage = new FakeFileStorage();
         var docs = new FakeDocumentRepository();
@@ -103,10 +106,23 @@ public class StudentDocumentServiceTests
         });
 
         var service = new StudentDocumentService(
-            docs, new FakeStudentRepository(), storage, options, new FakeAccessGuard(), new FakeCurrentUser(), Mapper());
+            docs, new FakeStudentRepository(), storage, options, new FakeAccessGuard(canMedical),
+            new FakeCurrentUser(), Mapper());
 
         return (service, storage, docs);
     }
+
+    private static StudentDocument MedicalDoc() => new()
+    {
+        Id = Guid.NewGuid(),
+        StudentId = StudentId,
+        SchoolId = SchoolId,
+        Title = "Vaccination record",
+        Category = DocumentCategory.Medical,
+        FileName = "vax.pdf",
+        ContentType = "application/pdf",
+        StorageKey = "key"
+    };
 
     [Fact]
     public async Task Rejects_a_file_over_the_size_limit()
@@ -147,5 +163,37 @@ public class StudentDocumentServiceTests
         Assert.Equal("Birth certificate", docs.Added.Title);
         Assert.False(string.IsNullOrEmpty(docs.Added.StorageKey));
         Assert.Equal("Birth certificate", result.Title);
+    }
+
+    [Fact]
+    public async Task A_medical_document_is_hidden_from_a_viewer_without_medical_access()
+    {
+        var (service, _, docs) = Build(canMedical: false);
+        docs.Added = MedicalDoc();
+
+        var list = await service.GetByStudentAsync(StudentId, CancellationToken.None);
+
+        Assert.Empty(list);
+    }
+
+    [Fact]
+    public async Task A_medical_document_is_shown_to_a_viewer_with_medical_access()
+    {
+        var (service, _, docs) = Build(canMedical: true);
+        docs.Added = MedicalDoc();
+
+        var list = await service.GetByStudentAsync(StudentId, CancellationToken.None);
+
+        Assert.Single(list);
+    }
+
+    [Fact]
+    public async Task Downloading_a_medical_document_is_refused_without_medical_access()
+    {
+        var (service, _, docs) = Build(canMedical: false);
+        docs.Added = MedicalDoc();
+
+        await Assert.ThrowsAsync<ForbiddenException>(
+            () => service.OpenAsync(StudentId, docs.Added.Id, CancellationToken.None));
     }
 }

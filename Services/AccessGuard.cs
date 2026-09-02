@@ -133,4 +133,17 @@ public class AccessGuard(
 
         throw new ForbiddenException("You do not have access to this student's medical record.");
     }
+
+    public async Task<bool> CanViewStudentMedicalAsync(Guid studentId, CancellationToken ct)
+    {
+        try
+        {
+            await EnsureCanViewStudentMedicalAsync(studentId, ct);
+            return true;
+        }
+        catch (ForbiddenException)
+        {
+            return false;
+        }
+    }
 }
