@@ -5,6 +5,9 @@ namespace EduCore.Services.Interfaces;
 public interface IGuardianService
 {
     Task<IEnumerable<GuardianContactDto>> GetByStudentAsync(Guid studentId, CancellationToken ct);
+    Task LinkAsync(Guid studentId, Guid guardianId, CancellationToken ct);
+    Task UnlinkAsync(Guid studentId, Guid guardianId, CancellationToken ct);
+    Task<IEnumerable<GuardianSearchResultDto>> SearchAsync(string query, CancellationToken ct);
 
     Task<IEnumerable<GuardianListDto>> GetAllAsync(CancellationToken ct);
     Task<GuardianListDto> GetByIdAsync(Guid guardianId, CancellationToken ct);

@@ -32,12 +32,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<TeacherSubject> TeacherSubjects => Set<TeacherSubject>();
     public DbSet<ClassSubjectTeacher> ClassSubjectTeachers => Set<ClassSubjectTeacher>();
 
+    public DbSet<SchoolShift> SchoolShifts => Set<SchoolShift>();
+    public DbSet<ShiftPeriod> ShiftPeriods => Set<ShiftPeriod>();
+    public DbSet<ScheduleEntry> ScheduleEntries => Set<ScheduleEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureUsers(modelBuilder);
         ConfigureSchoolCalendar(modelBuilder);
         ConfigureClasses(modelBuilder);
         ConfigureLessons(modelBuilder);
+        ConfigureScheduling(modelBuilder);
 
         modelBuilder.Entity<AuditLog>().Property(a => a.Action).HasMaxLength(1000);
         modelBuilder.Entity<AuditLog>().Property(a => a.TraceId).HasMaxLength(200);
@@ -75,6 +80,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .HasForeignKey<Guardian>(g => g.UserId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Guardian>().HasIndex(g => g.UserId).IsUnique();
+        modelBuilder.Entity<Guardian>().Property(g => g.NationalId).HasMaxLength(50);
+        modelBuilder.Entity<Guardian>().HasIndex(g => g.NationalId).IsUnique();
         modelBuilder.Entity<Guardian>().Property(g => g.PhoneNumber).HasMaxLength(30);
         modelBuilder.Entity<Guardian>().Property<uint>("Version").IsRowVersion();
 
@@ -282,6 +289,68 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .HasFilter("\"EndedOn\" IS NULL");
         modelBuilder.Entity<ClassSubjectTeacher>().Property<uint>("Version").IsRowVersion();
         ScopeToSchool<ClassSubjectTeacher>(modelBuilder);
+    }
+
+    private void ConfigureScheduling(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<SchoolShift>()
+            .HasOne<School>().WithMany()
+            .HasForeignKey(s => s.SchoolId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SchoolShift>().HasAlternateKey(s => new { s.Id, s.SchoolId });
+        modelBuilder.Entity<SchoolShift>().HasIndex(s => new { s.SchoolId, s.Name }).IsUnique();
+        modelBuilder.Entity<SchoolShift>().Property(s => s.Name).HasMaxLength(100);
+        modelBuilder.Entity<SchoolShift>().Property<uint>("Version").IsRowVersion();
+        ScopeToSchool<SchoolShift>(modelBuilder);
+
+        modelBuilder.Entity<ShiftPeriod>()
+            .HasOne(p => p.Shift).WithMany(s => s.Periods)
+            .HasForeignKey(p => new { p.SchoolShiftId, p.SchoolId })
+            .HasPrincipalKey(s => new { s.Id, s.SchoolId })
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ShiftPeriod>().HasAlternateKey(p => new { p.Id, p.SchoolId });
+        modelBuilder.Entity<ShiftPeriod>().HasIndex(p => new { p.SchoolShiftId, p.PeriodNumber }).IsUnique();
+        modelBuilder.Entity<ShiftPeriod>().Property<uint>("Version").IsRowVersion();
+        ScopeToSchool<ShiftPeriod>(modelBuilder);
+
+        modelBuilder.Entity<ScheduleEntry>()
+            .HasOne<AcademicYear>().WithMany()
+            .HasForeignKey(e => new { e.AcademicYearId, e.SchoolId })
+            .HasPrincipalKey(a => new { a.Id, a.SchoolId })
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ScheduleEntry>()
+            .HasOne<Class>().WithMany()
+            .HasForeignKey(e => new { e.ClassId, e.SchoolId })
+            .HasPrincipalKey(c => new { c.Id, c.SchoolId })
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ScheduleEntry>()
+            .HasOne<Subject>().WithMany()
+            .HasForeignKey(e => new { e.SubjectId, e.SchoolId })
+            .HasPrincipalKey(s => new { s.Id, s.SchoolId })
+            .OnDelete(DeleteBehavior.Restrict);
+        // Teacher must be qualified for the subject -- reuse TeacherSubject as the source of truth.
+        modelBuilder.Entity<ScheduleEntry>()
+            .HasOne<TeacherSubject>().WithMany()
+            .HasForeignKey(e => new { e.TeacherId, e.SubjectId, e.SchoolId })
+            .HasPrincipalKey(ts => new { ts.TeacherId, ts.SubjectId, ts.SchoolId })
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ScheduleEntry>()
+            .HasOne<ShiftPeriod>().WithMany()
+            .HasForeignKey(e => new { e.ShiftPeriodId, e.SchoolId })
+            .HasPrincipalKey(p => new { p.Id, p.SchoolId })
+            .OnDelete(DeleteBehavior.Restrict);
+        // One lesson per class per slot.
+        modelBuilder.Entity<ScheduleEntry>()
+            .HasIndex(e => new { e.SchoolId, e.AcademicYearId, e.ClassId, e.DayOfWeek, e.ShiftPeriodId })
+            .IsUnique();
+        // A teacher cannot be in two places at once.
+        // slot-based conflict (period, not clock time). Upgrade to time-range overlap
+        // only if a school runs shifts whose periods overlap in wall-clock time.
+        modelBuilder.Entity<ScheduleEntry>()
+            .HasIndex(e => new { e.SchoolId, e.AcademicYearId, e.TeacherId, e.DayOfWeek, e.ShiftPeriodId })
+            .IsUnique();
+        modelBuilder.Entity<ScheduleEntry>().Property<uint>("Version").IsRowVersion();
+        ScopeToSchool<ScheduleEntry>(modelBuilder);
     }
 
     private void ConfigureLessons(ModelBuilder modelBuilder)

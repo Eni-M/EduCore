@@ -60,6 +60,22 @@ public static class StudentEndpoints
                     Results.Ok(await service.GetByStudentAsync(studentId, ct)))
             .RequireAuthorization(Policies.StudentReadable);
 
+        group.MapPost("/{studentId:guid}/guardians/{guardianId:guid}",
+                async (Guid studentId, Guid guardianId, IGuardianService service, CancellationToken ct) =>
+                {
+                    await service.LinkAsync(studentId, guardianId, ct);
+                    return Results.NoContent();
+                })
+            .RequireAuthorization(Policies.Directorate);
+
+        group.MapDelete("/{studentId:guid}/guardians/{guardianId:guid}",
+                async (Guid studentId, Guid guardianId, IGuardianService service, CancellationToken ct) =>
+                {
+                    await service.UnlinkAsync(studentId, guardianId, ct);
+                    return Results.NoContent();
+                })
+            .RequireAuthorization(Policies.Directorate);
+
         group.MapGet("/{studentId:guid}/enrollments",
                 async (Guid studentId, IEnrollmentService service, CancellationToken ct) =>
                     Results.Ok(await service.GetByStudentAsync(studentId, ct)))

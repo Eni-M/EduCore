@@ -5,4 +5,5 @@ public record GuardianContactDto(
     string FirstName,
     string LastName,
     string Email,
+    string NationalId,
     string PhoneNumber);

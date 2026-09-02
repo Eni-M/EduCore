@@ -92,7 +92,7 @@ public class StatisticsScopeResolverTests
     }
 
     [Fact]
-    public async Task StateAdmin_IsScopedToTheirStateSchools()
+    public async Task StateAdmin_SeesEverySchoolNationwide_ByDefault()
     {
         var context = await Resolver(
                 new FakeCurrentUser(UserRole.StateAdmin, stateId: StateId), new StubPeriodResolver())
@@ -100,7 +100,19 @@ public class StatisticsScopeResolverTests
 
         Assert.Null(context.SchoolId);
         Assert.True(context.CrossSchool);
-        Assert.Equal(StateId, context.SchoolStateId);
+        Assert.Null(context.SchoolStateId);
+    }
+
+    [Fact]
+    public async Task StateAdmin_CanNarrowToAState()
+    {
+        var otherState = Guid.NewGuid();
+
+        var context = await Resolver(
+                new FakeCurrentUser(UserRole.StateAdmin, stateId: StateId), new StubPeriodResolver())
+            .ResolveAsync(new StatisticsFilter { StateId = otherState }, CancellationToken.None);
+
+        Assert.Equal(otherState, context.SchoolStateId);
     }
 
     [Fact]

@@ -83,6 +83,7 @@ public class MappingProfile : Profile
             .ForCtorParam("FirstName", o => o.MapFrom(gs => gs.Guardian.User.FirstName))
             .ForCtorParam("LastName", o => o.MapFrom(gs => gs.Guardian.User.LastName))
             .ForCtorParam("Email", o => o.MapFrom(gs => gs.Guardian.User.Email))
+            .ForCtorParam("NationalId", o => o.MapFrom(gs => gs.Guardian.NationalId))
             .ForCtorParam("PhoneNumber", o => o.MapFrom(gs => gs.Guardian.PhoneNumber));
 
         CreateMap<Student, Dtos.Student.StudentListDto>()

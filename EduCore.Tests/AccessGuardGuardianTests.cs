@@ -49,6 +49,14 @@ public class AccessGuardGuardianTests
         public Task<Guardian?> GetTrackedWithChildrenAsync(Guid guardianId, CancellationToken ct) => Task.FromResult<Guardian?>(null);
         public Task<IEnumerable<Guardian>> GetBySchoolAsync(Guid schoolId, CancellationToken ct) =>
             Task.FromResult<IEnumerable<Guardian>>([]);
+        public Task<IReadOnlyList<Guardian>> SearchAsync(string query, int take, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<Guardian>>([]);
+        public Task<Guardian?> GetGloballyAsync(Guid guardianId, CancellationToken ct) =>
+            Task.FromResult<Guardian?>(null);
+        public Task<bool> NationalIdExistsAsync(string nationalId, CancellationToken ct) =>
+            Task.FromResult(false);
+        public Task<GuardianStudent?> GetLinkAsync(Guid guardianId, Guid studentId, CancellationToken ct) =>
+            Task.FromResult<GuardianStudent?>(null);
         public Task<IReadOnlyList<GuardianStudent>> GetContactsForStudentAsync(Guid studentId, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<GuardianStudent>>([]);
         public Task AddLinkAsync(GuardianStudent link) => Task.CompletedTask;

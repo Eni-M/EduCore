@@ -20,6 +20,8 @@ using EduCore.Services.Statistics;
 using EduCore.Services.Statistics.Interfaces;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -65,6 +67,7 @@ builder.Services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
 builder.Services.AddScoped<ITeacherSubjectRepository, TeacherSubjectRepository>();
 builder.Services.AddScoped<IClassSubjectTeacherRepository, ClassSubjectTeacherRepository>();
 builder.Services.AddScoped<IDiaryEntryRepository, DiaryEntryRepository>();
+builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
 builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
 builder.Services.AddScoped<IMarkRepository, MarkRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
@@ -137,6 +140,7 @@ builder.Services.AddScoped<IGuardianService, GuardianService>();
 builder.Services.AddScoped<ITeacherService, TeacherService>();
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IDiaryEntryService, DiaryEntryService>();
+builder.Services.AddScoped<IScheduleService, ScheduleService>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IMarkService, MarkService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
@@ -182,7 +186,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization(options => options.AddEduCorePolicies());
+builder.Services.AddAuthorization(options =>
+{
+    // Set a default policy that requires authentication but no specific role.
+    // This ensures `.RequireAuthorization()` calls without a policy name
+    // work correctly and don't trigger 403 responses.
+    options.DefaultPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
+        .RequireAuthenticatedUser()
+        .Build();
+    
+    options.AddEduCorePolicies();
+});
 
 const string FrontendCors = "frontend";
 builder.Services.AddCors(options =>
@@ -238,19 +252,33 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
+// Bring the database schema up to date on every start, in any environment, so a
+// fresh deployment is ready without a manual migration step.
+await using (var scope = app.Services.CreateAsyncScope())
+    await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+
 if (app.Environment.IsDevelopment())
 {
     app.Services.GetRequiredService<IMapper>().ConfigurationProvider.AssertConfigurationIsValid();
     app.MapOpenApi();
-
-    await using (var scope = app.Services.CreateAsyncScope())
-        await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
 }
 
 await PlatformOwnerSeeder.SeedAsync(app.Services, app.Configuration);
 
+// Honour the reverse proxy's scheme/IP headers so the app knows the real client
+// protocol when TLS is terminated upstream (nginx / a load balancer).
+var forwardedOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+};
+forwardedOptions.KnownNetworks.Clear();
+forwardedOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedOptions);
+
 app.UseExceptionHandler();
-if (!app.Environment.IsDevelopment())
+// Off by default: TLS is terminated at the edge (nginx / the platform). Set
+// ForceHttpsRedirect=true only when the API itself is the HTTPS endpoint.
+if (app.Configuration.GetValue<bool>("ForceHttpsRedirect"))
 {
     app.UseHttpsRedirection();
 
@@ -278,6 +306,7 @@ api.MapClassEndpoints();
 api.MapStudentEndpoints();
 api.MapTeacherEndpoints();
 api.MapLessonEndpoints();
+api.MapScheduleEndpoints();
 api.MapGuardianEndpoints();
 api.MapAccountTierEndpoints();
 api.MapStatisticsEndpoints();

@@ -87,11 +87,13 @@ public class StudentService(
                     gs.Guardian.User.FirstName,
                     gs.Guardian.User.LastName,
                     gs.Guardian.User.Email,
+                    gs.Guardian.NationalId,
                     gs.Guardian.PhoneNumber))
                 .ToList(),
             currentClass?.Id,
             currentClass?.Name,
             currentClass?.Grade,
+            currentClass?.HomeroomTeacherName,
             (await attendances.GetByStudentAsync(studentId, null, null, ct)).ToList(),
             (await marks.GetByStudentAsync(studentId, null, null, ct)).ToList());
     }

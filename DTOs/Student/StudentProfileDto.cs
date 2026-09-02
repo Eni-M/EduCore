@@ -18,5 +18,6 @@ public record StudentProfileDto(
     Guid? CurrentClassId,
     string? CurrentClassName,
     int? CurrentGrade,
+    string? CurrentHomeroomTeacherName,
     IReadOnlyList<AttendanceListDto> Attendances,
     IReadOnlyList<MarkListDto> Marks);

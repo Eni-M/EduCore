@@ -1,16 +1,50 @@
-﻿services:
+name: educore
+
+services:
   db:
     image: postgres:16-alpine
     container_name: EduCore-db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-EduCoreDB}
       POSTGRES_USER: ${POSTGRES_USER:-educore}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-educore123}
     ports:
-      - "5434:5432"
+      - "${DB_PORT:-5434}:5432"
     volumes:
       - educore_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-educore} -d ${POSTGRES_DB:-EduCoreDB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=${POSTGRES_DB:-EduCoreDB};Username=${POSTGRES_USER:-educore};Password=${POSTGRES_PASSWORD:-educore123}"
+      Jwt__Key: ${Jwt__Key:?set Jwt__Key in .env — at least 32 bytes, e.g. openssl rand -base64 32}
+      # First run only: creates the initial super administrator, then leave blank.
+      SuperAdmin__Email: ${SuperAdmin__Email:-}
+      SuperAdmin__Password: ${SuperAdmin__Password:-}
+      # Cookies are marked Secure only under HTTPS. Leave false for a plain-HTTP start;
+      # set true once TLS terminates in front of the web service.
+      Session__Secure: ${Session__Secure:-false}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../EduCoreFront
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - api
 
 volumes:
   educore_pg_data:
-

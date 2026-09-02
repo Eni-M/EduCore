@@ -5,5 +5,6 @@ public record GuardianCreateDto(
     string LastName,
     string Email,
     string Password,
+    string NationalId,
     string PhoneNumber,
     IReadOnlyList<Guid> StudentIds);

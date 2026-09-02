@@ -136,11 +136,42 @@ CREATE FUNCTION sd_guardian(school uuid, stu uuid, fn text, ln text, email text,
 RETURNS void LANGUAGE plpgsql AS $f$
 DECLARE gid uuid := gen_random_uuid();
 BEGIN
-  INSERT INTO "Guardians"("Id","UserId","PhoneNumber")
-  VALUES (gid, sd_user(fn, ln, email, 1), phone);
+  INSERT INTO "Guardians"("Id","UserId","NationalId","PhoneNumber")
+  VALUES (gid, sd_user(fn, ln, email, 1),
+          lpad((floor(random() * 1e10))::bigint::text, 10, '0'), phone);
 
   INSERT INTO "GuardianStudents"("Id","GuardianId","StudentId","SchoolId")
   VALUES (gen_random_uuid(), gid, stu, school);
+END $f$;
+
+-- Creates a shift with six standard 45-minute periods and returns its id.
+CREATE FUNCTION sd_shift(school uuid, nm text)
+RETURNS uuid LANGUAGE plpgsql AS $f$
+DECLARE id uuid := gen_random_uuid();
+BEGIN
+  INSERT INTO "SchoolShifts"("Id","SchoolId","Name","IsActive") VALUES (id, school, nm, true);
+  INSERT INTO "ShiftPeriods"("Id","SchoolId","SchoolShiftId","PeriodNumber","StartTime","EndTime") VALUES
+    (gen_random_uuid(), school, id, 1, TIME '08:00', TIME '08:45'),
+    (gen_random_uuid(), school, id, 2, TIME '08:50', TIME '09:35'),
+    (gen_random_uuid(), school, id, 3, TIME '09:45', TIME '10:30'),
+    (gen_random_uuid(), school, id, 4, TIME '10:40', TIME '11:25'),
+    (gen_random_uuid(), school, id, 5, TIME '11:30', TIME '12:15'),
+    (gen_random_uuid(), school, id, 6, TIME '12:20', TIME '13:05');
+  RETURN id;
+END $f$;
+
+-- Places one recurring lesson in a class's timetable. School, academic year and the shift
+-- period are derived from the class + period number (each school has a single seeded shift).
+CREATE FUNCTION sd_sched(cls uuid, subj uuid, tch uuid, period_no int, dow int)
+RETURNS void LANGUAGE plpgsql AS $f$
+DECLARE sch uuid; yr uuid; per uuid;
+BEGIN
+  SELECT "SchoolId","AcademicYearId" INTO sch, yr FROM "Classes" WHERE "Id" = cls;
+  SELECT "Id" INTO per FROM "ShiftPeriods"
+    WHERE "SchoolId" = sch AND "PeriodNumber" = period_no LIMIT 1;
+  INSERT INTO "ScheduleEntries"
+    ("Id","SchoolId","AcademicYearId","ClassId","SubjectId","TeacherId","ShiftPeriodId","DayOfWeek")
+  VALUES (gen_random_uuid(), sch, yr, cls, subj, tch, per, dow);
 END $f$;
 
 CREATE FUNCTION sd_fill_marks(
@@ -447,6 +478,53 @@ BEGIN
     PERFORM sd_fill_marks(enr, c_c10, c_y26, i);
   END LOOP;
 
+  -- Timetables ------------------------------------------------------------
+  -- One morning shift (6 periods) per active school, then a weekly plan for one
+  -- class in each. Cells are all distinct, so no class- or teacher-slot clashes.
+  PERFORM sd_shift(elem,   'Turni i paradites');
+  PERFORM sd_shift(junior, 'Turni i paradites');
+  PERFORM sd_shift(high,   'Turni i paradites');
+
+  -- Elementary 5A (all three subjects taught by e_t2). Guardian Shpresa follows a 5A pupil.
+  PERFORM sd_sched(e_c5, e_alb, e_t2, 1, 1); PERFORM sd_sched(e_c5, e_mat, e_t2, 2, 1);
+  PERFORM sd_sched(e_c5, e_nat, e_t2, 3, 1);
+  PERFORM sd_sched(e_c5, e_mat, e_t2, 1, 2); PERFORM sd_sched(e_c5, e_alb, e_t2, 2, 2);
+  PERFORM sd_sched(e_c5, e_nat, e_t2, 1, 3); PERFORM sd_sched(e_c5, e_mat, e_t2, 2, 3);
+  PERFORM sd_sched(e_c5, e_alb, e_t2, 1, 4); PERFORM sd_sched(e_c5, e_nat, e_t2, 2, 4);
+  PERFORM sd_sched(e_c5, e_mat, e_t2, 1, 5);
+
+  -- Junior 9A (Gjuhe Shqipe = j_t1, Matematike = j_t2).
+  PERFORM sd_sched(j_c9, j_alb, j_t1, 1, 1); PERFORM sd_sched(j_c9, j_mat, j_t2, 2, 1);
+  PERFORM sd_sched(j_c9, j_mat, j_t2, 1, 2); PERFORM sd_sched(j_c9, j_alb, j_t1, 2, 2);
+  PERFORM sd_sched(j_c9, j_alb, j_t1, 1, 3); PERFORM sd_sched(j_c9, j_mat, j_t2, 2, 3);
+  PERFORM sd_sched(j_c9, j_mat, j_t2, 1, 4);
+  PERFORM sd_sched(j_c9, j_alb, j_t1, 1, 5);
+
+  -- High 12A (Mat/Fiz = h_t1, Let/Eng = h_t2). Guardian Kujtim follows two 12A pupils.
+  PERFORM sd_sched(h_c12, h_mat, h_t1, 1, 1); PERFORM sd_sched(h_c12, h_let, h_t2, 2, 1);
+  PERFORM sd_sched(h_c12, h_fiz, h_t1, 3, 1); PERFORM sd_sched(h_c12, h_eng, h_t2, 4, 1);
+  PERFORM sd_sched(h_c12, h_fiz, h_t1, 1, 2); PERFORM sd_sched(h_c12, h_eng, h_t2, 2, 2);
+  PERFORM sd_sched(h_c12, h_mat, h_t1, 3, 2); PERFORM sd_sched(h_c12, h_let, h_t2, 4, 2);
+  PERFORM sd_sched(h_c12, h_let, h_t2, 1, 3); PERFORM sd_sched(h_c12, h_mat, h_t1, 2, 3);
+  PERFORM sd_sched(h_c12, h_eng, h_t2, 1, 4); PERFORM sd_sched(h_c12, h_fiz, h_t1, 2, 4);
+  PERFORM sd_sched(h_c12, h_mat, h_t1, 1, 5); PERFORM sd_sched(h_c12, h_let, h_t2, 2, 5);
+
+  -- Cross-school guardian: one national ID, children in two different schools.
+  DECLARE
+    gx  uuid := gen_random_uuid();
+    s1  uuid; sc1 uuid; s2 uuid; sc2 uuid;
+  BEGIN
+    SELECT "Id","SchoolId" INTO s1, sc1 FROM "Students" WHERE "PersonalNumber" = 'EL50002';
+    SELECT "Id","SchoolId" INTO s2, sc2 FROM "Students" WHERE "PersonalNumber" = 'HS11001';
+
+    INSERT INTO "Guardians"("Id","UserId","NationalId","PhoneNumber")
+    VALUES (gx, sd_user('Fatmir','Berisha','fatmir.berisha@educore.com',1), '1010101010', '+383 44 900 900');
+
+    INSERT INTO "GuardianStudents"("Id","GuardianId","StudentId","SchoolId") VALUES
+      (gen_random_uuid(), gx, s1, sc1),
+      (gen_random_uuid(), gx, s2, sc2);
+  END;
+
   FOR cst IN
     SELECT a."Id"
     FROM "ClassSubjectTeachers" a
@@ -482,6 +560,8 @@ BEGIN
   END LOOP;
 END $seed$;
 
+DROP FUNCTION sd_sched(uuid,uuid,uuid,int,int);
+DROP FUNCTION sd_shift(uuid,text);
 DROP FUNCTION sd_fill_marks(uuid,uuid,uuid,int,boolean,boolean,boolean);
 DROP FUNCTION sd_lesson(uuid,date,int,text,int);
 DROP FUNCTION sd_guardian(uuid,uuid,text,text,text,text);

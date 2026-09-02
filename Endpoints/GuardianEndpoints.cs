@@ -15,6 +15,11 @@ public static class GuardianEndpoints
         group.MapGet("/", async (IGuardianService service, CancellationToken ct) =>
             Results.Ok(await service.GetAllAsync(ct)));
 
+        group.MapGet("/search", async (string? query, IGuardianService service, CancellationToken ct) =>
+            string.IsNullOrWhiteSpace(query) || query.Trim().Length < 2
+                ? Results.Ok(Array.Empty<object>())
+                : Results.Ok(await service.SearchAsync(query, ct)));
+
         group.MapGet("/{guardianId:guid}", async (Guid guardianId, IGuardianService service, CancellationToken ct) =>
             Results.Ok(await service.GetByIdAsync(guardianId, ct)));
 

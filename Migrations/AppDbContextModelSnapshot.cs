@@ -414,6 +414,11 @@ namespace EduCore.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("NationalId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -429,6 +434,9 @@ namespace EduCore.Migrations
                         .HasColumnName("xmin");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("NationalId")
+                        .IsUnique();
 
                     b.HasIndex("UserId")
                         .IsUnique();
@@ -559,6 +567,60 @@ namespace EduCore.Migrations
                     b.ToTable("RegionalAdmins");
                 });
 
+            modelBuilder.Entity("EduCore.Models.ScheduleEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AcademicYearId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClassId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("DayOfWeek")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ShiftPeriodId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TeacherId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcademicYearId", "SchoolId");
+
+                    b.HasIndex("ClassId", "SchoolId");
+
+                    b.HasIndex("ShiftPeriodId", "SchoolId");
+
+                    b.HasIndex("SubjectId", "SchoolId");
+
+                    b.HasIndex("TeacherId", "SubjectId", "SchoolId");
+
+                    b.HasIndex("SchoolId", "AcademicYearId", "ClassId", "DayOfWeek", "ShiftPeriodId")
+                        .IsUnique();
+
+                    b.HasIndex("SchoolId", "AcademicYearId", "TeacherId", "DayOfWeek", "ShiftPeriodId")
+                        .IsUnique();
+
+                    b.ToTable("ScheduleEntries");
+                });
+
             modelBuilder.Entity("EduCore.Models.School", b =>
                 {
                     b.Property<Guid>("Id")
@@ -595,6 +657,74 @@ namespace EduCore.Migrations
                     b.HasIndex("ZoneId");
 
                     b.ToTable("Schools");
+                });
+
+            modelBuilder.Entity("EduCore.Models.SchoolShift", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchoolId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("SchoolShifts");
+                });
+
+            modelBuilder.Entity("EduCore.Models.ShiftPeriod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<int>("PeriodNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SchoolShiftId")
+                        .HasColumnType("uuid");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchoolShiftId", "PeriodNumber")
+                        .IsUnique();
+
+                    b.HasIndex("SchoolShiftId", "SchoolId");
+
+                    b.ToTable("ShiftPeriods");
                 });
 
             modelBuilder.Entity("EduCore.Models.State", b =>
@@ -1091,6 +1221,44 @@ namespace EduCore.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("EduCore.Models.ScheduleEntry", b =>
+                {
+                    b.HasOne("EduCore.Models.AcademicYear", null)
+                        .WithMany()
+                        .HasForeignKey("AcademicYearId", "SchoolId")
+                        .HasPrincipalKey("Id", "SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduCore.Models.Class", null)
+                        .WithMany()
+                        .HasForeignKey("ClassId", "SchoolId")
+                        .HasPrincipalKey("Id", "SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduCore.Models.ShiftPeriod", null)
+                        .WithMany()
+                        .HasForeignKey("ShiftPeriodId", "SchoolId")
+                        .HasPrincipalKey("Id", "SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduCore.Models.Subject", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectId", "SchoolId")
+                        .HasPrincipalKey("Id", "SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduCore.Models.TeacherSubject", null)
+                        .WithMany()
+                        .HasForeignKey("TeacherId", "SubjectId", "SchoolId")
+                        .HasPrincipalKey("TeacherId", "SubjectId", "SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("EduCore.Models.School", b =>
                 {
                     b.HasOne("EduCore.Models.City", "City")
@@ -1106,6 +1274,27 @@ namespace EduCore.Migrations
                     b.Navigation("City");
 
                     b.Navigation("Zone");
+                });
+
+            modelBuilder.Entity("EduCore.Models.SchoolShift", b =>
+                {
+                    b.HasOne("EduCore.Models.School", null)
+                        .WithMany()
+                        .HasForeignKey("SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EduCore.Models.ShiftPeriod", b =>
+                {
+                    b.HasOne("EduCore.Models.SchoolShift", "Shift")
+                        .WithMany("Periods")
+                        .HasForeignKey("SchoolShiftId", "SchoolId")
+                        .HasPrincipalKey("Id", "SchoolId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Shift");
                 });
 
             modelBuilder.Entity("EduCore.Models.StateAdmin", b =>
@@ -1214,6 +1403,11 @@ namespace EduCore.Migrations
             modelBuilder.Entity("EduCore.Models.Guardian", b =>
                 {
                     b.Navigation("Children");
+                });
+
+            modelBuilder.Entity("EduCore.Models.SchoolShift", b =>
+                {
+                    b.Navigation("Periods");
                 });
 
             modelBuilder.Entity("EduCore.Models.State", b =>

@@ -7,6 +7,7 @@ public record GuardianListDto(
     string FirstName,
     string LastName,
     string Email,
+    string NationalId,
     string PhoneNumber,
     IReadOnlyList<GuardianChildDto> Children,
     AccountDto? Account);

@@ -26,6 +26,31 @@ public static class PlatformOwnerSeeder
             .GetRequiredService<ILoggerFactory>()
             .CreateLogger(typeof(PlatformOwnerSeeder));
 
+        var stateName = configuration["SuperAdmin:StateName"] ?? DefaultStateName;
+
+        // A StateAdmin user with no StateAdmins row (the old SuperAdmin remapped by the
+        // RoleHierarchyAndGuardians migration, which created the table empty) gets no state_id claim
+        // at login, so every RequireStateId() path — /api/schools, /api/regional-admins, statistics —
+        // 403s with "This action can only be performed by a state administrator." Link it here so
+        // existing databases self-heal on the next start instead of needing a rebuild.
+        var adminUserIds = await db.Users
+            .Where(u => u.Role == UserRole.StateAdmin)
+            .Select(u => u.Id)
+            .ToListAsync();
+        var linkedUserIds = await db.StateAdmins.Select(sa => sa.UserId).ToListAsync();
+        var orphanIds = adminUserIds.Except(linkedUserIds).ToList();
+
+        if (orphanIds.Count > 0)
+        {
+            var healState = await GetOrAddStateAsync(db, stateName);
+            foreach (var userId in orphanIds)
+                await db.StateAdmins.AddAsync(new StateAdmin { UserId = userId, State = healState });
+            await db.SaveChangesAsync();
+            logger.LogInformation(
+                "Linked {Count} existing state administrator(s) with no profile row to {State}.",
+                orphanIds.Count, stateName);
+        }
+
         if (await db.Users.AnyAsync(u => u.Role == UserRole.StateAdmin && u.DeactivatedAt == null))
             return;
 
@@ -47,14 +72,7 @@ public static class PlatformOwnerSeeder
                 "contain a lowercase letter, an uppercase letter and a digit. " +
                 "This account owns every school on the platform.");
 
-        var stateName = configuration["SuperAdmin:StateName"] ?? DefaultStateName;
-
-        var state = await db.States.FirstOrDefaultAsync(s => s.Name == stateName);
-        if (state is null)
-        {
-            state = new State { Name = stateName };
-            await db.States.AddAsync(state);
-        }
+        var state = await GetOrAddStateAsync(db, stateName);
 
         var user = await users.BuildLoginAsync(
             "Super", "Admin", email, password, UserRole.StateAdmin, CancellationToken.None);
@@ -67,5 +85,17 @@ public static class PlatformOwnerSeeder
             "Created the initial state administrator ({Email}) for {State}. They must change this " +
             "password on first sign-in.",
             email, stateName);
+    }
+
+    private static async Task<State> GetOrAddStateAsync(AppDbContext db, string name)
+    {
+        var state = await db.States.FirstOrDefaultAsync(s => s.Name == name);
+        if (state is null)
+        {
+            state = new State { Name = name };
+            await db.States.AddAsync(state);
+        }
+
+        return state;
     }
 }

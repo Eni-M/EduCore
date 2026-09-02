@@ -4,6 +4,7 @@ public class Guardian
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
+    public string NationalId { get; set; } = null!;
     public string PhoneNumber { get; set; } = null!;
 
     public User User { get; set; } = null!;

@@ -30,7 +30,9 @@ public class StatisticsScopeResolver(
             filter.CityId,
             filter.ZoneId,
             filter.StateId,
-            currentUser.IsStateAdmin ? currentUser.RequireStateId() : null);
+            // The ministry (StateAdmin) sees every school nationwide; a StateId filter, when given,
+            // narrows to that state. Everyone else has no school-location-state scope of their own.
+            currentUser.IsStateAdmin ? filter.StateId : null);
     }
 
     private StatisticsFilter ApplyTierScope(StatisticsFilter filter) =>

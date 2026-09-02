@@ -28,7 +28,56 @@ public class GuardianService(
             gs.Guardian.User.FirstName,
             gs.Guardian.User.LastName,
             gs.Guardian.User.Email,
+            gs.Guardian.NationalId,
             gs.Guardian.PhoneNumber));
+    }
+
+    public async Task<IEnumerable<GuardianSearchResultDto>> SearchAsync(string query, CancellationToken ct)
+    {
+        // Directorate-only (enforced at endpoint). Search spans every school so a guardian
+        // already registered elsewhere is reused, not duplicated.
+        var matches = await guardians.SearchAsync(query, 20, ct);
+
+        return matches.Select(g => new GuardianSearchResultDto(
+            g.Id, g.User.FirstName, g.User.LastName, g.User.Email, g.NationalId, g.PhoneNumber));
+    }
+
+    public async Task LinkAsync(Guid studentId, Guid guardianId, CancellationToken ct)
+    {
+        var schoolId = currentUser.RequireSchoolId();
+
+        // School-scoped: returns null if the student is not in the caller's school.
+        _ = await students.GetByIdAsync(studentId, ct)
+            ?? throw new NotFoundException("Student", studentId);
+
+        _ = await guardians.GetGloballyAsync(guardianId, ct)
+            ?? throw new NotFoundException("Guardian", guardianId);
+
+        if (await guardians.LinkExistsAsync(guardianId, studentId, ct))
+            return;
+
+        await guardians.AddLinkAsync(new GuardianStudent
+        {
+            GuardianId = guardianId,
+            StudentId = studentId,
+            SchoolId = schoolId
+        });
+        await guardians.SaveChangesAsync(ct);
+    }
+
+    public async Task UnlinkAsync(Guid studentId, Guid guardianId, CancellationToken ct)
+    {
+        var schoolId = currentUser.RequireSchoolId();
+
+        _ = await students.GetByIdAsync(studentId, ct)
+            ?? throw new NotFoundException("Student", studentId);
+
+        var link = await guardians.GetLinkAsync(guardianId, studentId, ct);
+        if (link is null || link.SchoolId != schoolId)
+            return;
+
+        guardians.RemoveLink(link);
+        await guardians.SaveChangesAsync(ct);
     }
 
     public async Task<IEnumerable<GuardianListDto>> GetAllAsync(CancellationToken ct)
@@ -57,10 +106,20 @@ public class GuardianService(
         var studentIds = dto.StudentIds.Distinct().ToList();
         await EnsureStudentsInSchoolAsync(studentIds, ct);
 
+        var nationalId = dto.NationalId.Trim();
+        if (await guardians.NationalIdExistsAsync(nationalId, ct))
+            throw new ConflictException(
+                "A guardian with this national ID already exists. Search for them and add them to the student instead.");
+
         var user = await users.BuildLoginAsync(
             dto.FirstName, dto.LastName, dto.Email, dto.Password, UserRole.Guardian, ct);
 
-        var guardian = new Guardian { User = user, PhoneNumber = dto.PhoneNumber.Trim() };
+        var guardian = new Guardian
+        {
+            User = user,
+            NationalId = nationalId,
+            PhoneNumber = dto.PhoneNumber.Trim()
+        };
 
         foreach (var studentId in studentIds)
             guardian.Children.Add(new GuardianStudent { StudentId = studentId, SchoolId = schoolId });
@@ -153,6 +212,7 @@ public class GuardianService(
             guardian.User.FirstName,
             guardian.User.LastName,
             guardian.User.Email,
+            guardian.NationalId,
             guardian.PhoneNumber,
             guardian.Children
                 .Where(c => c.SchoolId == schoolId)

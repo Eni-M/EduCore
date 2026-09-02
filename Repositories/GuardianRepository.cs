@@ -38,6 +38,40 @@ public class GuardianRepository(AppDbContext context) : Repository<Guardian>(con
             .OrderBy(g => g.User.LastName).ThenBy(g => g.User.FirstName)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<Guardian>> SearchAsync(string query, int take, CancellationToken ct)
+    {
+        var term = query.Trim();
+
+        return await _context.Guardians
+            .AsNoTracking()
+            .Include(g => g.User)
+            .IgnoreQueryFilters()
+            .Where(g =>
+                EF.Functions.ILike(g.NationalId, $"%{term}%") ||
+                EF.Functions.ILike(g.User.FirstName + " " + g.User.LastName, $"%{term}%"))
+            .OrderBy(g => g.User.LastName).ThenBy(g => g.User.FirstName)
+            .Take(take)
+            .ToListAsync(ct);
+    }
+
+    public async Task<Guardian?> GetGloballyAsync(Guid guardianId, CancellationToken ct) =>
+        await _context.Guardians
+            .AsNoTracking()
+            .Include(g => g.User)
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(g => g.Id == guardianId, ct);
+
+    public async Task<bool> NationalIdExistsAsync(string nationalId, CancellationToken ct) =>
+        await _context.Guardians
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .AnyAsync(g => g.NationalId == nationalId, ct);
+
+    public async Task<GuardianStudent?> GetLinkAsync(Guid guardianId, Guid studentId, CancellationToken ct) =>
+        await _context.GuardianStudents
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(gs => gs.GuardianId == guardianId && gs.StudentId == studentId, ct);
+
     public async Task<IReadOnlyList<GuardianStudent>> GetContactsForStudentAsync(
         Guid studentId, CancellationToken ct) =>
         await _context.GuardianStudents
