@@ -44,7 +44,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     }
 
     private void ScopeToSchool<T>(ModelBuilder modelBuilder) where T : class, ISchoolScoped =>
-        modelBuilder.Entity<T>().HasQueryFilter(e => e.SchoolId == currentUser.SchoolId);
+        modelBuilder.Entity<T>().HasQueryFilter(e => currentUser.SchoolIds.Contains(e.SchoolId));
 
     private void ConfigureUsers(ModelBuilder modelBuilder)
     {

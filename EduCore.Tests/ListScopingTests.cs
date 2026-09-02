@@ -29,7 +29,8 @@ public class ListScopingTests
     {
         public Guid UserId => Guid.NewGuid();
         public UserRole? Role => role;
-        public Guid? SchoolId => SchoolId;
+        public Guid? SchoolId => ListScopingTests.SchoolId;
+        public IReadOnlyCollection<Guid> SchoolIds => [ListScopingTests.SchoolId];
         public Guid? TeacherId => role == UserRole.Teacher ? ListScopingTests.TeacherId : null;
         public Guid? StudentId => role == UserRole.Student ? ListScopingTests.StudentId : null;
         public Guid? CityId => null;

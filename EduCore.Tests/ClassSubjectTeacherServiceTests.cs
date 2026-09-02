@@ -23,6 +23,7 @@ public class ClassSubjectTeacherServiceTests
         public Guid UserId => Guid.NewGuid();
         public UserRole? Role => UserRole.Directorate;
         public Guid? SchoolId => ClassSubjectTeacherServiceTests.SchoolId;
+        public IReadOnlyCollection<Guid> SchoolIds => [ClassSubjectTeacherServiceTests.SchoolId];
         public Guid? TeacherId => null;
         public Guid? StudentId => null;
         public Guid? CityId => null;

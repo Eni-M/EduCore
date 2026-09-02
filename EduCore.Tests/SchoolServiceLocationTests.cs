@@ -19,6 +19,7 @@ public class SchoolServiceLocationTests
         public Guid UserId => Guid.NewGuid();
         public UserRole? Role => UserRole.RegionalAdmin;
         public Guid? SchoolId => null;
+        public IReadOnlyCollection<Guid> SchoolIds => [];
         public Guid? TeacherId => null;
         public Guid? StudentId => null;
         public Guid? CityId { get; init; }

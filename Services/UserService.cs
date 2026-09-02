@@ -15,14 +15,17 @@ using PasswordGenerator;
 namespace EduCore.Services;
 
 public record ProfileScope(
-    Guid? SchoolId,
+    IReadOnlyList<Guid> SchoolIds,
     Guid? TeacherId,
     Guid? StudentId,
     Guid? CityId,
     Guid? StateId,
     Guid? GuardianId)
 {
-    public static readonly ProfileScope Empty = new(null, null, null, null, null, null);
+    public static readonly ProfileScope Empty = new([], null, null, null, null, null);
+
+    /// <summary>The single school this profile is pinned to, or null when it spans zero or several.</summary>
+    public Guid? SchoolId => SchoolIds.Count == 1 ? SchoolIds[0] : null;
 }
 
 public class UserService(
@@ -212,14 +215,16 @@ public class UserService(
             if (target.Role is UserRole.RegionalAdmin)
                 throw new ForbiddenException("You are not allowed to manage this account.");
 
-            if (scope.SchoolId is not { } regionSchoolId)
-                throw new ForbiddenException("You are not allowed to manage this account.");
+            var callerCityId = currentUser.CityId;
 
-            var school = await schoolRepository.GetByIdAsync(regionSchoolId, ct);
-            if (school?.CityId is null || school.CityId != currentUser.CityId)
-                throw new ForbiddenException("You are not allowed to manage this account.");
+            foreach (var schoolId in scope.SchoolIds)
+            {
+                var school = await schoolRepository.GetByIdAsync(schoolId, ct);
+                if (school?.CityId is not null && school.CityId == callerCityId)
+                    return;
+            }
 
-            return;
+            throw new ForbiddenException("You are not allowed to manage this account.");
         }
 
         if (currentUser.IsDirectorate)
@@ -227,10 +232,10 @@ public class UserService(
             if (target.Role is UserRole.Directorate or UserRole.RegionalAdmin)
                 throw new ForbiddenException("You are not allowed to manage this account.");
 
-            if (scope.SchoolId is null || scope.SchoolId != currentUser.SchoolId)
-                throw new ForbiddenException("You are not allowed to manage this account.");
+            if (currentUser.SchoolId is { } callerSchoolId && scope.SchoolIds.Contains(callerSchoolId))
+                return;
 
-            return;
+            throw new ForbiddenException("You are not allowed to manage this account.");
         }
 
         throw new ForbiddenException("You are not allowed to manage this account.");
@@ -257,7 +262,9 @@ public class UserService(
                 claims.Add(new Claim(name, value.Value.ToString()));
         }
 
-        Add(ClaimNames.SchoolId, scope.SchoolId);
+        foreach (var schoolId in scope.SchoolIds)
+            claims.Add(new Claim(ClaimNames.SchoolId, schoolId.ToString()));
+
         Add(ClaimNames.TeacherId, scope.TeacherId);
         Add(ClaimNames.StudentId, scope.StudentId);
         Add(ClaimNames.CityId, scope.CityId);
@@ -281,6 +288,7 @@ public class UserService(
                 ExpiresAt: expiresAt,
                 UserId: user.Id,
                 SchoolId: scope.SchoolId,
+                SchoolIds: scope.SchoolIds,
                 TeacherId: scope.TeacherId,
                 StudentId: scope.StudentId,
                 CityId: scope.CityId,
@@ -300,19 +308,19 @@ public class UserService(
             case UserRole.Teacher:
             {
                 var teacher = await teacherRepository.GetByUserIdAsync(user.Id, ct);
-                return ProfileScope.Empty with { SchoolId = teacher?.SchoolId, TeacherId = teacher?.Id };
+                return ProfileScope.Empty with { SchoolIds = One(teacher?.SchoolId), TeacherId = teacher?.Id };
             }
 
             case UserRole.Student:
             {
                 var student = await studentRepository.GetByUserIdAsync(user.Id, ct);
-                return ProfileScope.Empty with { SchoolId = student?.SchoolId, StudentId = student?.Id };
+                return ProfileScope.Empty with { SchoolIds = One(student?.SchoolId), StudentId = student?.Id };
             }
 
             case UserRole.Directorate:
             {
                 var directorate = await directorateRepository.GetByUserIdAsync(user.Id, ct);
-                return ProfileScope.Empty with { SchoolId = directorate?.SchoolId };
+                return ProfileScope.Empty with { SchoolIds = One(directorate?.SchoolId) };
             }
 
             case UserRole.RegionalAdmin:
@@ -334,17 +342,19 @@ public class UserService(
                 if (guardian is null)
                     return ProfileScope.Empty;
 
-                var schools = guardian.Children.Select(c => c.SchoolId).Distinct().ToList();
-
+                // Every school the guardian has a child in — one school_id claim is emitted per id
+                // so the school scope filter admits all of them.
                 return ProfileScope.Empty with
                 {
                     GuardianId = guardian.Id,
-                    SchoolId = schools.Count == 1 ? schools[0] : null
+                    SchoolIds = guardian.Children.Select(c => c.SchoolId).Distinct().ToList()
                 };
             }
 
             default:
                 return ProfileScope.Empty;
         }
+
+        static IReadOnlyList<Guid> One(Guid? id) => id is { } value ? [value] : [];
     }
 }

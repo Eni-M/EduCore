@@ -4,6 +4,7 @@ public record AuthResponseDto(
     DateTime ExpiresAt,
     Guid UserId,
     Guid? SchoolId,
+    IReadOnlyList<Guid> SchoolIds,
     Guid? TeacherId,
     Guid? StudentId,
     Guid? CityId,

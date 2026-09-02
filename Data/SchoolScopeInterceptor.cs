@@ -1,3 +1,4 @@
+using System.Linq;
 using EduCore.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -33,17 +34,17 @@ public class SchoolScopeInterceptor(ICurrentUser currentUser) : SaveChangesInter
         if (currentUser.IsStateAdmin || currentUser.IsRegionalAdmin)
             return;
 
-        var schoolId = currentUser.SchoolId;
+        var schoolIds = currentUser.SchoolIds;
 
         foreach (var entry in context.ChangeTracker.Entries<ISchoolScoped>())
         {
             if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
                 continue;
 
-            if (entry.Entity.SchoolId != schoolId)
+            if (!schoolIds.Contains(entry.Entity.SchoolId))
                 throw new InvalidOperationException(
                     $"Cannot save {entry.Entity.GetType().Name} for school {entry.Entity.SchoolId} " +
-                    $"while acting for school {schoolId?.ToString() ?? "none"}.");
+                    $"while acting for school(s) {(schoolIds.Count == 0 ? "none" : string.Join(", ", schoolIds))}.");
         }
     }
 }

@@ -22,6 +22,7 @@ public class AccessGuardGuardianTests
         public Guid UserId => Guid.NewGuid();
         public UserRole? Role => UserRole.Guardian;
         public Guid? SchoolId => null;
+        public IReadOnlyCollection<Guid> SchoolIds => [];
         public Guid? TeacherId => null;
         public Guid? StudentId => null;
         public Guid? CityId => null;

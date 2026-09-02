@@ -22,6 +22,7 @@ public class EnrollmentServiceTests
         public Guid UserId => Guid.NewGuid();
         public UserRole? Role => UserRole.Directorate;
         public Guid? SchoolId => EnrollmentServiceTests.SchoolId;
+        public IReadOnlyCollection<Guid> SchoolIds => [EnrollmentServiceTests.SchoolId];
         public Guid? TeacherId => null;
         public Guid? StudentId => null;
         public Guid? CityId => null;

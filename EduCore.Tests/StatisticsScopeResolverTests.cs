@@ -21,6 +21,7 @@ public class StatisticsScopeResolverTests
         public Guid UserId => Guid.NewGuid();
         public UserRole? Role => role;
         public Guid? SchoolId => schoolId;
+        public IReadOnlyCollection<Guid> SchoolIds => schoolId is { } s ? [s] : [];
         public Guid? TeacherId => null;
         public Guid? StudentId => null;
         public Guid? CityId => cityId;

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Security.Claims;
 using EduCore.Enums;
 using EduCore.Exceptions;
@@ -15,7 +16,17 @@ public class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUse
     public UserRole? Role =>
         Enum.TryParse<UserRole>(Principal?.FindFirst(ClaimTypes.Role)?.Value, out var role) ? role : null;
 
-    public Guid? SchoolId => ReadGuid(ClaimNames.SchoolId);
+    public IReadOnlyCollection<Guid> SchoolIds =>
+        Principal?.FindAll(ClaimNames.SchoolId)
+            .Select(c => Guid.TryParse(c.Value, out var value) ? value : (Guid?)null)
+            .Where(v => v is not null)
+            .Select(v => v!.Value)
+            .Distinct()
+            .ToArray()
+        ?? [];
+
+    public Guid? SchoolId => SchoolIds.Count == 1 ? SchoolIds.First() : null;
+
     public Guid? TeacherId => ReadGuid(ClaimNames.TeacherId);
     public Guid? StudentId => ReadGuid(ClaimNames.StudentId);
     public Guid? CityId => ReadGuid(ClaimNames.CityId);
