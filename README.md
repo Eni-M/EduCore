@@ -16,7 +16,7 @@ From `EduCore/`:
 
 ```bash
 cp .env.example .env
-# edit .env: set Jwt__Key, POSTGRES_PASSWORD, and (first run only) SuperAdmin__Email / SuperAdmin__Password
+# edit .env: set Jwt__Key, Encryption__Key, POSTGRES_PASSWORD, and (first run only) SuperAdmin__Email / SuperAdmin__Password
 docker compose up -d --build
 ```
 
@@ -30,7 +30,7 @@ in `.env` and restart.
 
 ```bash
 docker compose up -d db     # Postgres only
-dotnet run                  # API — needs Jwt__Key and ConnectionStrings__Default in .env
+dotnet run                  # API — needs Jwt__Key, Encryption__Key and ConnectionStrings__Default in .env
 ```
 
 Run the front end from `../EduCoreFront` with `npm run dev`.

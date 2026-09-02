@@ -416,8 +416,8 @@ namespace EduCore.Migrations
 
                     b.Property<string>("NationalId")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
@@ -794,8 +794,8 @@ namespace EduCore.Migrations
 
                     b.Property<string>("PersonalNumber")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<Guid>("SchoolId")
                         .HasColumnType("uuid");

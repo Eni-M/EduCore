@@ -46,8 +46,11 @@ public class GuardianRepository(AppDbContext context) : Repository<Guardian>(con
             .AsNoTracking()
             .Include(g => g.User)
             .IgnoreQueryFilters()
+            // NationalId is encrypted at rest, so only an exact match is possible (a substring
+            // LIKE would run against ciphertext). The equality converter makes the exact match
+            // work; names still support partial search.
             .Where(g =>
-                EF.Functions.ILike(g.NationalId, $"%{term}%") ||
+                g.NationalId == term ||
                 EF.Functions.ILike(g.User.FirstName + " " + g.User.LastName, $"%{term}%"))
             .OrderBy(g => g.User.LastName).ThenBy(g => g.User.FirstName)
             .Take(take)

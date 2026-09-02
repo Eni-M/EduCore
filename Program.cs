@@ -14,6 +14,7 @@ using EduCore.Repositories.Interfaces;
 using EduCore.Repositories.Statistics;
 using EduCore.Repositories.Statistics.Interfaces;
 using EduCore.Security;
+using EduCore.Security.Encryption;
 using EduCore.Services;
 using EduCore.Services.Interfaces;
 using EduCore.Services.Statistics;
@@ -73,6 +74,20 @@ builder.Services.AddScoped<IMarkRepository, MarkRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+
+// Field-level encryption for national identifiers at rest. Requires a 32-byte key, supplied
+// out of band like Jwt:Key (never committed). Generate one with: openssl rand -base64 32
+var encryptionKey = builder.Configuration["Encryption:Key"];
+byte[] encryptionKeyBytes;
+try { encryptionKeyBytes = string.IsNullOrWhiteSpace(encryptionKey) ? [] : Convert.FromBase64String(encryptionKey); }
+catch (FormatException) { encryptionKeyBytes = []; }
+
+if (encryptionKeyBytes.Length != 32)
+    throw new InvalidOperationException(
+        "Encryption:Key must be a base64-encoded 32-byte key. Set Encryption__Key in .env " +
+        "(see .env.example) or as an environment variable. Generate one with: openssl rand -base64 32");
+
+builder.Services.AddSingleton<IFieldEncryptor>(new AesFieldEncryptor(encryptionKeyBytes));
 
 builder.Services.AddOptions<GradingOptions>()
     .Bind(builder.Configuration.GetSection(GradingOptions.SectionName))

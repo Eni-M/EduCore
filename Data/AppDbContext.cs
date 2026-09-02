@@ -1,10 +1,12 @@
 using EduCore.Models;
 using EduCore.Security;
+using EduCore.Security.Encryption;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace EduCore.Data;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser currentUser)
+public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser currentUser, IFieldEncryptor encryptor)
     : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
@@ -53,6 +55,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
 
     private void ConfigureUsers(ModelBuilder modelBuilder)
     {
+        // Encrypt national identifiers at rest. The conversion is deterministic, so the unique
+        // indexes on these columns and the equality lookups (PersonalNumberExists / NationalIdExists)
+        // keep working: EF applies the same converter to the compared value in a WHERE clause.
+        var encrypted = new ValueConverter<string, string>(
+            v => encryptor.Encrypt(v),
+            v => encryptor.Decrypt(v));
+
         modelBuilder.Entity<User>().HasIndex(u => u.Email).IsUnique();
         modelBuilder.Entity<User>().Property(u => u.FirstName).HasMaxLength(100);
         modelBuilder.Entity<User>().Property(u => u.LastName).HasMaxLength(100);
@@ -71,7 +80,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Student>().HasAlternateKey(s => new { s.Id, s.SchoolId });
         modelBuilder.Entity<Student>().HasIndex(s => s.PersonalNumber).IsUnique();
-        modelBuilder.Entity<Student>().Property(s => s.PersonalNumber).HasMaxLength(50);
+        modelBuilder.Entity<Student>().Property(s => s.PersonalNumber).HasMaxLength(256).HasConversion(encrypted);
         modelBuilder.Entity<Student>().Property<uint>("Version").IsRowVersion();
         ScopeToSchool<Student>(modelBuilder);
 
@@ -80,7 +89,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .HasForeignKey<Guardian>(g => g.UserId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Guardian>().HasIndex(g => g.UserId).IsUnique();
-        modelBuilder.Entity<Guardian>().Property(g => g.NationalId).HasMaxLength(50);
+        modelBuilder.Entity<Guardian>().Property(g => g.NationalId).HasMaxLength(256).HasConversion(encrypted);
         modelBuilder.Entity<Guardian>().HasIndex(g => g.NationalId).IsUnique();
         modelBuilder.Entity<Guardian>().Property(g => g.PhoneNumber).HasMaxLength(30);
         modelBuilder.Entity<Guardian>().Property<uint>("Version").IsRowVersion();
