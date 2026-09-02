@@ -12,16 +12,17 @@ docker exec EduCore-db psql -U educore -d postgres -c 'CREATE DATABASE "EduCoreD
 dotnet ef database update
 ```
 
-Start the API once so `SuperAdminSeeder` creates the first account (it needs
-`SuperAdmin__Email` and `SuperAdmin__Password` in `.env`), then:
+Start the API once so `PlatformOwnerSeeder` creates the first account — the top-tier
+**state administrator** and its state (default `Kosova`, override with `SuperAdmin__StateName`).
+It needs `SuperAdmin__Email` and `SuperAdmin__Password` in `.env`. Then:
 
 ```bash
 docker exec -i EduCore-db psql -U educore -d EduCoreDB -v ON_ERROR_STOP=1 < Data/Seeds/00-full-dataset.sql
 ```
 
-The script copies the SuperAdmin's password hash onto every account it creates, so all seeded
-users share that one password and no secret is written down in this repository. It needs a
-SuperAdmin to exist first for exactly that reason.
+The script copies the state administrator's password hash onto every account it creates, so all
+seeded users share that one password and no secret is written down in this repository. It needs
+that account to exist first for exactly that reason, and reuses the `Kosova` state it created.
 
 Not idempotent — running it twice violates the unique index on user email. It is for an empty
 database only.
@@ -33,6 +34,7 @@ one kind of record cannot look fine because no such record exists.
 
 | | |
 |---|---|
+| Account tiers | 1 state admin (seeded on start), 3 regional admins (Prishtina/Prizren/Peja), 4 directorates, 3 guardians |
 | Schools | 4 — one Elementary, one JuniorHigh, one HighSchool, and one **switched off** |
 | Academic years | 10, each with **exactly two** non-overlapping terms |
 | Students | 38 across 11 classes |

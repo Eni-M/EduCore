@@ -1,7 +1,7 @@
 BEGIN;
 
 CREATE TABLE sd_ctx(hash text, today date);
-INSERT INTO sd_ctx SELECT "PasswordHash", CURRENT_DATE FROM "Users" WHERE "Role" = 3 LIMIT 1;
+INSERT INTO sd_ctx SELECT "PasswordHash", CURRENT_DATE FROM "Users" WHERE "Role" = 5 LIMIT 1;
 
 CREATE FUNCTION sd_user(fn text, ln text, email text, role int, deactivated boolean DEFAULT false)
 RETURNS uuid LANGUAGE plpgsql AS $fn$
@@ -35,7 +35,7 @@ CREATE FUNCTION sd_teacher(school uuid, fn text, ln text, email text)
 RETURNS uuid LANGUAGE plpgsql AS $f$
 DECLARE id uuid := gen_random_uuid();
 BEGIN
-  INSERT INTO "Teachers"("Id","UserId","SchoolId") VALUES (id, sd_user(fn, ln, email, 1), school);
+  INSERT INTO "Teachers"("Id","UserId","SchoolId") VALUES (id, sd_user(fn, ln, email, 2), school);
   RETURN id;
 END $f$;
 
@@ -132,11 +132,15 @@ BEGIN
   RETURN id;
 END $f$;
 
-CREATE FUNCTION sd_parent(school uuid, stu uuid, nm text, phone text)
+CREATE FUNCTION sd_guardian(school uuid, stu uuid, fn text, ln text, email text, phone text)
 RETURNS void LANGUAGE plpgsql AS $f$
+DECLARE gid uuid := gen_random_uuid();
 BEGIN
-  INSERT INTO "Parents"("Id","StudentId","SchoolId","Name","PhoneNumber")
-  VALUES (gen_random_uuid(), stu, school, nm, phone);
+  INSERT INTO "Guardians"("Id","UserId","PhoneNumber")
+  VALUES (gid, sd_user(fn, ln, email, 1), phone);
+
+  INSERT INTO "GuardianStudents"("Id","GuardianId","StudentId","SchoolId")
+  VALUES (gen_random_uuid(), gid, stu, school);
 END $f$;
 
 CREATE FUNCTION sd_fill_marks(
@@ -186,7 +190,7 @@ DO $seed$
 DECLARE
   today        date := (SELECT today FROM sd_ctx);
 
-  kosova       uuid := gen_random_uuid();
+  kosova       uuid;
   shqiperia    uuid := gen_random_uuid();
   prishtina    uuid := gen_random_uuid();
   prizren      uuid := gen_random_uuid();
@@ -229,7 +233,15 @@ DECLARE
   d            date;
   cst          uuid;
 BEGIN
-  INSERT INTO "States"("Id","Name") VALUES (kosova,'Kosova'), (shqiperia,'Shqiperia');
+  -- The platform-owner seeder (app start) already created the state administrator
+  -- and their state (default 'Kosova'). Reuse it; only create it if absent.
+  SELECT "Id" INTO kosova FROM "States" WHERE "Name" = 'Kosova';
+  IF kosova IS NULL THEN
+    kosova := gen_random_uuid();
+    INSERT INTO "States"("Id","Name") VALUES (kosova,'Kosova');
+  END IF;
+  INSERT INTO "States"("Id","Name") VALUES (shqiperia,'Shqiperia');
+
   INSERT INTO "Cities"("Id","Name","StateId") VALUES
     (prishtina,'Prishtina',kosova), (prizren,'Prizren',kosova),
     (peja,'Peja',kosova), (tirana,'Tirana',shqiperia);
@@ -243,11 +255,17 @@ BEGIN
     (high,  'Gjimnazi Sami Frasheri',        2, prizren,   zone_qendra_prizren,   NULL),
     (closed,'Akademia e Vjeter',             2, peja,      zone_qendra_peja,      now() - interval '30 days');
 
-  INSERT INTO "Admins"("Id","UserId","SchoolId") VALUES
-    (gen_random_uuid(), sd_user('Arta','Krasniqi','admin.fillore@educore.com',2), elem),
-    (gen_random_uuid(), sd_user('Blerim','Gashi','admin.qemali@educore.com',2), junior),
-    (gen_random_uuid(), sd_user('Fisnik','Berisha','admin.gjimnazi@educore.com',2), high),
-    (gen_random_uuid(), sd_user('Lume','Hoxha','admin.akademia@educore.com',2), closed);
+  INSERT INTO "Directorates"("Id","UserId","SchoolId") VALUES
+    (gen_random_uuid(), sd_user('Arta','Krasniqi','admin.fillore@educore.com',3), elem),
+    (gen_random_uuid(), sd_user('Blerim','Gashi','admin.qemali@educore.com',3), junior),
+    (gen_random_uuid(), sd_user('Fisnik','Berisha','admin.gjimnazi@educore.com',3), high),
+    (gen_random_uuid(), sd_user('Lume','Hoxha','admin.akademia@educore.com',3), closed);
+
+  -- One regional administrator per active city (role 4).
+  INSERT INTO "RegionalAdmins"("Id","UserId","CityId") VALUES
+    (gen_random_uuid(), sd_user('Rina','Aliu','regional.prishtina@educore.com',4), prishtina),
+    (gen_random_uuid(), sd_user('Besart','Doni','regional.prizren@educore.com',4), prizren),
+    (gen_random_uuid(), sd_user('Leke','Nikci','regional.peja@educore.com',4), peja);
 
   e_y25 := sd_year(elem,'2024/2025', DATE '2024-09-01', DATE '2025-06-30');
   e_y26 := sd_year(elem,'2025/2026', DATE '2025-09-01', DATE '2026-06-30');
@@ -275,7 +293,9 @@ BEGIN
                       DATE '2015-04-10', 'EL5000'||i, i % 2, prishtina);
     enr := sd_enroll(elem, stu, e_c5, DATE '2025-09-01');
     PERFORM sd_fill_marks(enr, e_c5, e_y26, i);
-    IF i = 1 THEN PERFORM sd_parent(elem, stu,'Shpresa Pesta','+383 44 111 001'); END IF;
+    IF i = 1 THEN
+      PERFORM sd_guardian(elem, stu,'Shpresa','Pesta','shpresa.pesta@educore.com','+383 44 111 001');
+    END IF;
   END LOOP;
 
   stu := sd_student(elem,'Ardit','Pesta','e5.off@educore.com', DATE '2015-06-02','EL50099', 1, prishtina,
@@ -388,7 +408,10 @@ BEGIN
                       DATE '2008-09-19','HS12R0'||i, i % 2, prizren);
     enr := sd_enroll(high, stu, h_c12, DATE '2025-09-01');
     PERFORM sd_fill_marks(enr, h_c12, h_y26, i);
-    IF i <= 2 THEN PERFORM sd_parent(high, stu,'Kujtim Dymbedhjete','+383 44 222 00'||i); END IF;
+    IF i <= 2 THEN
+      PERFORM sd_guardian(high, stu,'Kujtim','Dymbedhjete',
+                          'kujtim.dymbedhjete'||i||'@educore.com','+383 44 222 00'||i);
+    END IF;
   END LOOP;
 
   stu := sd_student(high,'Gjysme','Dymbedhjete','h12.half@educore.com',
@@ -461,7 +484,7 @@ END $seed$;
 
 DROP FUNCTION sd_fill_marks(uuid,uuid,uuid,int,boolean,boolean,boolean);
 DROP FUNCTION sd_lesson(uuid,date,int,text,int);
-DROP FUNCTION sd_parent(uuid,uuid,text,text);
+DROP FUNCTION sd_guardian(uuid,uuid,text,text,text,text);
 DROP FUNCTION sd_mark(uuid,uuid,uuid,int,int);
 DROP FUNCTION sd_enroll(uuid,uuid,uuid,date,date,int);
 DROP FUNCTION sd_student(uuid,text,text,text,date,text,int,uuid,date,boolean);
