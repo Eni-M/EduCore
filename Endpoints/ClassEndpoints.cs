@@ -21,7 +21,7 @@ public static class ClassEndpoints
 
         group.MapGet("/{classId:guid}", async (Guid classId, IClassService service, CancellationToken ct) =>
                 Results.Ok(await service.GetByIdAsync(classId, ct)))
-            .RequireAuthorization(Policies.AnySchoolUser);
+            .RequireAuthorization(Policies.StudentReadable);
 
         group.MapPost("/", async (ClassCreateDto dto, IClassService service, CancellationToken ct) =>
             {
@@ -53,12 +53,12 @@ public static class ClassEndpoints
         group.MapGet("/{classId:guid}/subject-teachers",
                 async (Guid classId, bool? includeEnded, IClassSubjectTeacherService service, CancellationToken ct) =>
                     Results.Ok(await service.GetByClassAsync(classId, includeEnded ?? false, ct)))
-            .RequireAuthorization(Policies.AnySchoolUser);
+            .RequireAuthorization(Policies.StudentReadable);
 
         group.MapGet("/{classId:guid}/diary-entries",
                 async (Guid classId, DateOnly? from, DateOnly? to, IDiaryEntryService service, CancellationToken ct) =>
                     Results.Ok(await service.GetByClassAsync(classId, from, to, ct)))
-            .RequireAuthorization(Policies.AnySchoolUser);
+            .RequireAuthorization(Policies.StudentReadable);
 
         group.MapGet("/{classId:guid}/marks",
                 async (Guid classId, Guid? subjectId, Guid? gradingPeriodId, IMarkService service,

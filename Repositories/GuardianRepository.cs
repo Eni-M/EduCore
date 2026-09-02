@@ -11,6 +11,7 @@ public class GuardianRepository(AppDbContext context) : Repository<Guardian>(con
         await _context.Guardians
             .AsNoTracking()
             .Include(g => g.Children)
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(g => g.UserId == userId, ct);
 
     public async Task<Guardian?> GetWithChildrenAsync(Guid guardianId, CancellationToken ct) =>
