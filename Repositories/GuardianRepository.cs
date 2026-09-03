@@ -19,6 +19,7 @@ public class GuardianRepository(AppDbContext context) : Repository<Guardian>(con
             .AsNoTracking()
             .Include(g => g.User)
             .Include(g => g.Children).ThenInclude(c => c.Student).ThenInclude(s => s.User)
+            .Include(g => g.Children).ThenInclude(c => c.Student).ThenInclude(s => s.School)
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(g => g.Id == guardianId, ct);
 
@@ -33,6 +34,7 @@ public class GuardianRepository(AppDbContext context) : Repository<Guardian>(con
             .AsNoTracking()
             .Include(g => g.User)
             .Include(g => g.Children).ThenInclude(c => c.Student).ThenInclude(s => s.User)
+            .Include(g => g.Children).ThenInclude(c => c.Student).ThenInclude(s => s.School)
             .IgnoreQueryFilters()
             .Where(g => g.Children.Any(c => c.SchoolId == schoolId))
             .OrderBy(g => g.User.LastName).ThenBy(g => g.User.FirstName)

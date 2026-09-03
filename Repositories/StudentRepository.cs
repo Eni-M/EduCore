@@ -46,11 +46,16 @@ public class StudentRepository(AppDbContext context) : Repository<Student>(conte
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var term = $"%{search.Trim()}%";
+            var trimmed = search.Trim();
+            var term = $"%{trimmed}%";
+            // PersonalNumber is deterministically encrypted at rest, so only exact
+            // equality translates (substring ILike can't match ciphertext) — a full
+            // national ID matches, a partial one does not.
             query = query.Where(s =>
                 EF.Functions.ILike(s.User.FirstName, term)
                 || EF.Functions.ILike(s.User.LastName, term)
-                || EF.Functions.ILike(s.User.Email, term));
+                || EF.Functions.ILike(s.User.Email, term)
+                || s.PersonalNumber == trimmed);
         }
 
         var totalCount = await query.CountAsync(ct);

@@ -189,7 +189,9 @@ public class GuardianService(
                        ?? throw new NotFoundException("Guardian", guardianId);
 
         return guardian.Children
-            .Select(c => new GuardianChildDto(c.StudentId, c.Student.User.FirstName, c.Student.User.LastName))
+            .Select(c => new GuardianChildDto(
+                c.StudentId, c.Student.User.FirstName, c.Student.User.LastName,
+                c.Student.School.Name, c.Student.School.Type))
             .OrderBy(c => c.LastName).ThenBy(c => c.FirstName);
     }
 
@@ -217,7 +219,8 @@ public class GuardianService(
             guardian.Children
                 .Where(c => c.SchoolId == schoolId)
                 .Select(c => new GuardianChildDto(
-                    c.StudentId, c.Student.User.FirstName, c.Student.User.LastName))
+                    c.StudentId, c.Student.User.FirstName, c.Student.User.LastName,
+                    c.Student.School.Name, c.Student.School.Type))
                 .ToList(),
             new AccountDto(guardian.UserId, guardian.User.DeactivatedAt));
 }

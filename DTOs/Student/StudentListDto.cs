@@ -7,6 +7,7 @@ public record StudentListDto(
     string FirstName,
     string LastName,
     string Email,
+    string PersonalNumber,
     DateOnly DateOfBirth,
     bool IsGraduated,
     AccountDto? Account);

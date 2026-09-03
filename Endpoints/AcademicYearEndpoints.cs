@@ -11,9 +11,10 @@ public static class AcademicYearEndpoints
     {
         var group = api.MapGroup("/academic-years").WithTags("Academic years");
 
+        // Statistics' PeriodPicker (State/Regional admins, not just Directorate) reads this list.
         group.MapGet("/", async (Guid? schoolId, IAcademicYearService service, CancellationToken ct) =>
                 Results.Ok(await service.GetAllAsync(schoolId, ct)))
-            .RequireAuthorization(Policies.Directorate);
+            .RequireAuthorization(Policies.StatisticsViewer);
 
         group.MapGet("/{academicYearId:guid}",
                 async (Guid academicYearId, IAcademicYearService service, CancellationToken ct) =>

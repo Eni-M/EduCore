@@ -75,15 +75,27 @@ public class ScheduleRepository(AppDbContext context) : IScheduleRepository
         await Project(context.ScheduleEntries.AsNoTracking().Where(e => e.Id == entryId))
             .FirstOrDefaultAsync(ct);
 
-    public async Task<IReadOnlyList<ScheduleEntryDto>> GetEntriesByClassAsync(Guid classId, CancellationToken ct) =>
-        await Project(context.ScheduleEntries.AsNoTracking().Where(e => e.ClassId == classId))
-            .OrderBy(e => e.DayOfWeek).ThenBy(e => e.PeriodNumber)
+    public async Task<IReadOnlyList<ScheduleEntryDto>> GetEntriesByClassAsync(Guid classId, CancellationToken ct)
+    {
+        var entries = await Project(context.ScheduleEntries.AsNoTracking().Where(e => e.ClassId == classId))
             .ToListAsync(ct);
 
-    public async Task<IReadOnlyList<ScheduleEntryDto>> GetEntriesByTeacherAsync(Guid teacherId, CancellationToken ct) =>
-        await Project(context.ScheduleEntries.AsNoTracking().Where(e => e.TeacherId == teacherId))
-            .OrderBy(e => e.DayOfWeek).ThenBy(e => e.PeriodNumber)
+        return entries
+            .OrderBy(e => e.DayOfWeek)
+            .ThenBy(e => e.PeriodNumber)
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<ScheduleEntryDto>> GetEntriesByTeacherAsync(Guid teacherId, CancellationToken ct)
+    {
+        var entries = await Project(context.ScheduleEntries.AsNoTracking().Where(e => e.TeacherId == teacherId))
             .ToListAsync(ct);
+
+        return entries
+            .OrderBy(e => e.DayOfWeek)
+            .ThenBy(e => e.PeriodNumber)
+            .ToList();
+    }
 
     public async Task<ScheduleEntry?> GetEntryTrackedAsync(Guid entryId, CancellationToken ct) =>
         await context.ScheduleEntries.FirstOrDefaultAsync(e => e.Id == entryId, ct);
