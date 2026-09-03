@@ -10,8 +10,12 @@ public static class SubjectEndpoints
     {
         var group = api.MapGroup("/subjects").WithTags("Subjects");
 
-        group.MapGet("/", async (ISubjectService service, CancellationToken ct) =>
-                Results.Ok(await service.GetAllAsync(ct)))
+        group.MapGet("/", async (int? page, int? pageSize, string? search,
+                ISubjectService service, CancellationToken ct) =>
+                page is null && pageSize is null && string.IsNullOrWhiteSpace(search)
+                    ? Results.Ok(await service.GetAllAsync(ct))
+                    : Results.Ok(await service.GetPagedAsync(
+                    new Dtos.Pagination.PaginationQueryDto(page ?? 1, pageSize ?? 20), search, ct)))
             .RequireAuthorization(Policies.AnySchoolUser);
 
         group.MapGet("/{subjectId:guid}", async (Guid subjectId, ISubjectService service, CancellationToken ct) =>

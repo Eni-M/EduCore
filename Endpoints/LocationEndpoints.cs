@@ -36,8 +36,12 @@ public static class LocationEndpoints
 
         var cities = api.MapGroup("/cities").WithTags("Locations");
 
-        cities.MapGet("/", async (Guid? stateId, ILocationService service, CancellationToken ct) =>
-                Results.Ok(await service.GetCitiesAsync(stateId, ct)))
+        cities.MapGet("/", async (Guid? stateId, int? page, int? pageSize, string? search,
+                ILocationService service, CancellationToken ct) =>
+                page is null && pageSize is null && string.IsNullOrWhiteSpace(search)
+                    ? Results.Ok(await service.GetCitiesAsync(stateId, ct))
+                    : Results.Ok(await service.GetCitiesPagedAsync(
+                        stateId, new Dtos.Pagination.PaginationQueryDto(page ?? 1, pageSize ?? 20), search, ct)))
             .RequireAuthorization();
 
         cities.MapPost("/", async (CityWriteDto dto, ILocationService service, CancellationToken ct) =>

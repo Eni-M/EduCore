@@ -17,8 +17,12 @@ public static class SchoolEndpoints
 
         var managedSchools = schools.RequireAuthorization(Policies.RegionalOrState);
 
-        managedSchools.MapGet("/", async (bool? activeOnly, ISchoolService service, CancellationToken ct) =>
-            Results.Ok(await service.GetAllAsync(activeOnly ?? false, ct)));
+        managedSchools.MapGet("/", async (bool? activeOnly, int? page, int? pageSize, string? search,
+                ISchoolService service, CancellationToken ct) =>
+            page is null && pageSize is null && string.IsNullOrWhiteSpace(search)
+                ? Results.Ok(await service.GetAllAsync(activeOnly ?? false, ct))
+                : Results.Ok(await service.GetPagedAsync(
+                    activeOnly ?? false, new Dtos.Pagination.PaginationQueryDto(page ?? 1, pageSize ?? 20), search, ct)));
 
         managedSchools.MapGet("/{schoolId:guid}", async (Guid schoolId, ISchoolService service, CancellationToken ct) =>
             Results.Ok(await service.GetByIdAsync(schoolId, ct)));
@@ -51,8 +55,12 @@ public static class SchoolEndpoints
             .RequireAuthorization(Policies.RegionalAdmin)
             .WithTags("Directorates");
 
-        directorates.MapGet("/", async (IDirectorateService service, CancellationToken ct) =>
-            Results.Ok(await service.GetAllAsync(ct)));
+        directorates.MapGet("/", async (int? page, int? pageSize, string? search,
+                IDirectorateService service, CancellationToken ct) =>
+            page is null && pageSize is null && string.IsNullOrWhiteSpace(search)
+                ? Results.Ok(await service.GetAllAsync(ct))
+                : Results.Ok(await service.GetPagedAsync(
+                    new Dtos.Pagination.PaginationQueryDto(page ?? 1, pageSize ?? 20), search, ct)));
 
         directorates.MapGet("/{directorateId:guid}",
             async (Guid directorateId, IDirectorateService service, CancellationToken ct) =>

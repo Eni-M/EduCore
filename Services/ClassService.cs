@@ -6,6 +6,8 @@ using EduCore.Repositories.Interfaces;
 using EduCore.Security;
 using EduCore.Services.Assignment;
 using EduCore.Services.Interfaces;
+using EduCore.Dtos.Pagination;
+using EduCore.Helpers;
 
 namespace EduCore.Services;
 
@@ -30,6 +32,14 @@ public class ClassService(
         return academicYearId is null
             ? mine
             : mine.Where(c => c.AcademicYearId == academicYearId);
+    }
+
+    public async Task<PagedResultDto<ClassListDto>> GetPagedAsync(
+        Guid? academicYearId, PaginationQueryDto pagination, string? search, CancellationToken ct)
+    {
+        var all = await GetAllAsync(academicYearId, ct);
+        return all.Search(search, c => new[] { c.Name, c.AcademicYearName, c.HomeroomTeacherName })
+            .ToPagedResult(pagination);
     }
 
     public async Task<ClassListDto> GetByIdAsync(Guid classId, CancellationToken ct)

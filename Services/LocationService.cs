@@ -3,6 +3,8 @@ using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Services.Interfaces;
+using EduCore.Dtos.Pagination;
+using EduCore.Helpers;
 
 namespace EduCore.Services;
 
@@ -53,6 +55,13 @@ public class LocationService(ILocationRepository locations) : ILocationService
 
     public async Task<IEnumerable<CityListDto>> GetCitiesAsync(Guid? stateId, CancellationToken ct) =>
         await locations.GetCitiesAsync(stateId, ct);
+
+    public async Task<PagedResultDto<CityListDto>> GetCitiesPagedAsync(
+        Guid? stateId, PaginationQueryDto pagination, string? search, CancellationToken ct)
+    {
+        var all = await GetCitiesAsync(stateId, ct);
+        return all.Search(search, c => new[] { c.Name, c.StateName }).ToPagedResult(pagination);
+    }
 
     public async Task<CityListDto> CreateCityAsync(CityWriteDto dto, CancellationToken ct)
     {

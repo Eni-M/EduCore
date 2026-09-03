@@ -9,6 +9,8 @@ using EduCore.Security;
 using EduCore.Services.Assignment;
 using EduCore.Services.Interfaces;
 using Microsoft.Extensions.Options;
+using EduCore.Dtos.Pagination;
+using EduCore.Helpers;
 
 namespace EduCore.Services;
 
@@ -25,6 +27,15 @@ public class TeacherService(
 {
     public async Task<IEnumerable<TeacherListDto>> GetAllAsync(CancellationToken ct) =>
         WithVisibleAccounts(mapper.Map<IEnumerable<TeacherListDto>>(await teachers.GetAllWithUserAsync(ct)));
+
+    public async Task<PagedResultDto<TeacherListDto>> GetPagedAsync(
+        PaginationQueryDto pagination, string? search, CancellationToken ct)
+    {
+        var all = await GetAllAsync(ct);
+        return all.Search(search,
+                t => new[] { t.FirstName, t.LastName, t.Email, string.Join(" ", t.Subjects) })
+            .ToPagedResult(pagination);
+    }
 
     public async Task<TeacherDetailDto> GetByIdAsync(Guid teacherId, CancellationToken ct)
     {

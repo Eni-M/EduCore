@@ -7,6 +7,8 @@ using EduCore.Repositories.Interfaces;
 using EduCore.Security;
 using EduCore.Services.Assignment;
 using EduCore.Services.Interfaces;
+using EduCore.Dtos.Pagination;
+using EduCore.Helpers;
 
 namespace EduCore.Services;
 
@@ -32,6 +34,13 @@ public class SubjectService(
         return enrollment is null
             ? []
             : Distinct(await assignments.GetByClassAsync(enrollment.ClassId, false, ct));
+    }
+
+    public async Task<PagedResultDto<SubjectListDto>> GetPagedAsync(
+        PaginationQueryDto pagination, string? search, CancellationToken ct)
+    {
+        var all = await GetAllAsync(ct);
+        return all.Search(search, s => new[] { s.Name }).ToPagedResult(pagination);
     }
 
     private static IEnumerable<SubjectListDto> Distinct(

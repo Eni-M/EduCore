@@ -6,6 +6,8 @@ using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
 using EduCore.Services.Interfaces;
+using EduCore.Dtos.Pagination;
+using EduCore.Helpers;
 
 namespace EduCore.Services;
 
@@ -20,6 +22,14 @@ public class RegionalAdminService(
     public async Task<IEnumerable<RegionalAdminListDto>> GetAllAsync(CancellationToken ct) =>
         mapper.Map<IEnumerable<RegionalAdminListDto>>(
             await regionalAdmins.GetByStateAsync(currentUser.RequireStateId(), ct));
+
+    public async Task<PagedResultDto<RegionalAdminListDto>> GetPagedAsync(
+        PaginationQueryDto pagination, string? search, CancellationToken ct)
+    {
+        var all = await GetAllAsync(ct);
+        return all.Search(search, r => new[] { r.FirstName, r.LastName, r.Email, r.CityName, r.StateName })
+            .ToPagedResult(pagination);
+    }
 
     public async Task<RegionalAdminListDto> GetByIdAsync(Guid regionalAdminId, CancellationToken ct)
     {

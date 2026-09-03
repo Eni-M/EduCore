@@ -11,8 +11,12 @@ public static class ClassEndpoints
     {
         var group = api.MapGroup("/classes").WithTags("Classes");
 
-        group.MapGet("/", async (Guid? academicYearId, IClassService service, CancellationToken ct) =>
-                Results.Ok(await service.GetAllAsync(academicYearId, ct)))
+        group.MapGet("/", async (Guid? academicYearId, int? page, int? pageSize, string? search,
+                IClassService service, CancellationToken ct) =>
+                page is null && pageSize is null && string.IsNullOrWhiteSpace(search)
+                    ? Results.Ok(await service.GetAllAsync(academicYearId, ct))
+                    : Results.Ok(await service.GetPagedAsync(
+                        academicYearId, new Dtos.Pagination.PaginationQueryDto(page ?? 1, pageSize ?? 20), search, ct)))
             .RequireAuthorization(Policies.DirectorateOrTeacher);
 
         group.MapGet("/mine", async (IClassService service, CancellationToken ct) =>

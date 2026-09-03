@@ -5,6 +5,8 @@ using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
 using EduCore.Services.Interfaces;
+using EduCore.Dtos.Pagination;
+using EduCore.Helpers;
 
 namespace EduCore.Services;
 
@@ -25,6 +27,14 @@ public class SchoolService(
                 await schools.GetByStateAsync(currentUser.RequireStateId(), activeOnly, ct));
 
         return mapper.Map<IEnumerable<SchoolListDto>>(await schools.GetAllOrderedAsync(activeOnly, ct));
+    }
+
+    public async Task<PagedResultDto<SchoolListDto>> GetPagedAsync(
+        bool activeOnly, PaginationQueryDto pagination, string? search, CancellationToken ct)
+    {
+        var all = await GetAllAsync(activeOnly, ct);
+        return all.Search(search, s => new[] { s.Name, s.CityName, s.ZoneName, s.StateName })
+            .ToPagedResult(pagination);
     }
 
     public async Task<SchoolListDto> GetByIdAsync(Guid schoolId, CancellationToken ct)

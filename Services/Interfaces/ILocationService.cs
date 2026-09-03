@@ -1,4 +1,5 @@
 using EduCore.Dtos.Location;
+using EduCore.Dtos.Pagination;
 
 namespace EduCore.Services.Interfaces;
 
@@ -10,6 +11,8 @@ public interface ILocationService
     Task DeleteStateAsync(Guid stateId, CancellationToken ct);
 
     Task<IEnumerable<CityListDto>> GetCitiesAsync(Guid? stateId, CancellationToken ct);
+    Task<PagedResultDto<CityListDto>> GetCitiesPagedAsync(
+        Guid? stateId, PaginationQueryDto pagination, string? search, CancellationToken ct);
     Task<CityListDto> CreateCityAsync(CityWriteDto dto, CancellationToken ct);
     Task<CityListDto> UpdateCityAsync(Guid cityId, CityWriteDto dto, CancellationToken ct);
     Task DeleteCityAsync(Guid cityId, CancellationToken ct);
