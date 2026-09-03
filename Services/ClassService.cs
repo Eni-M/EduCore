@@ -15,6 +15,7 @@ public class ClassService(
     IAcademicYearRepository academicYears,
     IAccessGuard access,
     ITeacherRepository teachers,
+    IScheduleRepository schedule,
     IElementaryAssignmentSync elementarySync,
     ICurrentUser currentUser,
     IMapper mapper) : IClassService
@@ -56,6 +57,7 @@ public class ClassService(
         var school = await schools.GetByIdAsync(schoolId, ct)
                      ?? throw new NotFoundException("School", schoolId);
         GradeBands.Validate(school.Type, dto.Grade);
+        await EnsureShiftInSchoolAsync(dto.ShiftId, ct);
 
         var entity = mapper.Map<Class>(dto);
         entity.SchoolId = schoolId;
@@ -76,6 +78,7 @@ public class ClassService(
         var school = await schools.GetByIdAsync(entity.SchoolId, ct)
                      ?? throw new NotFoundException("School", entity.SchoolId);
         GradeBands.Validate(school.Type, dto.Grade);
+        await EnsureShiftInSchoolAsync(dto.ShiftId, ct);
 
         mapper.Map(dto, entity);
 
@@ -106,6 +109,15 @@ public class ClassService(
         await classes.SaveChangesAsync(ct);
 
         return await ReadAsync(classId, ct);
+    }
+
+    // A shift is looked up through the school-scoped filter, so this also rejects a
+    // shift that belongs to another school (the single-column FK would not).
+    private async Task EnsureShiftInSchoolAsync(Guid? shiftId, CancellationToken ct)
+    {
+        if (shiftId is null) return;
+        _ = await schedule.GetShiftAsync(shiftId.Value, ct)
+            ?? throw new NotFoundException("Shift", shiftId.Value);
     }
 
     private async Task<Class> GetOwnedAsync(Guid classId, CancellationToken ct) =>

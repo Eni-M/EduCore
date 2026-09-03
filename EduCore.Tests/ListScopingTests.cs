@@ -45,7 +45,7 @@ public class ListScopingTests
     }
 
     private static ClassListDto Class(Guid id, string name) =>
-        new(id, name, 10, SchoolId, "School", YearId, "2025/2026", null, null, 30);
+        new(id, name, 10, SchoolId, "School", YearId, "2025/2026", null, null, 30, null, null);
 
     private sealed class FakeClassRepository : IClassRepository
     {
@@ -185,7 +185,7 @@ public class ListScopingTests
     public async Task Admin_listing_classes_sees_the_whole_school()
     {
         var service = new ClassService(
-            new FakeClassRepository(), null!, null!, null!, null!, new NoopElementarySync(),
+            new FakeClassRepository(), null!, null!, null!, null!, null!, new NoopElementarySync(),
             new FakeCurrentUser(UserRole.Directorate), Mapper());
 
         var result = await service.GetAllAsync(null, CancellationToken.None);
@@ -197,7 +197,7 @@ public class ListScopingTests
     public async Task Teacher_listing_classes_sees_only_their_own()
     {
         var service = new ClassService(
-            new FakeClassRepository(), null!, null!, null!, null!, new NoopElementarySync(),
+            new FakeClassRepository(), null!, null!, null!, null!, null!, new NoopElementarySync(),
             new FakeCurrentUser(UserRole.Teacher), Mapper());
 
         var result = await service.GetAllAsync(null, CancellationToken.None);
@@ -209,7 +209,7 @@ public class ListScopingTests
     public async Task Teacher_listing_classes_still_honours_the_year_filter()
     {
         var service = new ClassService(
-            new FakeClassRepository(), null!, null!, null!, null!, new NoopElementarySync(),
+            new FakeClassRepository(), null!, null!, null!, null!, null!, new NoopElementarySync(),
             new FakeCurrentUser(UserRole.Teacher), Mapper());
 
         Assert.Empty(await service.GetAllAsync(Guid.NewGuid(), CancellationToken.None));

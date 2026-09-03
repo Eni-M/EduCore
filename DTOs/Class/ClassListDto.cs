@@ -10,4 +10,6 @@ public record ClassListDto(
     string AcademicYearName,
     Guid? HomeroomTeacherId,
     string? HomeroomTeacherName,
-    int? Capacity);
+    int? Capacity,
+    Guid? ShiftId,
+    string? ShiftName);

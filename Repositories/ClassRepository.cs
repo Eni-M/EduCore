@@ -16,6 +16,8 @@ public class ClassRepository(AppDbContext context) : Repository<Class>(context),
         from t in teacherMatch.DefaultIfEmpty()
         join u in _context.Users on t.UserId equals u.Id into userMatch
         from u in userMatch.DefaultIfEmpty()
+        join sh in _context.SchoolShifts on c.ShiftId equals (Guid?)sh.Id into shiftMatch
+        from sh in shiftMatch.DefaultIfEmpty()
         select new ClassListDto(
             c.Id,
             c.Name,
@@ -26,7 +28,9 @@ public class ClassRepository(AppDbContext context) : Repository<Class>(context),
             y.Name,
             c.HomeroomTeacherId,
             u == null ? null : u.FirstName + " " + u.LastName,
-            c.Capacity);
+            c.Capacity,
+            c.ShiftId,
+            sh == null ? null : sh.Name);
 
     public async Task<IEnumerable<ClassListDto>> GetAllAsync(Guid? academicYearId, CancellationToken ct)
     {

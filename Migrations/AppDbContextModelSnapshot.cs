@@ -248,6 +248,9 @@ namespace EduCore.Migrations
                     b.Property<Guid>("SchoolId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ShiftId")
+                        .HasColumnType("uuid");
+
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -257,6 +260,8 @@ namespace EduCore.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("HomeroomTeacherId");
+
+                    b.HasIndex("ShiftId");
 
                     b.HasIndex("AcademicYearId", "SchoolId");
 
@@ -1340,12 +1345,19 @@ namespace EduCore.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("EduCore.Models.SchoolShift", "Shift")
+                        .WithMany()
+                        .HasForeignKey("ShiftId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("EduCore.Models.AcademicYear", null)
                         .WithMany()
                         .HasForeignKey("AcademicYearId", "SchoolId")
                         .HasPrincipalKey("Id", "SchoolId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Shift");
                 });
 
             modelBuilder.Entity("EduCore.Models.ClassSubjectTeacher", b =>

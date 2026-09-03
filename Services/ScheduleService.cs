@@ -135,6 +135,12 @@ public class ScheduleService(
         var period = await schedule.GetPeriodAsync(dto.ShiftPeriodId, ct)
                      ?? throw new NotFoundException("Period", dto.ShiftPeriodId);
 
+        // A class runs in one shift; its lessons must sit in that shift's periods.
+        if (cls.ShiftId is not null && period.SchoolShiftId != cls.ShiftId)
+            throw new BusinessException(
+                "That period belongs to a different shift than this class. " +
+                "Use a period from the class's own shift.");
+
         // The active assignment is the single source of truth for who teaches this subject here.
         var assignment = await assignments.GetActiveAsync(dto.ClassId, dto.SubjectId, ct)
             ?? throw new BusinessException(

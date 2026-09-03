@@ -81,7 +81,7 @@ public class CalendarServiceTests
     {
         public Task<IEnumerable<ClassListDto>> GetByTeacherAsync(Guid teacherId, CancellationToken ct) =>
             Task.FromResult<IEnumerable<ClassListDto>>(
-                taught.Select(id => new ClassListDto(id, "C", 1, SchoolId, "S", Guid.NewGuid(), "Y", null, null, null)));
+                taught.Select(id => new ClassListDto(id, "C", 1, SchoolId, "S", Guid.NewGuid(), "Y", null, null, null, null, null)));
         public Task<Class?> GetByIdAsync(Guid id, CancellationToken ct) =>
             Task.FromResult<Class?>(new Class { Id = id, SchoolId = SchoolId });
         public Task<IEnumerable<ClassListDto>> GetAllAsync(Guid? academicYearId, CancellationToken ct) =>

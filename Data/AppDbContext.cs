@@ -247,6 +247,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .HasOne<Teacher>().WithMany()
             .HasForeignKey(c => c.HomeroomTeacherId)
             .OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<Class>()
+            .HasOne(c => c.Shift).WithMany()
+            .HasForeignKey(c => c.ShiftId)
+            .OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<Class>().HasAlternateKey(c => new { c.Id, c.SchoolId });
         modelBuilder.Entity<Class>().HasAlternateKey(c => new { c.Id, c.AcademicYearId });
         modelBuilder.Entity<Class>().HasIndex(c => new { c.SchoolId, c.AcademicYearId, c.Name }).IsUnique();
