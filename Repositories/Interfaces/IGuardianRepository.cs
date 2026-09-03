@@ -7,7 +7,8 @@ public interface IGuardianRepository : IRepository<Guardian>
     Task<Guardian?> GetByUserIdAsync(Guid userId, CancellationToken ct);
     Task<Guardian?> GetWithChildrenAsync(Guid guardianId, CancellationToken ct);
     Task<Guardian?> GetTrackedWithChildrenAsync(Guid guardianId, CancellationToken ct);
-    Task<IEnumerable<Guardian>> GetBySchoolAsync(Guid schoolId, CancellationToken ct);
+    Task<(IReadOnlyList<Guardian> Items, int TotalCount)> GetPagedBySchoolAsync(
+        Guid schoolId, EduCore.Dtos.Pagination.PaginationQueryDto pagination, string? search, CancellationToken ct);
     Task<IReadOnlyList<Guardian>> SearchAsync(string query, int take, CancellationToken ct);
     Task<Guardian?> GetGloballyAsync(Guid guardianId, CancellationToken ct);
     Task<bool> NationalIdExistsAsync(string nationalId, CancellationToken ct);

@@ -1,5 +1,6 @@
 using EduCore.Dtos.Account;
 using EduCore.Dtos.Guardian;
+using EduCore.Dtos.Pagination;
 using EduCore.Enums;
 using EduCore.Exceptions;
 using EduCore.Models;
@@ -80,11 +81,21 @@ public class GuardianService(
         await guardians.SaveChangesAsync(ct);
     }
 
-    public async Task<IEnumerable<GuardianListDto>> GetAllAsync(CancellationToken ct)
+    public async Task<PagedResultDto<GuardianListDto>> GetPagedAsync(
+        PaginationQueryDto pagination, string? search, CancellationToken ct)
     {
         var schoolId = currentUser.RequireSchoolId();
-        var rows = await guardians.GetBySchoolAsync(schoolId, ct);
-        return rows.Select(g => ToListDto(g, schoolId));
+        var page = Math.Max(1, pagination.Page);
+        var pageSize = Math.Clamp(pagination.PageSize, 1, 100);
+
+        var (items, totalCount) = await guardians.GetPagedBySchoolAsync(
+            schoolId, new PaginationQueryDto(page, pageSize), search, ct);
+
+        return new PagedResultDto<GuardianListDto>(
+            items.Select(g => ToListDto(g, schoolId)).ToList(),
+            page,
+            pageSize,
+            totalCount);
     }
 
     public async Task<GuardianListDto> GetByIdAsync(Guid guardianId, CancellationToken ct)

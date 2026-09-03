@@ -106,8 +106,9 @@ public class AccessGuardMedicalTests
         public Task<Guardian?> GetByUserIdAsync(Guid userId, CancellationToken ct) => Task.FromResult<Guardian?>(null);
         public Task<Guardian?> GetWithChildrenAsync(Guid guardianId, CancellationToken ct) => Task.FromResult<Guardian?>(null);
         public Task<Guardian?> GetTrackedWithChildrenAsync(Guid guardianId, CancellationToken ct) => Task.FromResult<Guardian?>(null);
-        public Task<IEnumerable<Guardian>> GetBySchoolAsync(Guid schoolId, CancellationToken ct) =>
-            Task.FromResult<IEnumerable<Guardian>>([]);
+        public Task<(IReadOnlyList<Guardian> Items, int TotalCount)> GetPagedBySchoolAsync(
+            Guid schoolId, EduCore.Dtos.Pagination.PaginationQueryDto pagination, string? search, CancellationToken ct) =>
+            Task.FromResult<(IReadOnlyList<Guardian>, int)>((new List<Guardian>(), 0));
         public Task<IReadOnlyList<Guardian>> SearchAsync(string query, int take, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<Guardian>>([]);
         public Task<Guardian?> GetGloballyAsync(Guid guardianId, CancellationToken ct) => Task.FromResult<Guardian?>(null);

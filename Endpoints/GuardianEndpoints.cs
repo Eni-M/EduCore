@@ -12,8 +12,10 @@ public static class GuardianEndpoints
             .RequireAuthorization(Policies.Directorate)
             .WithTags("Guardians");
 
-        group.MapGet("/", async (IGuardianService service, CancellationToken ct) =>
-            Results.Ok(await service.GetAllAsync(ct)));
+        group.MapGet("/", async (int? page, int? pageSize, string? search,
+                IGuardianService service, CancellationToken ct) =>
+            Results.Ok(await service.GetPagedAsync(
+                new Dtos.Pagination.PaginationQueryDto(page ?? 1, pageSize ?? 20), search, ct)));
 
         group.MapGet("/search", async (string? query, IGuardianService service, CancellationToken ct) =>
             string.IsNullOrWhiteSpace(query) || query.Trim().Length < 2
