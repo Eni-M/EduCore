@@ -33,8 +33,8 @@ namespace EduCore.Migrations
                 "TO \"FK_Directorates_Users_UserId\";");
 
             // The contact-only Parent record is replaced by the Guardian login entity + GuardianStudent
-            // join. Existing Parent rows carry no login and cannot be migrated automatically; reseed
-            // guardian data (Data/Seeds/00-full-dataset.sql) or recreate guardians via /api/guardians.
+            // join. Existing Parent rows carry no login and cannot be migrated automatically; recreate
+            // guardians via /api/guardians or the app's account-management flow.
             migrationBuilder.DropTable(
                 name: "Parents");
 

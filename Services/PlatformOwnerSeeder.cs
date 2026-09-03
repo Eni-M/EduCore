@@ -28,11 +28,6 @@ public static class PlatformOwnerSeeder
 
         var stateName = configuration["SuperAdmin:StateName"] ?? DefaultStateName;
 
-        // A StateAdmin user with no StateAdmins row (the old SuperAdmin remapped by the
-        // RoleHierarchyAndGuardians migration, which created the table empty) gets no state_id claim
-        // at login, so every RequireStateId() path — /api/schools, /api/regional-admins, statistics —
-        // 403s with "This action can only be performed by a state administrator." Link it here so
-        // existing databases self-heal on the next start instead of needing a rebuild.
         var adminUserIds = await db.Users
             .Where(u => u.Role == UserRole.StateAdmin)
             .Select(u => u.Id)
@@ -73,6 +68,26 @@ public static class PlatformOwnerSeeder
                 "This account owns every school on the platform.");
 
         var state = await GetOrAddStateAsync(db, stateName);
+        var existingUser = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
+
+        if (existingUser is not null)
+        {
+            if (existingUser.Role != UserRole.StateAdmin)
+                existingUser.Role = UserRole.StateAdmin;
+
+            if (existingUser.DeactivatedAt is not null)
+                existingUser.DeactivatedAt = null;
+
+            if (!await db.StateAdmins.AnyAsync(sa => sa.UserId == existingUser.Id))
+                await db.StateAdmins.AddAsync(new StateAdmin { UserId = existingUser.Id, State = state });
+
+            await db.SaveChangesAsync();
+
+            logger.LogInformation(
+                "The configured platform owner email already exists; reusing user {UserId} as the state administrator for {State}.",
+                existingUser.Id, stateName);
+            return;
+        }
 
         var user = await users.BuildLoginAsync(
             "Super", "Admin", email, password, UserRole.StateAdmin, CancellationToken.None);

@@ -43,8 +43,12 @@ builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<AuditSaveChangesInterceptor>();
 builder.Services.AddScoped<SchoolScopeInterceptor>();
 
+var defaultConnectionString = builder.Configuration.GetConnectionString("Default")
+    ?? builder.Configuration["DATABASE_URL"]
+    ?? builder.Configuration["ConnectionStrings:Default"];
+
 builder.Services.AddDbContext<AppDbContext>((sp, options) =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("Default"))
+    options.UseNpgsql(defaultConnectionString)
         .AddInterceptors(
             sp.GetRequiredService<AuditSaveChangesInterceptor>(),
             sp.GetRequiredService<SchoolScopeInterceptor>()));
@@ -324,6 +328,8 @@ app.UseAuthentication();
 // Rate limiter middleware — run after authentication so per-user limits can be applied
 app.UseRateLimiter();
 app.UseAuthorization();
+
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 
 app.MapAuthEndpoints();
 
