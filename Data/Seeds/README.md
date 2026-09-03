@@ -34,12 +34,13 @@ one kind of record cannot look fine because no such record exists.
 
 | | |
 |---|---|
-| Account tiers | 1 state admin (seeded on start), 3 regional admins (Prishtina/Prizren/Peja), 4 directorates, 3 guardians |
+| Account tiers | 1 state admin (seeded on start), 3 regional admins (Prishtina/Prizren/Peja), 4 directorates, 4 guardians (one across two schools) |
 | Schools | 4 — one Elementary, one JuniorHigh, one HighSchool, and one **switched off** |
 | Academic years | 10, each with **exactly two** non-overlapping terms |
 | Students | 38 across 11 classes |
 | Marks | 195, spanning fails, at-risk grades and passes |
 | Lessons / attendance | 142 / 598, all inside their own year and never in the future |
+| Timetables | 3 morning shifts (6 periods each) and 32 schedule entries across three classes (5A, 9A, 12A) |
 
 **Academic year selection.** `AcademicYearPicker` has three cases and the data covers the two
 that can occur with a started year: Shkolla Ismail Qemali's current year *contains today*,
@@ -58,4 +59,5 @@ graduate. The data holds, deliberately:
 - enrollments closed as Graduated, TransferredOut and Withdrawn
 
 **Edge cases.** One deactivated sign-in, one student with no gender recorded, one with no city
-recorded, three students with guardians, and one school with `DeactivatedAt` set.
+recorded, five students with guardians (one guardian shared across two schools by national ID),
+and one school with `DeactivatedAt` set.
