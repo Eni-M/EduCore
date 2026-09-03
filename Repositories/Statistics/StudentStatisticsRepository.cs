@@ -19,6 +19,9 @@ public class StudentStatisticsRepository(AppDbContext context)
         if (ctx.CountryId is not null)
             students = students.Where(s => s.CountryId == ctx.CountryId);
 
+        if (ctx.OriginCityId is not null)
+            students = students.Where(s => s.OriginCityId == ctx.OriginCityId);
+
         if (ctx.ClassId is null && ctx.Grade is null && ctx.AcademicYearId is null)
             return students;
 

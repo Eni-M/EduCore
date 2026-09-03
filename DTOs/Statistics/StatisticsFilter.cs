@@ -9,6 +9,7 @@ public record StatisticsFilter
     public Guid? StateId { get; init; }
     // Student origin (where the family comes from) — separate from the school's location.
     public Guid? CountryId { get; init; }
+    public Guid? OriginCityId { get; init; }
 
     public Guid? AcademicYearId { get; init; }
     public Guid? GradingPeriodId { get; init; }

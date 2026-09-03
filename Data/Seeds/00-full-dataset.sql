@@ -1,7 +1,10 @@
 BEGIN;
 
 CREATE TABLE sd_ctx(hash text, today date);
-INSERT INTO sd_ctx SELECT "PasswordHash", CURRENT_DATE FROM "Users" WHERE "Role" = 5 LIMIT 1;
+-- Every seeded user signs in with "SuperAdmin1234!" (PBKDF2 hash below), MustChangePassword=false.
+INSERT INTO sd_ctx VALUES (
+  'AQAAAAIAAYagAAAAENdg6qZ9/rUL1UtC83XI5TVx3cg1afWv+7Sv4NTxId3Jf3HM+9lq1S5OQs3wLTXxiA==',
+  CURRENT_DATE);
 
 CREATE FUNCTION sd_user(fn text, ln text, email text, role int, deactivated boolean DEFAULT false)
 RETURNS uuid LANGUAGE plpgsql AS $fn$
@@ -578,6 +581,13 @@ DROP FUNCTION sd_subject(uuid,text);
 DROP FUNCTION sd_teacher(uuid,text,text,text);
 DROP FUNCTION sd_year(uuid,text,date,date);
 DROP FUNCTION sd_user(text,text,text,int,boolean);
+
+-- The platform owner (StateAdmin, role 5) was seeded before this script ran; give
+-- it the same "SuperAdmin1234!" password so every account uses one credential.
+UPDATE "Users"
+SET "PasswordHash" = (SELECT hash FROM sd_ctx), "MustChangePassword" = false
+WHERE "Role" = 5;
+
 DROP TABLE sd_ctx;
 
 COMMIT;

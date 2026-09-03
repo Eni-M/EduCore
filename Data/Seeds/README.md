@@ -20,9 +20,10 @@ It needs `SuperAdmin__Email` and `SuperAdmin__Password` in `.env`. Then:
 docker exec -i EduCore-db psql -U educore -d EduCoreDB -v ON_ERROR_STOP=1 < Data/Seeds/00-full-dataset.sql
 ```
 
-The script copies the state administrator's password hash onto every account it creates, so all
-seeded users share that one password and no secret is written down in this repository. It needs
-that account to exist first for exactly that reason, and reuses the `Kosova` state it created.
+Every seeded account (and the state administrator) signs in with **`SuperAdmin1234!`** and has
+`MustChangePassword=false`. The script writes a fixed PBKDF2 hash of that password, so the dev
+login is known and identical everywhere. It still reuses the `Kosova` state the platform owner
+created, so start the API once first.
 
 Not idempotent — running it twice violates the unique index on user email. It is for an empty
 database only.
