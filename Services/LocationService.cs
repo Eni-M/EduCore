@@ -156,4 +156,102 @@ public class LocationService(ILocationRepository locations) : ILocationService
         locations.RemoveZone(zone);
         await locations.SaveChangesAsync(ct);
     }
+
+    // --- Student origin: countries and their cities ---
+
+    public async Task<IEnumerable<CountryListDto>> GetCountriesAsync(CancellationToken ct) =>
+        await locations.GetCountriesAsync(ct);
+
+    public async Task<CountryListDto> CreateCountryAsync(CountryWriteDto dto, CancellationToken ct)
+    {
+        if (await locations.CountryNameExistsAsync(dto.Name, null, ct))
+            throw new ConflictException($"A country named {dto.Name} already exists.");
+
+        var country = new Country { Name = dto.Name.Trim() };
+
+        await locations.AddCountryAsync(country);
+        await locations.SaveChangesAsync(ct);
+
+        return new CountryListDto(country.Id, country.Name, 0);
+    }
+
+    public async Task<CountryListDto> UpdateCountryAsync(Guid countryId, CountryWriteDto dto, CancellationToken ct)
+    {
+        var country = await locations.GetCountryAsync(countryId, ct)
+                      ?? throw new NotFoundException("Country", countryId);
+
+        if (await locations.CountryNameExistsAsync(dto.Name, countryId, ct))
+            throw new ConflictException($"A country named {dto.Name} already exists.");
+
+        country.Name = dto.Name.Trim();
+        await locations.SaveChangesAsync(ct);
+
+        return (await locations.GetCountriesAsync(ct)).First(c => c.Id == countryId);
+    }
+
+    public async Task DeleteCountryAsync(Guid countryId, CancellationToken ct)
+    {
+        var country = await locations.GetCountryAsync(countryId, ct)
+                      ?? throw new NotFoundException("Country", countryId);
+
+        if (await locations.CountryIsInUseAsync(countryId, ct))
+            throw new ConflictException(
+                "This country still has cities or is recorded against a student, and cannot be deleted.");
+
+        locations.RemoveCountry(country);
+        await locations.SaveChangesAsync(ct);
+    }
+
+    public async Task<IEnumerable<OriginCityListDto>> GetOriginCitiesAsync(Guid? countryId, CancellationToken ct) =>
+        await locations.GetOriginCitiesAsync(countryId, ct);
+
+    public async Task<OriginCityListDto> CreateOriginCityAsync(OriginCityWriteDto dto, CancellationToken ct)
+    {
+        _ = await locations.GetCountryAsync(dto.CountryId, ct)
+            ?? throw new NotFoundException("Country", dto.CountryId);
+
+        if (await locations.OriginCityNameExistsInCountryAsync(dto.CountryId, dto.Name, null, ct))
+            throw new ConflictException($"A city named {dto.Name} already exists in that country.");
+
+        var city = new OriginCity { Name = dto.Name.Trim(), CountryId = dto.CountryId };
+
+        await locations.AddOriginCityAsync(city);
+        await locations.SaveChangesAsync(ct);
+
+        return await locations.GetOriginCityDtoAsync(city.Id, ct)
+               ?? throw new NotFoundException("City", city.Id);
+    }
+
+    public async Task<OriginCityListDto> UpdateOriginCityAsync(
+        Guid cityId, OriginCityWriteDto dto, CancellationToken ct)
+    {
+        var city = await locations.GetOriginCityAsync(cityId, ct)
+                   ?? throw new NotFoundException("City", cityId);
+
+        _ = await locations.GetCountryAsync(dto.CountryId, ct)
+            ?? throw new NotFoundException("Country", dto.CountryId);
+
+        if (await locations.OriginCityNameExistsInCountryAsync(dto.CountryId, dto.Name, cityId, ct))
+            throw new ConflictException($"A city named {dto.Name} already exists in that country.");
+
+        city.Name = dto.Name.Trim();
+        city.CountryId = dto.CountryId;
+        await locations.SaveChangesAsync(ct);
+
+        return await locations.GetOriginCityDtoAsync(cityId, ct)
+               ?? throw new NotFoundException("City", cityId);
+    }
+
+    public async Task DeleteOriginCityAsync(Guid cityId, CancellationToken ct)
+    {
+        var city = await locations.GetOriginCityAsync(cityId, ct)
+                   ?? throw new NotFoundException("City", cityId);
+
+        if (await locations.OriginCityIsInUseAsync(cityId, ct))
+            throw new ConflictException(
+                "This city is recorded against a student and cannot be deleted.");
+
+        locations.RemoveOriginCity(city);
+        await locations.SaveChangesAsync(ct);
+    }
 }

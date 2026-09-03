@@ -75,8 +75,12 @@ CREATE FUNCTION sd_student(
 RETURNS uuid LANGUAGE plpgsql AS $f$
 DECLARE id uuid := gen_random_uuid();
 BEGIN
-  INSERT INTO "Students"("Id","UserId","SchoolId","DateOfBirth","PersonalNumber","GraduationDate","Gender","CityId")
-  VALUES (id, sd_user(fn, ln, email, 0, deactivated), school, dob, pn, graduated, gender, city);
+  -- Student origin is a Country now (separate from school geography). The legacy
+  -- `city` argument only signals whether an origin was recorded; map it to Kosovo,
+  -- or leave it unrecorded when null.
+  INSERT INTO "Students"("Id","UserId","SchoolId","DateOfBirth","PersonalNumber","GraduationDate","Gender","CountryId")
+  VALUES (id, sd_user(fn, ln, email, 0, deactivated), school, dob, pn, graduated, gender,
+          CASE WHEN city IS NULL THEN NULL ELSE 'b1000000-0000-0000-0000-000000000001'::uuid END);
   RETURN id;
 END $f$;
 

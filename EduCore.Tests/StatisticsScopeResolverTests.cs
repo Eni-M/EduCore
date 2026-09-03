@@ -142,15 +142,16 @@ public class StatisticsScopeResolverTests
     {
         var cityId = Guid.NewGuid();
         var zoneId = Guid.NewGuid();
-        var stateId = Guid.NewGuid();
+        var countryId = Guid.NewGuid();
 
         var context = await Directorate(SchoolA, new StubPeriodResolver())
             .ResolveAsync(
-                new StatisticsFilter { CityId = cityId, ZoneId = zoneId, StateId = stateId },
+                // City/Zone are school location; Country is student origin — separate dimensions.
+                new StatisticsFilter { CityId = cityId, ZoneId = zoneId, CountryId = countryId },
                 CancellationToken.None);
 
         Assert.Equal(cityId, context.CityId);
         Assert.Equal(zoneId, context.ZoneId);
-        Assert.Equal(stateId, context.StateId);
+        Assert.Equal(countryId, context.CountryId);
     }
 }

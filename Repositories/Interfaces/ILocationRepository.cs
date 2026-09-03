@@ -27,11 +27,27 @@ public interface ILocationRepository
     Task<bool> ZoneNameExistsInCityAsync(Guid cityId, string name, Guid? excludeZoneId, CancellationToken ct);
     Task<bool> ZoneIsInUseAsync(Guid zoneId, CancellationToken ct);
 
+    Task<IEnumerable<CountryListDto>> GetCountriesAsync(CancellationToken ct);
+    Task<Country?> GetCountryAsync(Guid countryId, CancellationToken ct);
+    Task<bool> CountryNameExistsAsync(string name, Guid? excludeCountryId, CancellationToken ct);
+    Task<bool> CountryIsInUseAsync(Guid countryId, CancellationToken ct);
+
+    Task<IEnumerable<OriginCityListDto>> GetOriginCitiesAsync(Guid? countryId, CancellationToken ct);
+    Task<OriginCity?> GetOriginCityAsync(Guid cityId, CancellationToken ct);
+    Task<OriginCityListDto?> GetOriginCityDtoAsync(Guid cityId, CancellationToken ct);
+    Task<bool> OriginCityNameExistsInCountryAsync(
+        Guid countryId, string name, Guid? excludeCityId, CancellationToken ct);
+    Task<bool> OriginCityIsInUseAsync(Guid cityId, CancellationToken ct);
+
     Task AddStateAsync(State state);
     Task AddCityAsync(City city);
     Task AddZoneAsync(Zone zone);
+    Task AddCountryAsync(Country country);
+    Task AddOriginCityAsync(OriginCity city);
     void RemoveState(State state);
     void RemoveCity(City city);
     void RemoveZone(Zone zone);
+    void RemoveCountry(Country country);
+    void RemoveOriginCity(OriginCity city);
     Task<bool> SaveChangesAsync(CancellationToken ct);
 }

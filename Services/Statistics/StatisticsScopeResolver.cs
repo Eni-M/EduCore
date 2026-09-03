@@ -29,9 +29,10 @@ public class StatisticsScopeResolver(
             filter.TeacherId,
             filter.CityId,
             filter.ZoneId,
-            filter.StateId,
+            // Student origin — filters students by where their family comes from.
+            filter.CountryId,
             // The ministry (StateAdmin) sees every school nationwide; a StateId filter, when given,
-            // narrows to that state. Everyone else has no school-location-state scope of their own.
+            // narrows to that school region. Everyone else has no school-location-state scope of their own.
             currentUser.IsStateAdmin ? filter.StateId : null);
     }
 

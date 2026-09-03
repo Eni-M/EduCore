@@ -59,8 +59,7 @@ public class LocationRepository(AppDbContext context) : ILocationRepository
             ct);
 
     public async Task<bool> CityIsInUseAsync(Guid cityId, CancellationToken ct) =>
-        await context.Students.IgnoreQueryFilters().AnyAsync(s => s.CityId == cityId, ct)
-        || await context.Schools.AnyAsync(s => s.CityId == cityId, ct);
+        await context.Schools.AnyAsync(s => s.CityId == cityId, ct);
 
     public async Task<bool> CityHasZonesAsync(Guid cityId, CancellationToken ct) =>
         await context.Zones.AnyAsync(z => z.CityId == cityId, ct);
@@ -101,12 +100,72 @@ public class LocationRepository(AppDbContext context) : ILocationRepository
     public async Task<bool> ZoneIsInUseAsync(Guid zoneId, CancellationToken ct) =>
         await context.Schools.AnyAsync(s => s.ZoneId == zoneId, ct);
 
+    // --- Student origin: countries and their cities (separate from school geography) ---
+
+    public async Task<IEnumerable<CountryListDto>> GetCountriesAsync(CancellationToken ct) =>
+        await context.Countries
+            .AsNoTracking()
+            .OrderBy(c => c.Name)
+            .Select(c => new CountryListDto(c.Id, c.Name, c.Cities.Count))
+            .ToListAsync(ct);
+
+    public async Task<Country?> GetCountryAsync(Guid countryId, CancellationToken ct) =>
+        await context.Countries.FirstOrDefaultAsync(c => c.Id == countryId, ct);
+
+    public async Task<bool> CountryNameExistsAsync(string name, Guid? excludeCountryId, CancellationToken ct) =>
+        await context.Countries.AnyAsync(
+            c => c.Name.ToLower() == name.ToLower() && (excludeCountryId == null || c.Id != excludeCountryId),
+            ct);
+
+    public async Task<bool> CountryIsInUseAsync(Guid countryId, CancellationToken ct) =>
+        await context.Students.IgnoreQueryFilters().AnyAsync(s => s.CountryId == countryId, ct)
+        || await context.OriginCities.AnyAsync(c => c.CountryId == countryId, ct);
+
+    public async Task<IEnumerable<OriginCityListDto>> GetOriginCitiesAsync(Guid? countryId, CancellationToken ct)
+    {
+        var query = context.OriginCities.AsNoTracking();
+
+        if (countryId is not null)
+            query = query.Where(c => c.CountryId == countryId);
+
+        return await query
+            .OrderBy(c => c.Country.Name)
+            .ThenBy(c => c.Name)
+            .Select(c => new OriginCityListDto(c.Id, c.Name, c.CountryId, c.Country.Name))
+            .ToListAsync(ct);
+    }
+
+    public async Task<OriginCity?> GetOriginCityAsync(Guid cityId, CancellationToken ct) =>
+        await context.OriginCities.FirstOrDefaultAsync(c => c.Id == cityId, ct);
+
+    public async Task<OriginCityListDto?> GetOriginCityDtoAsync(Guid cityId, CancellationToken ct) =>
+        await context.OriginCities
+            .AsNoTracking()
+            .Where(c => c.Id == cityId)
+            .Select(c => new OriginCityListDto(c.Id, c.Name, c.CountryId, c.Country.Name))
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<bool> OriginCityNameExistsInCountryAsync(
+        Guid countryId, string name, Guid? excludeCityId, CancellationToken ct) =>
+        await context.OriginCities.AnyAsync(
+            c => c.CountryId == countryId
+                 && c.Name.ToLower() == name.ToLower()
+                 && (excludeCityId == null || c.Id != excludeCityId),
+            ct);
+
+    public async Task<bool> OriginCityIsInUseAsync(Guid cityId, CancellationToken ct) =>
+        await context.Students.IgnoreQueryFilters().AnyAsync(s => s.OriginCityId == cityId, ct);
+
     public async Task AddStateAsync(State state) => await context.States.AddAsync(state);
     public async Task AddCityAsync(City city) => await context.Cities.AddAsync(city);
     public async Task AddZoneAsync(Zone zone) => await context.Zones.AddAsync(zone);
+    public async Task AddCountryAsync(Country country) => await context.Countries.AddAsync(country);
+    public async Task AddOriginCityAsync(OriginCity city) => await context.OriginCities.AddAsync(city);
     public void RemoveState(State state) => context.States.Remove(state);
     public void RemoveCity(City city) => context.Cities.Remove(city);
     public void RemoveZone(Zone zone) => context.Zones.Remove(zone);
+    public void RemoveCountry(Country country) => context.Countries.Remove(country);
+    public void RemoveOriginCity(OriginCity city) => context.OriginCities.Remove(city);
 
     public async Task<bool> SaveChangesAsync(CancellationToken ct) =>
         await context.SaveChangesAsync(ct) > 0;

@@ -17,7 +17,8 @@ public class StudentRepository(AppDbContext context) : Repository<Student>(conte
         await _context.Students
             .AsNoTracking()
             .Include(s => s.User)
-            .Include(s => s.City).ThenInclude(c => c!.State)
+            .Include(s => s.Country)
+            .Include(s => s.OriginCity)
             .Include(s => s.Guardians).ThenInclude(gs => gs.Guardian).ThenInclude(g => g.User)
             .FirstOrDefaultAsync(s => s.Id == studentId, ct);
 

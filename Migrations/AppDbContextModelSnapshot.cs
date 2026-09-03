@@ -311,6 +311,52 @@ namespace EduCore.Migrations
                     b.ToTable("ClassSubjectTeachers");
                 });
 
+            modelBuilder.Entity("EduCore.Models.Country", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Countries");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("b1000000-0000-0000-0000-000000000001"),
+                            Name = "Kosovo"
+                        },
+                        new
+                        {
+                            Id = new Guid("b1000000-0000-0000-0000-000000000002"),
+                            Name = "Albania"
+                        },
+                        new
+                        {
+                            Id = new Guid("b1000000-0000-0000-0000-000000000003"),
+                            Name = "North Macedonia"
+                        },
+                        new
+                        {
+                            Id = new Guid("b1000000-0000-0000-0000-000000000004"),
+                            Name = "Serbia"
+                        },
+                        new
+                        {
+                            Id = new Guid("b1000000-0000-0000-0000-000000000005"),
+                            Name = "Montenegro"
+                        });
+                });
+
             modelBuilder.Entity("EduCore.Models.DiaryEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -653,6 +699,28 @@ namespace EduCore.Migrations
                     b.ToTable("Notices");
                 });
 
+            modelBuilder.Entity("EduCore.Models.OriginCity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CountryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CountryId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("OriginCities");
+                });
+
             modelBuilder.Entity("EduCore.Models.RegionalAdmin", b =>
                 {
                     b.Property<Guid>("Id")
@@ -948,7 +1016,11 @@ namespace EduCore.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("CityId")
+                    b.Property<string>("Address")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<Guid?>("CountryId")
                         .HasColumnType("uuid");
 
                     b.Property<DateOnly>("DateOfBirth")
@@ -959,6 +1031,9 @@ namespace EduCore.Migrations
 
                     b.Property<DateOnly?>("GraduationDate")
                         .HasColumnType("date");
+
+                    b.Property<Guid?>("OriginCityId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("PersonalNumber")
                         .IsRequired()
@@ -979,7 +1054,9 @@ namespace EduCore.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CityId");
+                    b.HasIndex("CountryId");
+
+                    b.HasIndex("OriginCityId");
 
                     b.HasIndex("PersonalNumber")
                         .IsUnique();
@@ -1525,6 +1602,17 @@ namespace EduCore.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("EduCore.Models.OriginCity", b =>
+                {
+                    b.HasOne("EduCore.Models.Country", "Country")
+                        .WithMany("Cities")
+                        .HasForeignKey("CountryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Country");
+                });
+
             modelBuilder.Entity("EduCore.Models.RegionalAdmin", b =>
                 {
                     b.HasOne("EduCore.Models.City", "City")
@@ -1651,9 +1739,14 @@ namespace EduCore.Migrations
 
             modelBuilder.Entity("EduCore.Models.Student", b =>
                 {
-                    b.HasOne("EduCore.Models.City", "City")
+                    b.HasOne("EduCore.Models.Country", "Country")
                         .WithMany()
-                        .HasForeignKey("CityId")
+                        .HasForeignKey("CountryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EduCore.Models.OriginCity", "OriginCity")
+                        .WithMany()
+                        .HasForeignKey("OriginCityId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("EduCore.Models.School", "School")
@@ -1668,7 +1761,9 @@ namespace EduCore.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("City");
+                    b.Navigation("Country");
+
+                    b.Navigation("OriginCity");
 
                     b.Navigation("School");
 
@@ -1751,6 +1846,11 @@ namespace EduCore.Migrations
                         .IsRequired();
 
                     b.Navigation("City");
+                });
+
+            modelBuilder.Entity("EduCore.Models.Country", b =>
+                {
+                    b.Navigation("Cities");
                 });
 
             modelBuilder.Entity("EduCore.Models.Guardian", b =>

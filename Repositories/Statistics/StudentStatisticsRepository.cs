@@ -16,8 +16,8 @@ public class StudentStatisticsRepository(AppDbContext context)
     {
         var students = Scope(_context.Students, ctx);
 
-        if (ctx.StateId is not null)
-            students = students.Where(s => s.City != null && s.City.StateId == ctx.StateId);
+        if (ctx.CountryId is not null)
+            students = students.Where(s => s.CountryId == ctx.CountryId);
 
         if (ctx.ClassId is null && ctx.Grade is null && ctx.AcademicYearId is null)
             return students;

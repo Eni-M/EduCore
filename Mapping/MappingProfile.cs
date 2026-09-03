@@ -100,8 +100,8 @@ public class MappingProfile : Profile
             .ForCtorParam("FirstName", o => o.MapFrom(s => s.User.FirstName))
             .ForCtorParam("LastName", o => o.MapFrom(s => s.User.LastName))
             .ForCtorParam("Email", o => o.MapFrom(s => s.User.Email))
-            .ForCtorParam("CityName", o => o.MapFrom(s => s.City != null ? s.City.Name : null))
-            .ForCtorParam("StateName", o => o.MapFrom(s => s.City != null ? s.City.State.Name : null))
+            .ForCtorParam("CountryName", o => o.MapFrom(s => s.Country != null ? s.Country.Name : null))
+            .ForCtorParam("OriginCityName", o => o.MapFrom(s => s.OriginCity != null ? s.OriginCity.Name : null))
             .ForCtorParam("Guardians", o => o.MapFrom(s => s.Guardians));
 
         CreateWriteMap<Dtos.Student.StudentCreateDto, Student>();

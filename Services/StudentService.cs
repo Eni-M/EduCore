@@ -106,8 +106,7 @@ public class StudentService(
         var user = await users.BuildLoginAsync(
             dto.FirstName, dto.LastName, dto.Email, dto.Password, UserRole.Student, ct);
 
-        if (dto.CityId is { } cityId && await locations.GetCityAsync(cityId, ct) is null)
-            throw new NotFoundException("City", cityId);
+        await EnsureOriginAsync(dto.CountryId, dto.OriginCityId, ct);
 
         var student = mapper.Map<Student>(dto);
         student.User = user;
@@ -130,8 +129,7 @@ public class StudentService(
         var user = await userRepository.GetByIdAsync(student.UserId, ct)
                    ?? throw new NotFoundException("User", student.UserId);
 
-        if (dto.CityId is { } cityId && await locations.GetCityAsync(cityId, ct) is null)
-            throw new NotFoundException("City", cityId);
+        await EnsureOriginAsync(dto.CountryId, dto.OriginCityId, ct);
 
         await users.ApplyLoginEditAsync(user, dto.FirstName, dto.LastName, dto.Email, ct);
 
@@ -248,4 +246,19 @@ public class StudentService(
 
     private IEnumerable<StudentListDto> WithVisibleAccounts(IEnumerable<StudentListDto> rows) =>
         currentUser.CanManageAccounts() ? rows : rows.Select(row => row with { Account = null });
+
+    // Student origin: an optional country and, within it, an optional city.
+    private async Task EnsureOriginAsync(Guid? countryId, Guid? originCityId, CancellationToken ct)
+    {
+        if (countryId is { } cid && await locations.GetCountryAsync(cid, ct) is null)
+            throw new NotFoundException("Country", cid);
+
+        if (originCityId is not { } ocid) return;
+
+        var city = await locations.GetOriginCityAsync(ocid, ct)
+                   ?? throw new NotFoundException("City", ocid);
+
+        if (countryId is null || city.CountryId != countryId)
+            throw new BusinessException("That city is not in the selected country.");
+    }
 }

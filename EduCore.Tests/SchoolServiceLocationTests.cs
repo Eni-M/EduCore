@@ -82,6 +82,23 @@ public class SchoolServiceLocationTests
         public void RemoveState(Models.State state) { }
         public void RemoveCity(City city) { }
         public void RemoveZone(Zone zone) { }
+
+        public Task<IEnumerable<CountryListDto>> GetCountriesAsync(CancellationToken ct) =>
+            Task.FromResult(Enumerable.Empty<CountryListDto>());
+        public Task<Country?> GetCountryAsync(Guid countryId, CancellationToken ct) => Task.FromResult<Country?>(null);
+        public Task<bool> CountryNameExistsAsync(string name, Guid? excludeCountryId, CancellationToken ct) => Task.FromResult(false);
+        public Task<bool> CountryIsInUseAsync(Guid countryId, CancellationToken ct) => Task.FromResult(false);
+        public Task<IEnumerable<OriginCityListDto>> GetOriginCitiesAsync(Guid? countryId, CancellationToken ct) =>
+            Task.FromResult(Enumerable.Empty<OriginCityListDto>());
+        public Task<OriginCity?> GetOriginCityAsync(Guid cityId, CancellationToken ct) => Task.FromResult<OriginCity?>(null);
+        public Task<OriginCityListDto?> GetOriginCityDtoAsync(Guid cityId, CancellationToken ct) => Task.FromResult<OriginCityListDto?>(null);
+        public Task<bool> OriginCityNameExistsInCountryAsync(Guid countryId, string name, Guid? excludeCityId, CancellationToken ct) => Task.FromResult(false);
+        public Task<bool> OriginCityIsInUseAsync(Guid cityId, CancellationToken ct) => Task.FromResult(false);
+        public Task AddCountryAsync(Country country) => Task.CompletedTask;
+        public Task AddOriginCityAsync(OriginCity city) => Task.CompletedTask;
+        public void RemoveCountry(Country country) { }
+        public void RemoveOriginCity(OriginCity city) { }
+
         public Task<bool> SaveChangesAsync(CancellationToken ct) => Task.FromResult(true);
     }
 

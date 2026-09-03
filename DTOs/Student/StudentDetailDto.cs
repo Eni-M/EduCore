@@ -12,7 +12,9 @@ public record StudentDetailDto(
     string PersonalNumber,
     DateOnly? GraduationDate,
     Gender? Gender,
-    Guid? CityId,
-    string? CityName,
-    string? StateName,
+    Guid? CountryId,
+    string? CountryName,
+    Guid? OriginCityId,
+    string? OriginCityName,
+    string? Address,
     IReadOnlyList<GuardianContactDto> Guardians);

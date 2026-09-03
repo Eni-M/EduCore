@@ -13,5 +13,7 @@ public record StatisticsQuery(
     Guid? TeacherId,
     Guid? CityId,
     Guid? ZoneId,
-    Guid? StateId,
+    // Student origin (where the family comes from).
+    Guid? CountryId,
+    // School location state (the ministry can narrow to a region).
     Guid? SchoolStateId = null);

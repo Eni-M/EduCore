@@ -9,4 +9,6 @@ public record StudentEditDto(
     DateOnly DateOfBirth,
     string PersonalNumber,
     Gender Gender,
-    Guid? CityId);
+    Guid? CountryId,
+    Guid? OriginCityId,
+    string? Address);

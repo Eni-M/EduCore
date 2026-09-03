@@ -34,6 +34,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<State> States => Set<State>();
     public DbSet<City> Cities => Set<City>();
     public DbSet<Zone> Zones => Set<Zone>();
+    public DbSet<Country> Countries => Set<Country>();
+    public DbSet<OriginCity> OriginCities => Set<OriginCity>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<TeacherSubject> TeacherSubjects => Set<TeacherSubject>();
@@ -216,10 +218,28 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Zone>().HasIndex(z => new { z.CityId, z.Name }).IsUnique();
 
-        modelBuilder.Entity<Student>()
-            .HasOne(s => s.City).WithMany()
-            .HasForeignKey(s => s.CityId)
+        // Student origin — its own tables, never joined to the school State/City/Zone.
+        modelBuilder.Entity<Country>().Property(c => c.Name).HasMaxLength(150).IsRequired();
+        modelBuilder.Entity<Country>().HasIndex(c => c.Name).IsUnique();
+
+        modelBuilder.Entity<OriginCity>().Property(c => c.Name).HasMaxLength(150).IsRequired();
+        modelBuilder.Entity<OriginCity>()
+            .HasOne(c => c.Country).WithMany(c => c.Cities)
+            .HasForeignKey(c => c.CountryId)
             .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<OriginCity>().HasIndex(c => new { c.CountryId, c.Name }).IsUnique();
+
+        SeedCountries(modelBuilder);
+
+        modelBuilder.Entity<Student>()
+            .HasOne(s => s.Country).WithMany()
+            .HasForeignKey(s => s.CountryId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Student>()
+            .HasOne(s => s.OriginCity).WithMany()
+            .HasForeignKey(s => s.OriginCityId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Student>().Property(s => s.Address).HasMaxLength(300);
 
         modelBuilder.Entity<School>()
             .HasOne(s => s.City).WithMany()
@@ -231,6 +251,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .HasForeignKey(s => s.ZoneId)
             .OnDelete(DeleteBehavior.Restrict);
     }
+
+    // Kosovo plus the neighbours students most often come from. Seeded so the
+    // origin dropdown works out of the box; more can be added by a state admin.
+    private static void SeedCountries(ModelBuilder modelBuilder) =>
+        modelBuilder.Entity<Country>().HasData(
+            new Country { Id = new Guid("b1000000-0000-0000-0000-000000000001"), Name = "Kosovo" },
+            new Country { Id = new Guid("b1000000-0000-0000-0000-000000000002"), Name = "Albania" },
+            new Country { Id = new Guid("b1000000-0000-0000-0000-000000000003"), Name = "North Macedonia" },
+            new Country { Id = new Guid("b1000000-0000-0000-0000-000000000004"), Name = "Serbia" },
+            new Country { Id = new Guid("b1000000-0000-0000-0000-000000000005"), Name = "Montenegro" });
 
     private void ConfigureClasses(ModelBuilder modelBuilder)
     {
