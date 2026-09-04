@@ -19,6 +19,25 @@ services:
       timeout: 5s
       retries: 10
 
+  migrate:
+    build:
+      context: .
+    # One-shot schema migration. Applies pending migrations and exits 0 on success,
+    # non-zero on failure. The api service below only starts after this completes, so
+    # no replica ever races to migrate and a broken migration fails here -- visibly --
+    # instead of crash-looping the API. Same environment as api: the migrate path
+    # returns before seeding or serving, but Build() still resolves all options.
+    command: ["dotnet", "EduCore.dll", "--migrate"]
+    restart: "no"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=${POSTGRES_DB:-EduCoreDB};Username=${POSTGRES_USER:-educore};Password=${POSTGRES_PASSWORD:-educore123}"
+      Jwt__Key: ${Jwt__Key:?set Jwt__Key in .env — at least 32 bytes, e.g. openssl rand -base64 32}
+      Encryption__Key: ${Encryption__Key:?set Encryption__Key in .env — exactly 32 bytes base64, e.g. openssl rand -base64 32}
+    depends_on:
+      db:
+        condition: service_healthy
+
   api:
     build:
       context: .
@@ -43,6 +62,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   web:
     build:
@@ -51,7 +72,8 @@ services:
     ports:
       - "${WEB_PORT:-8080}:80"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   educore_pg_data:

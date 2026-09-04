@@ -305,10 +305,31 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
-// Bring the database schema up to date on every start, in any environment, so a
-// fresh deployment is ready without a manual migration step.
-await using (var scope = app.Services.CreateAsyncScope())
-    await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+// Schema migration is an explicit, separate step: `dotnet EduCore.dll --migrate` applies
+// pending migrations and exits, non-zero if any fail. Doing it on every boot instead meant
+// each replica raced the others to migrate on start, and a broken migration took the API
+// down with it rather than failing a job someone can see and rerun. compose runs this once,
+// to completion, before the API starts.
+if (args.Contains("--migrate"))
+{
+    await using var migrationScope = app.Services.CreateAsyncScope();
+    await migrationScope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+    return;
+}
+
+// ...and the API refuses to serve traffic against a schema it does not match, rather than
+// discovering the mismatch one failing query at a time.
+await using (var startupScope = app.Services.CreateAsyncScope())
+{
+    var db = startupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+
+    if (pending.Count > 0)
+        throw new InvalidOperationException(
+            $"The database is missing {pending.Count} migration(s), starting with {pending[0]}. " +
+            "Run `dotnet EduCore.dll --migrate` (compose does this in the `migrate` service) " +
+            "before starting the API.");
+}
 
 if (app.Environment.IsDevelopment())
 {
