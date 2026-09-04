@@ -13,6 +13,13 @@ public class LocationService(ILocationRepository locations) : ILocationService
     public async Task<IEnumerable<StateListDto>> GetStatesAsync(CancellationToken ct) =>
         await locations.GetStatesAsync(ct);
 
+    public async Task<PagedResultDto<StateListDto>> GetStatesPagedAsync(
+        PaginationQueryDto pagination, string? search, CancellationToken ct)
+    {
+        var all = await GetStatesAsync(ct);
+        return all.Search(search, s => new[] { s.Name }).ToPagedResult(pagination);
+    }
+
     public async Task<StateListDto> CreateStateAsync(StateWriteDto dto, CancellationToken ct)
     {
         if (await locations.StateNameExistsAsync(dto.Name, null, ct))
@@ -118,6 +125,13 @@ public class LocationService(ILocationRepository locations) : ILocationService
     public async Task<IEnumerable<ZoneListDto>> GetZonesAsync(Guid? cityId, CancellationToken ct) =>
         await locations.GetZonesAsync(cityId, ct);
 
+    public async Task<PagedResultDto<ZoneListDto>> GetZonesPagedAsync(
+        Guid? cityId, PaginationQueryDto pagination, string? search, CancellationToken ct)
+    {
+        var all = await GetZonesAsync(cityId, ct);
+        return all.Search(search, z => new[] { z.Name, z.CityName, z.StateName }).ToPagedResult(pagination);
+    }
+
     public async Task<ZoneListDto> CreateZoneAsync(ZoneWriteDto dto, CancellationToken ct)
     {
         _ = await locations.GetCityAsync(dto.CityId, ct)
@@ -171,6 +185,13 @@ public class LocationService(ILocationRepository locations) : ILocationService
     public async Task<IEnumerable<CountryListDto>> GetCountriesAsync(CancellationToken ct) =>
         await locations.GetCountriesAsync(ct);
 
+    public async Task<PagedResultDto<CountryListDto>> GetCountriesPagedAsync(
+        PaginationQueryDto pagination, string? search, CancellationToken ct)
+    {
+        var all = await GetCountriesAsync(ct);
+        return all.Search(search, c => new[] { c.Name }).ToPagedResult(pagination);
+    }
+
     public async Task<CountryListDto> CreateCountryAsync(CountryWriteDto dto, CancellationToken ct)
     {
         if (await locations.CountryNameExistsAsync(dto.Name, null, ct))
@@ -213,6 +234,13 @@ public class LocationService(ILocationRepository locations) : ILocationService
 
     public async Task<IEnumerable<OriginCityListDto>> GetOriginCitiesAsync(Guid? countryId, CancellationToken ct) =>
         await locations.GetOriginCitiesAsync(countryId, ct);
+
+    public async Task<PagedResultDto<OriginCityListDto>> GetOriginCitiesPagedAsync(
+        Guid? countryId, PaginationQueryDto pagination, string? search, CancellationToken ct)
+    {
+        var all = await GetOriginCitiesAsync(countryId, ct);
+        return all.Search(search, c => new[] { c.Name, c.CountryName }).ToPagedResult(pagination);
+    }
 
     public async Task<OriginCityListDto> CreateOriginCityAsync(OriginCityWriteDto dto, CancellationToken ct)
     {

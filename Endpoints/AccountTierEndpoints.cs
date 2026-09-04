@@ -1,5 +1,7 @@
+using EduCore.Dtos.Pagination;
 using EduCore.Dtos.RegionalAdmin;
 using EduCore.Dtos.StateAdmin;
+using EduCore.Helpers;
 using EduCore.Security;
 using EduCore.Services.Interfaces;
 
@@ -13,8 +15,12 @@ public static class AccountTierEndpoints
             .RequireAuthorization(Policies.StateAdmin)
             .WithTags("Regional administrators");
 
-        regionalAdmins.MapGet("/", async (IRegionalAdminService service, CancellationToken ct) =>
-            Results.Ok(await service.GetAllAsync(ct)));
+        regionalAdmins.MapGet("/", async (int? page, int? pageSize, string? search,
+                IRegionalAdminService service, CancellationToken ct) =>
+            page is null && pageSize is null && string.IsNullOrWhiteSpace(search)
+                ? Results.Ok(await service.GetAllAsync(ct))
+                : Results.Ok(await service.GetPagedAsync(
+                    new PaginationQueryDto(page ?? 1, pageSize ?? 20), search, ct)));
 
         regionalAdmins.MapGet("/{regionalAdminId:guid}",
             async (Guid regionalAdminId, IRegionalAdminService service, CancellationToken ct) =>
@@ -36,8 +42,12 @@ public static class AccountTierEndpoints
             .RequireAuthorization(Policies.StateAdmin)
             .WithTags("State administrators");
 
-        stateAdmins.MapGet("/", async (IStateAdminService service, CancellationToken ct) =>
-            Results.Ok(await service.GetAllAsync(ct)));
+        stateAdmins.MapGet("/", async (int? page, int? pageSize, string? search,
+                IStateAdminService service, CancellationToken ct) =>
+            page is null && pageSize is null && string.IsNullOrWhiteSpace(search)
+                ? Results.Ok(await service.GetAllAsync(ct))
+                : Results.Ok(await service.GetPagedAsync(
+                    new PaginationQueryDto(page ?? 1, pageSize ?? 20), search, ct)));
 
         stateAdmins.MapGet("/{stateAdminId:guid}",
             async (Guid stateAdminId, IStateAdminService service, CancellationToken ct) =>

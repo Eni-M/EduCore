@@ -1,4 +1,6 @@
 using EduCore.Dtos.Location;
+using EduCore.Dtos.Pagination;
+using EduCore.Helpers;
 using EduCore.Security;
 using EduCore.Services.Interfaces;
 
@@ -10,8 +12,12 @@ public static class LocationEndpoints
     {
         var states = api.MapGroup("/states").WithTags("Locations");
 
-        states.MapGet("/", async (ILocationService service, CancellationToken ct) =>
-                Results.Ok(await service.GetStatesAsync(ct)))
+        states.MapGet("/", async (int? page, int? pageSize, string? search,
+                ILocationService service, CancellationToken ct) =>
+                page is null && pageSize is null && string.IsNullOrWhiteSpace(search)
+                    ? Results.Ok(await service.GetStatesAsync(ct))
+                    : Results.Ok(await service.GetStatesPagedAsync(
+                        new PaginationQueryDto(page ?? 1, pageSize ?? 20), search, ct)))
             .RequireAuthorization();
 
         states.MapPost("/", async (StateWriteDto dto, ILocationService service, CancellationToken ct) =>
@@ -66,8 +72,12 @@ public static class LocationEndpoints
 
         var zones = api.MapGroup("/zones").WithTags("Locations");
 
-        zones.MapGet("/", async (Guid? cityId, ILocationService service, CancellationToken ct) =>
-                Results.Ok(await service.GetZonesAsync(cityId, ct)))
+        zones.MapGet("/", async (Guid? cityId, int? page, int? pageSize, string? search,
+                ILocationService service, CancellationToken ct) =>
+                page is null && pageSize is null && string.IsNullOrWhiteSpace(search)
+                    ? Results.Ok(await service.GetZonesAsync(cityId, ct))
+                    : Results.Ok(await service.GetZonesPagedAsync(
+                        cityId, new PaginationQueryDto(page ?? 1, pageSize ?? 20), search, ct)))
             .RequireAuthorization();
 
         zones.MapPost("/", async (ZoneWriteDto dto, ILocationService service, CancellationToken ct) =>
@@ -94,8 +104,12 @@ public static class LocationEndpoints
         // (the student form needs the list); managed by the ministry.
         var countries = api.MapGroup("/countries").WithTags("Locations");
 
-        countries.MapGet("/", async (ILocationService service, CancellationToken ct) =>
-                Results.Ok(await service.GetCountriesAsync(ct)))
+        countries.MapGet("/", async (int? page, int? pageSize, string? search,
+                ILocationService service, CancellationToken ct) =>
+                page is null && pageSize is null && string.IsNullOrWhiteSpace(search)
+                    ? Results.Ok(await service.GetCountriesAsync(ct))
+                    : Results.Ok(await service.GetCountriesPagedAsync(
+                        new PaginationQueryDto(page ?? 1, pageSize ?? 20), search, ct)))
             .RequireAuthorization();
 
         countries.MapPost("/", async (CountryWriteDto dto, ILocationService service, CancellationToken ct) =>
@@ -120,8 +134,12 @@ public static class LocationEndpoints
 
         var originCities = api.MapGroup("/origin-cities").WithTags("Locations");
 
-        originCities.MapGet("/", async (Guid? countryId, ILocationService service, CancellationToken ct) =>
-                Results.Ok(await service.GetOriginCitiesAsync(countryId, ct)))
+        originCities.MapGet("/", async (Guid? countryId, int? page, int? pageSize, string? search,
+                ILocationService service, CancellationToken ct) =>
+                page is null && pageSize is null && string.IsNullOrWhiteSpace(search)
+                    ? Results.Ok(await service.GetOriginCitiesAsync(countryId, ct))
+                    : Results.Ok(await service.GetOriginCitiesPagedAsync(
+                        countryId, new PaginationQueryDto(page ?? 1, pageSize ?? 20), search, ct)))
             .RequireAuthorization();
 
         originCities.MapPost("/", async (OriginCityWriteDto dto, ILocationService service, CancellationToken ct) =>

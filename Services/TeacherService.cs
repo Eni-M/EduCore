@@ -37,6 +37,18 @@ public class TeacherService(
             .ToPagedResult(pagination);
     }
 
+    public async Task<PagedResultDto<TeacherListDto>> GetPagedAsync(
+        PaginationQueryDto pagination, Guid? subjectId, string? search, CancellationToken ct)
+    {
+        var all = subjectId is null
+            ? await GetAllAsync(ct)
+            : await GetBySubjectAsync(subjectId.Value, ct);
+
+        return all.Search(search,
+                t => new[] { t.FirstName, t.LastName, t.Email, string.Join(" ", t.Subjects) })
+            .ToPagedResult(pagination);
+    }
+
     public async Task<TeacherDetailDto> GetByIdAsync(Guid teacherId, CancellationToken ct)
     {
         var teacher = await teachers.GetWithSubjectsAsync(teacherId, ct)

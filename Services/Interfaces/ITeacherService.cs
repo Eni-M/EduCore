@@ -9,6 +9,8 @@ public interface ITeacherService
     Task<IEnumerable<TeacherListDto>> GetAllAsync(CancellationToken ct);
     Task<PagedResultDto<TeacherListDto>> GetPagedAsync(
         PaginationQueryDto pagination, string? search, CancellationToken ct);
+    Task<PagedResultDto<TeacherListDto>> GetPagedAsync(
+        PaginationQueryDto pagination, Guid? subjectId, string? search, CancellationToken ct);
     Task<TeacherDetailDto> GetByIdAsync(Guid teacherId, CancellationToken ct);
     Task<IEnumerable<TeacherListDto>> GetBySubjectAsync(Guid subjectId, CancellationToken ct);
 

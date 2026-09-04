@@ -1,6 +1,7 @@
 using AutoMapper;
 using EduCore.Dtos.AcademicYear;
 using EduCore.Dtos.GradingPeriod;
+using EduCore.Dtos.Pagination;
 using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
@@ -19,6 +20,14 @@ public class AcademicYearService(
 {
     public async Task<IEnumerable<AcademicYearListDto>> GetAllAsync(Guid? schoolId, CancellationToken ct) =>
         mapper.Map<IEnumerable<AcademicYearListDto>>(await academicYears.GetAllOrderedAsync(ct));
+
+    public async Task<PagedResultDto<AcademicYearListDto>> GetPagedAsync(
+        Guid? schoolId, PaginationQueryDto pagination, string? search, CancellationToken ct)
+    {
+        var all = await GetAllAsync(schoolId, ct);
+        return all.Search(search, y => new[] { y.Name, y.SchoolName })
+            .ToPagedResult(pagination);
+    }
 
     public async Task<AcademicYearListDto> GetByIdAsync(Guid academicYearId, CancellationToken ct) =>
         mapper.Map<AcademicYearListDto>(await GetOwnedYearAsync(academicYearId, ct));

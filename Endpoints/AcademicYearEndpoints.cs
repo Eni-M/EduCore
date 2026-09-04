@@ -1,5 +1,7 @@
 using EduCore.Dtos.AcademicYear;
 using EduCore.Dtos.GradingPeriod;
+using EduCore.Dtos.Pagination;
+using EduCore.Helpers;
 using EduCore.Security;
 using EduCore.Services.Interfaces;
 
@@ -12,8 +14,12 @@ public static class AcademicYearEndpoints
         var group = api.MapGroup("/academic-years").WithTags("Academic years");
 
         // Statistics' PeriodPicker (State/Regional admins, not just Directorate) reads this list.
-        group.MapGet("/", async (Guid? schoolId, IAcademicYearService service, CancellationToken ct) =>
-                Results.Ok(await service.GetAllAsync(schoolId, ct)))
+        group.MapGet("/", async (Guid? schoolId, int? page, int? pageSize, string? search,
+                IAcademicYearService service, CancellationToken ct) =>
+                page is null && pageSize is null && string.IsNullOrWhiteSpace(search)
+                    ? Results.Ok(await service.GetAllAsync(schoolId, ct))
+                    : Results.Ok(await service.GetPagedAsync(
+                        schoolId, new PaginationQueryDto(page ?? 1, pageSize ?? 20), search, ct)))
             .RequireAuthorization(Policies.StatisticsViewer);
 
         group.MapGet("/{academicYearId:guid}",

@@ -1,5 +1,7 @@
+using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Teacher;
 using EduCore.Dtos.TeacherSubject;
+using EduCore.Helpers;
 using EduCore.Security;
 using EduCore.Services.Interfaces;
 
@@ -11,10 +13,14 @@ public static class TeacherEndpoints
     {
         var group = api.MapGroup("/teachers").WithTags("Teachers");
 
-        group.MapGet("/", async (Guid? subjectId, ITeacherService service, CancellationToken ct) =>
-                Results.Ok(subjectId is null
-                    ? await service.GetAllAsync(ct)
-                    : await service.GetBySubjectAsync(subjectId.Value, ct)))
+        group.MapGet("/", async (Guid? subjectId, int? page, int? pageSize, string? search,
+                ITeacherService service, CancellationToken ct) =>
+                page is null && pageSize is null && string.IsNullOrWhiteSpace(search)
+                    ? Results.Ok(subjectId is null
+                        ? await service.GetAllAsync(ct)
+                        : await service.GetBySubjectAsync(subjectId.Value, ct))
+                    : Results.Ok(await service.GetPagedAsync(
+                        new PaginationQueryDto(page ?? 1, pageSize ?? 20), subjectId, search, ct)))
             .RequireAuthorization(Policies.DirectorateOrTeacher);
 
         group.MapGet("/me", async (ITeacherService service, ICurrentUser currentUser, CancellationToken ct) =>
