@@ -4,6 +4,11 @@ namespace EduCore.Helpers;
 
 public static class ListPagination
 {
+    // Single source of truth for page clamping: server-side paging (Skip/Take in the
+    // database) must echo the same page/pageSize as the in-memory pager below.
+    public static (int Page, int PageSize) Normalize(PaginationQueryDto pagination) =>
+        (Math.Max(1, pagination.Page), Math.Clamp(pagination.PageSize, 1, 100));
+
     // Pages an already-materialised list for the HTTP response. This trims the payload
     // the client receives; it does not reduce the database read (the caller has already
     // loaded the full list). Push paging into the SQL query if a list ever grows large
@@ -11,8 +16,7 @@ public static class ListPagination
     public static PagedResultDto<T> ToPagedResult<T>(
         this IEnumerable<T> source, PaginationQueryDto pagination)
     {
-        var page = Math.Max(1, pagination.Page);
-        var pageSize = Math.Clamp(pagination.PageSize, 1, 100);
+        var (page, pageSize) = Normalize(pagination);
 
         var list = source as IReadOnlyList<T> ?? source.ToList();
         var items = list.Skip((page - 1) * pageSize).Take(pageSize).ToList();

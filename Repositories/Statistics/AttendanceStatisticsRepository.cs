@@ -55,6 +55,21 @@ public class AttendanceStatisticsRepository(AppDbContext context)
                    g.Count(x => !x.IsPresent && x.IsExcused)))
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<AttendanceGroup>> GetByClassAsync(
+        StatisticsQuery ctx, IReadOnlyCollection<Guid> classIds, CancellationToken ct) =>
+        await (from a in AttendanceInWindow(ctx).Where(a => classIds.Contains(a.ClassId))
+               join c in ClassesInScope(ctx) on a.ClassId equals c.Id
+               group a by new { c.Id, c.Name }
+               into g
+               orderby g.Key.Name
+               select new AttendanceGroup(
+                   g.Key.Id.ToString(),
+                   g.Key.Name,
+                   g.Count(),
+                   g.Count(x => x.IsPresent),
+                   g.Count(x => !x.IsPresent && x.IsExcused)))
+            .ToListAsync(ct);
+
     public async Task<IReadOnlyList<AttendanceGroup>> GetByGradeAsync(
         StatisticsQuery ctx, CancellationToken ct)
     {

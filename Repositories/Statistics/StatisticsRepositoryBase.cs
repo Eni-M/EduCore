@@ -99,10 +99,20 @@ public abstract class StatisticsRepositoryBase(AppDbContext context)
 
     protected IQueryable<Models.Enrollment> EnrollmentsInWindow(StatisticsQuery ctx)
     {
-        var classIds = ClassesInScope(ctx).Select(c => c.Id);
-
-        return Scope(_context.Enrollments, ctx)
-            .Where(e => classIds.Contains(e.ClassId))
+        var enrollments = Scope(_context.Enrollments, ctx)
             .Where(e => e.EnrolledAt <= ctx.To && (e.LeftAt == null || e.LeftAt >= ctx.From));
+
+        // The class restriction only filters when the caller narrowed to specific classes.
+        // Otherwise every in-scope enrollment already belongs to an in-scope class (same
+        // SchoolId through the (ClassId, SchoolId) foreign key), so an unfiltered
+        // IN (SELECT Id FROM Classes) would only add a full table scan. Callers that
+        // aggregate per class join ClassesInScope themselves.
+        if (ctx.ClassId is not null || ctx.Grade is not null || ctx.AcademicYearId is not null)
+        {
+            var classIds = ClassesInScope(ctx).Select(c => c.Id);
+            enrollments = enrollments.Where(e => classIds.Contains(e.ClassId));
+        }
+
+        return enrollments;
     }
 }

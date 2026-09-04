@@ -11,9 +11,20 @@ public interface IAcademicStatisticsRepository
     Task<AcademicTotals> GetTotalsAsync(StatisticsQuery ctx, CancellationToken ct);
     Task<IReadOnlyList<AcademicGroup>> GetBySubjectAsync(StatisticsQuery ctx, CancellationToken ct);
     Task<IReadOnlyList<AcademicGroup>> GetByClassAsync(StatisticsQuery ctx, CancellationToken ct);
+
+    // Same aggregation as GetByClassAsync, restricted to the requested classes so a
+    // paged caller only pays for the page it returns.
+    Task<IReadOnlyList<AcademicGroup>> GetByClassAsync(
+        StatisticsQuery ctx, IReadOnlyCollection<Guid> classIds, CancellationToken ct);
+
     Task<IReadOnlyList<AcademicGroup>> GetByGradeAsync(StatisticsQuery ctx, CancellationToken ct);
     Task<GradeDistributionResultDto> GetDistributionAsync(StatisticsQuery ctx, CancellationToken ct);
     Task<IReadOnlyList<AtRiskStudentDto>> GetAtRiskAsync(StatisticsQuery ctx, CancellationToken ct);
+
+    // Same student-level risk rule as GetAtRiskAsync, but grouped to per-class counts in
+    // the database. The class summary only needs the count, never the per-student rows.
+    Task<IReadOnlyList<AtRiskClassCount>> GetAtRiskCountsByClassAsync(
+        StatisticsQuery ctx, IReadOnlyCollection<Guid> classIds, CancellationToken ct);
 
     Task<IReadOnlyList<AcademicGroup>> GetSubjectGradeBaselinesAsync(
         StatisticsQuery ctx, CancellationToken ct);

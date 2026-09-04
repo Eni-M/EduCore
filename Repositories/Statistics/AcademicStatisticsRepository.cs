@@ -81,6 +81,26 @@ public class AcademicStatisticsRepository(
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<AcademicGroup>> GetByClassAsync(
+        StatisticsQuery ctx, IReadOnlyCollection<Guid> classIds, CancellationToken ct)
+    {
+        var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
+
+        return await (from m in GradedMarks(ctx).Where(m => classIds.Contains(m.ClassId))
+                      join c in ClassesInScope(ctx) on m.ClassId equals c.Id
+                      group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+                          by new { c.Id, c.Name }
+                      into g
+                      orderby g.Key.Name
+                      select new AcademicGroup(
+                          g.Key.Id.ToString(),
+                          g.Key.Name,
+                          g.Count(),
+                          g.Average(),
+                          g.Count(value => value >= pass)))
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<AcademicGroup>> GetByGradeAsync(
         StatisticsQuery ctx, CancellationToken ct)
     {
@@ -211,5 +231,37 @@ public class AcademicStatisticsRepository(
                 r.Failed,
                 r.AtRisk))
             .ToList();
+    }
+
+    public async Task<IReadOnlyList<AtRiskClassCount>> GetAtRiskCountsByClassAsync(
+        StatisticsQuery ctx, IReadOnlyCollection<Guid> classIds, CancellationToken ct)
+    {
+        var (first, second) = (grading.FirstMarkWeight, grading.SecondMarkWeight);
+        var atRiskUpper = grading.AtRiskUpperValue;
+
+        // Same student-level risk rule as GetAtRiskAsync (average of weighted graded marks
+        // below the at-risk threshold), but the database reduces to per-class counts: the
+        // class summary only needs the number of at-risk students per class, never the
+        // rows. The inner key keeps (student, class); names are functionally dependent on
+        // those ids (one student has one name, one class has one name/grade), so the
+        // grouping — and therefore every count — is identical to GetAtRiskAsync.
+        // The Users join from GetAtRiskAsync is omitted: it only supplies names, and every
+        // student has exactly one user (required UserId foreign key), so it can neither
+        // filter nor duplicate rows here.
+        var atRiskStudents = from m in GradedMarks(ctx).Where(m => classIds.Contains(m.ClassId))
+                             join e in Scope(_context.Enrollments, ctx) on m.EnrollmentId equals e.Id
+                             join st in Scope(_context.Students, ctx) on e.StudentId equals st.Id
+                             join c in ClassesInScope(ctx) on m.ClassId equals c.Id
+                             group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+                                 by new { st.Id, ClassId = c.Id }
+                             into g
+                             where g.Average() < atRiskUpper
+                             select g.Key;
+
+        return await (from s in atRiskStudents
+                      group s by s.ClassId
+                      into g
+                      select new AtRiskClassCount(g.Key, g.Count()))
+            .ToListAsync(ct);
     }
 }

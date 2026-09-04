@@ -1,8 +1,10 @@
+using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Rows;
 using EduCore.Data;
 using EduCore.Dtos.Statistics.Aggregate;
 using EduCore.Enums;
+using EduCore.Helpers;
 using EduCore.Repositories.Statistics.Interfaces;
 using EduCore.Services.Statistics;
 using Microsoft.EntityFrameworkCore;
@@ -89,6 +91,41 @@ public class StudentStatisticsRepository(AppDbContext context)
                    g.Key.Grade,
                    g.Select(x => x.StudentId).Distinct().Count()))
             .ToListAsync(ct);
+
+    public async Task<PagedResultDto<ClassCountRow>> GetByClassPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct)
+    {
+        var (page, pageSize) = ListPagination.Normalize(pagination);
+
+        // Same row set as GetByClassAsync: active enrollments in the window joined to
+        // in-scope classes. The total counts distinct classes; the page aggregates the
+        // same groups with ORDER BY applied before Skip/Take, so concatenated pages
+        // equal the full list without ever materialising it.
+        var matches = from e in EnrollmentsInWindow(ctx)
+                      where e.LeftAt == null
+                      join c in ClassesInScope(ctx) on e.ClassId equals c.Id
+                      select new { c.Id, c.Name, c.Grade, e.StudentId };
+
+        var totalCount = await matches.Select(x => x.Id).Distinct().CountAsync(ct);
+
+        var items = await (from x in matches
+                           group x by new { x.Id, x.Name, x.Grade }
+                           into g
+                           // Name keeps the historical list order; Id makes it deterministic:
+                           // duplicate class names across schools would otherwise let rows
+                           // slip or repeat across LIMIT/OFFSET page boundaries.
+                           orderby g.Key.Name, g.Key.Id
+                           select new ClassCountRow(
+                               g.Key.Id,
+                               g.Key.Name,
+                               g.Key.Grade,
+                               g.Select(y => y.StudentId).Distinct().Count()))
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return new PagedResultDto<ClassCountRow>(items, page, pageSize, totalCount);
+    }
 
     public async Task<IReadOnlyList<CountRow>> GetByAgeAsync(
         StatisticsQuery ctx, CancellationToken ct)

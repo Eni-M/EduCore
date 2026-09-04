@@ -9,6 +9,11 @@ public interface IAttendanceStatisticsRepository
 {
     Task<AttendanceTotals> GetTotalsAsync(StatisticsQuery ctx, CancellationToken ct);
     Task<IReadOnlyList<AttendanceGroup>> GetByClassAsync(StatisticsQuery ctx, CancellationToken ct);
+
+    // Same aggregation as GetByClassAsync, restricted to the requested classes so a
+    // paged caller only pays for the page it returns.
+    Task<IReadOnlyList<AttendanceGroup>> GetByClassAsync(
+        StatisticsQuery ctx, IReadOnlyCollection<Guid> classIds, CancellationToken ct);
     Task<IReadOnlyList<AttendanceGroup>> GetByGradeAsync(StatisticsQuery ctx, CancellationToken ct);
     Task<IReadOnlyList<AttendanceGroup>> GetBySubjectAsync(StatisticsQuery ctx, CancellationToken ct);
 

@@ -2,7 +2,6 @@ using EduCore.Repositories.Interfaces;
 using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Aggregate;
-using EduCore.Helpers;
 using EduCore.Repositories.Statistics.Interfaces;
 using EduCore.Services.Statistics.Interfaces;
 
@@ -29,12 +28,11 @@ public class StatisticsOverviewService(
     private async Task<SchoolOverviewDto> BuildAsync(
         StatisticsFilter filter, PaginationQueryDto? pagination, CancellationToken ct)
     {
-        var allClasses = await classes.GetSummariesAsync(filter, ct);
-
+        // Paged requests aggregate only the requested page of classes in the database.
+        // The unpaged path (chart/export callers) keeps the previous full-list behavior.
         var classesPage = pagination is null
-            ? new PagedResultDto<ClassSummaryDto>(
-                allClasses, 1, allClasses.Count == 0 ? 1 : allClasses.Count, allClasses.Count)
-            : allClasses.ToPagedResult(pagination);
+            ? await FullClassListAsync(filter, ct)
+            : await classes.GetSummariesPagedAsync(filter, pagination, ct);
 
         return new SchoolOverviewDto(
             await students.GetSummaryAsync(filter, ct),
@@ -46,6 +44,15 @@ public class StatisticsOverviewService(
             classesPage.Page,
             classesPage.PageSize,
             classesPage.TotalCount);
+    }
+
+    private async Task<PagedResultDto<ClassSummaryDto>> FullClassListAsync(
+        StatisticsFilter filter, CancellationToken ct)
+    {
+        var allClasses = await classes.GetSummariesAsync(filter, ct);
+
+        return new PagedResultDto<ClassSummaryDto>(
+            allClasses, 1, allClasses.Count == 0 ? 1 : allClasses.Count, allClasses.Count);
     }
 
     public async Task<PlatformOverviewDto> GetPlatformOverviewAsync(

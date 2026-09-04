@@ -13,6 +13,11 @@
 
   <ItemGroup>
     <PackageReference Include="xunit.v3" Version="4.0.0" />
+    <!-- Unify the EF Relational version with the app (10.0.10). Without this, the Npgsql
+         provider's [10.0.4, 11.0.0) range resolves to 10.0.4 here while the app was
+         compiled against 10.0.10, and any EF-backed test fails at runtime with
+         FileNotFoundException for 10.0.10. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup>
