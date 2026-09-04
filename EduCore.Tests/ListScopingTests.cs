@@ -141,10 +141,10 @@ public class ListScopingTests
 
     private sealed class NoopElementarySync : IElementaryAssignmentSync
     {
-        public Task SyncNewSubjectAsync(Guid schoolId, Guid subjectId, CancellationToken ct) =>
-            Task.CompletedTask;
+        public Task SyncCurriculumSubjectAddedAsync(
+            Guid schoolId, int grade, Guid subjectId, CancellationToken ct) => Task.CompletedTask;
         public Task SyncHomeroomChangeAsync(
-            Guid schoolId, Guid classId, Guid? previousTeacherId, Guid? newTeacherId,
+            Guid schoolId, Guid classId, int grade, Guid? previousTeacherId, Guid? newTeacherId,
             CancellationToken ct) => Task.CompletedTask;
     }
 
@@ -177,7 +177,6 @@ public class ListScopingTests
         new(new FakeSubjectRepository(),
             new FakeAssignmentRepository(),
             new FakeEnrollmentRepository(enrolled),
-            new NoopElementarySync(),
             new FakeCurrentUser(role),
             Mapper());
 

@@ -1,5 +1,6 @@
 using AutoMapper;
 using EduCore.Dtos.Medical;
+using EduCore.Enums;
 using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
@@ -11,7 +12,10 @@ namespace EduCore.Services;
 public class StudentMedicalRecordService(
     IStudentMedicalRecordRepository records,
     IStudentRepository students,
+    IGuardianRepository guardians,
+    INotificationService notifications,
     IAccessGuard access,
+    ICurrentUser currentUser,
     IMapper mapper) : IStudentMedicalRecordService
 {
     public async Task<StudentMedicalRecordDto?> GetByStudentAsync(Guid studentId, CancellationToken ct)
@@ -30,13 +34,44 @@ public class StudentMedicalRecordService(
         var student = await students.GetByIdAsync(studentId, ct)
                       ?? throw new NotFoundException("Student", studentId);
 
+        var record = await ApplyAsync(studentId, student.SchoolId, dto, ct);
+        return mapper.Map<StudentMedicalRecordDto>(record);
+    }
+
+    public async Task<StudentMedicalRecordDto> UpsertByGuardianAsync(
+        Guid studentId, StudentMedicalRecordUpsertDto dto, CancellationToken ct)
+    {
+        var guardianId = currentUser.RequireGuardianId();
+        if (!await guardians.LinkExistsAsync(guardianId, studentId, ct))
+            throw new ForbiddenException("You can only update your own child's medical record.");
+
+        var student = await students.GetWithGuardiansAsync(studentId, ct)
+                      ?? throw new NotFoundException("Student", studentId);
+
+        var record = await ApplyAsync(studentId, student.SchoolId, dto, ct);
+
+        // Surface the change to the school's directorate for review.
+        var studentName = $"{student.User.FirstName} {student.User.LastName}";
+        await notifications.NotifyRoleAsync(
+            student.SchoolId,
+            UserRole.Directorate,
+            $"A guardian updated the medical record for {studentName}.",
+            $"/students/{studentId}",
+            ct);
+
+        return mapper.Map<StudentMedicalRecordDto>(record);
+    }
+
+    private async Task<StudentMedicalRecord> ApplyAsync(
+        Guid studentId, Guid schoolId, StudentMedicalRecordUpsertDto dto, CancellationToken ct)
+    {
         var record = await records.GetByStudentAsync(studentId, ct);
 
         if (record is null)
         {
             record = mapper.Map<StudentMedicalRecord>(dto);
             record.StudentId = studentId;
-            record.SchoolId = student.SchoolId;
+            record.SchoolId = schoolId;
             record.UpdatedAt = DateTime.UtcNow;
             await records.AddAsync(record);
         }
@@ -48,7 +83,6 @@ public class StudentMedicalRecordService(
         }
 
         await records.SaveChangesAsync(ct);
-
-        return mapper.Map<StudentMedicalRecordDto>(record);
+        return record;
     }
 }

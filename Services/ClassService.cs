@@ -69,11 +69,24 @@ public class ClassService(
         GradeBands.Validate(school.Type, dto.Grade);
         await EnsureShiftInSchoolAsync(dto.ShiftId, ct);
 
+        if (dto.HomeroomTeacherId is not null)
+            _ = await teachers.GetByIdAsync(dto.HomeroomTeacherId.Value, ct)
+                ?? throw new NotFoundException("Teacher", dto.HomeroomTeacherId.Value);
+
         var entity = mapper.Map<Class>(dto);
         entity.SchoolId = schoolId;
 
         await classes.AddAsync(entity);
         await classes.SaveChangesAsync(ct);
+
+        // In an elementary school this assigns the homeroom teacher to every subject in the
+        // grade's curriculum. No-op elsewhere or when no teacher was chosen.
+        if (dto.HomeroomTeacherId is not null)
+        {
+            await elementarySync.SyncHomeroomChangeAsync(
+                schoolId, entity.Id, entity.Grade, null, dto.HomeroomTeacherId, ct);
+            await classes.SaveChangesAsync(ct);
+        }
 
         return await ReadAsync(entity.Id, ct);
     }
@@ -114,7 +127,7 @@ public class ClassService(
         classes.Update(entity);
 
         await elementarySync.SyncHomeroomChangeAsync(
-            entity.SchoolId, classId, oldTeacherId, dto.TeacherId, ct);
+            entity.SchoolId, classId, entity.Grade, oldTeacherId, dto.TeacherId, ct);
 
         await classes.SaveChangesAsync(ct);
 

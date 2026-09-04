@@ -485,6 +485,37 @@ namespace EduCore.Migrations
                     b.ToTable("Enrollments");
                 });
 
+            modelBuilder.Entity("EduCore.Models.GradeCurriculum", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Grade")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubjectId");
+
+                    b.HasIndex("SchoolId", "Grade", "SubjectId")
+                        .IsUnique();
+
+                    b.ToTable("GradeCurricula");
+                });
+
             modelBuilder.Entity("EduCore.Models.GradingPeriod", b =>
                 {
                     b.Property<Guid>("Id")
@@ -697,6 +728,46 @@ namespace EduCore.Migrations
                     b.HasIndex("SchoolId", "Pinned", "CreatedAt");
 
                     b.ToTable("Notices");
+                });
+
+            modelBuilder.Entity("EduCore.Models.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Link")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RecipientRole")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchoolId", "RecipientRole", "ReadAt");
+
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("EduCore.Models.OriginCity", b =>
@@ -1514,6 +1585,17 @@ namespace EduCore.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("EduCore.Models.GradeCurriculum", b =>
+                {
+                    b.HasOne("EduCore.Models.Subject", "Subject")
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Subject");
+                });
+
             modelBuilder.Entity("EduCore.Models.GradingPeriod", b =>
                 {
                     b.HasOne("EduCore.Models.AcademicYear", null)
@@ -1594,6 +1676,15 @@ namespace EduCore.Migrations
                 });
 
             modelBuilder.Entity("EduCore.Models.Notice", b =>
+                {
+                    b.HasOne("EduCore.Models.School", null)
+                        .WithMany()
+                        .HasForeignKey("SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EduCore.Models.Notification", b =>
                 {
                     b.HasOne("EduCore.Models.School", null)
                         .WithMany()

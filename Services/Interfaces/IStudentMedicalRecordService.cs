@@ -9,4 +9,9 @@ public interface IStudentMedicalRecordService
     Task<StudentMedicalRecordDto?> GetByStudentAsync(Guid studentId, CancellationToken ct);
 
     Task<StudentMedicalRecordDto> UpsertAsync(Guid studentId, StudentMedicalRecordUpsertDto dto, CancellationToken ct);
+
+    // A guardian updating their own child's record. Verifies the guardian link and notifies the
+    // school's directorate to review the change.
+    Task<StudentMedicalRecordDto> UpsertByGuardianAsync(
+        Guid studentId, StudentMedicalRecordUpsertDto dto, CancellationToken ct);
 }

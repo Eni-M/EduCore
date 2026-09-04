@@ -30,6 +30,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<StudentMedicalRecord> StudentMedicalRecords => Set<StudentMedicalRecord>();
     public DbSet<Notice> Notices => Set<Notice>();
     public DbSet<CalendarEvent> CalendarEvents => Set<CalendarEvent>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     public DbSet<State> States => Set<State>();
     public DbSet<City> Cities => Set<City>();
@@ -40,6 +41,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<TeacherSubject> TeacherSubjects => Set<TeacherSubject>();
     public DbSet<ClassSubjectTeacher> ClassSubjectTeachers => Set<ClassSubjectTeacher>();
+    public DbSet<GradeCurriculum> GradeCurricula => Set<GradeCurriculum>();
 
     public DbSet<SchoolShift> SchoolShifts => Set<SchoolShift>();
     public DbSet<ShiftPeriod> ShiftPeriods => Set<ShiftPeriod>();
@@ -339,6 +341,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .HasFilter("\"EndedOn\" IS NULL");
         modelBuilder.Entity<ClassSubjectTeacher>().Property<uint>("Version").IsRowVersion();
         ScopeToSchool<ClassSubjectTeacher>(modelBuilder);
+
+        modelBuilder.Entity<GradeCurriculum>()
+            .HasOne(gc => gc.Subject).WithMany()
+            .HasForeignKey(gc => gc.SubjectId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<GradeCurriculum>()
+            .HasIndex(gc => new { gc.SchoolId, gc.Grade, gc.SubjectId }).IsUnique();
+        modelBuilder.Entity<GradeCurriculum>().Property<uint>("Version").IsRowVersion();
+        ScopeToSchool<GradeCurriculum>(modelBuilder);
     }
 
     private void ConfigureScheduling(ModelBuilder modelBuilder)
@@ -569,5 +580,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         modelBuilder.Entity<CalendarEvent>().Property(e => e.Description).HasMaxLength(4000);
         modelBuilder.Entity<CalendarEvent>().Property<uint>("Version").IsRowVersion();
         ScopeToSchool<CalendarEvent>(modelBuilder);
+
+        modelBuilder.Entity<Notification>()
+            .HasOne<School>().WithMany()
+            .HasForeignKey(n => n.SchoolId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Notification>().HasIndex(n => new { n.SchoolId, n.RecipientRole, n.ReadAt });
+        modelBuilder.Entity<Notification>().Property(n => n.Message).HasMaxLength(1000);
+        modelBuilder.Entity<Notification>().Property(n => n.Link).HasMaxLength(500);
+        modelBuilder.Entity<Notification>().Property<uint>("Version").IsRowVersion();
+        ScopeToSchool<Notification>(modelBuilder);
     }
 }

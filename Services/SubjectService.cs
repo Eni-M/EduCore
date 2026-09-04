@@ -5,7 +5,6 @@ using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
-using EduCore.Services.Assignment;
 using EduCore.Services.Interfaces;
 using EduCore.Dtos.Pagination;
 using EduCore.Helpers;
@@ -16,7 +15,6 @@ public class SubjectService(
     ISubjectRepository subjects,
     IClassSubjectTeacherRepository assignments,
     IEnrollmentRepository enrollments,
-    IElementaryAssignmentSync elementarySync,
     ICurrentUser currentUser,
     IMapper mapper) : ISubjectService
 {
@@ -61,9 +59,6 @@ public class SubjectService(
         subject.SchoolId = currentUser.RequireSchoolId();
 
         await subjects.AddAsync(subject);
-
-        await elementarySync.SyncNewSubjectAsync(subject.SchoolId, subject.Id, ct);
-
         await subjects.SaveChangesAsync(ct);
 
         return mapper.Map<SubjectListDto>(subject);

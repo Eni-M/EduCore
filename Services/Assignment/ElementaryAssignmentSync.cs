@@ -6,26 +6,27 @@ namespace EduCore.Services.Assignment;
 
 public class ElementaryAssignmentSync(
     ISchoolRepository schools,
-    ISubjectRepository subjects,
+    IGradeCurriculumRepository curriculum,
     IClassRepository classes,
     IClassSubjectTeacherRepository assignments,
     ITeacherSubjectRepository teacherSubjects) : IElementaryAssignmentSync
 {
     public async Task SyncHomeroomChangeAsync(
-        Guid schoolId, Guid classId, Guid? oldTeacherId, Guid? newTeacherId, CancellationToken ct)
+        Guid schoolId, Guid classId, int grade, Guid? oldTeacherId, Guid? newTeacherId, CancellationToken ct)
     {
         if (oldTeacherId == newTeacherId || !await IsElementaryAsync(schoolId, ct))
             return;
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var allSubjects = await subjects.GetAllOrderedAsync(ct);
+        var gradeSubjects = await curriculum.GetSubjectsForGradeAsync(grade, ct);
 
         var activeBySubject = (await assignments.GetActiveForClassAsync(classId, ct))
             .ToDictionary(a => a.SubjectId);
 
         if (newTeacherId is null)
         {
-            foreach (var subject in allSubjects)
+            // Homeroom teacher removed: end only the assignments they held.
+            foreach (var subject in gradeSubjects)
             {
                 if (activeBySubject.TryGetValue(subject.Id, out var active)
                     && active.TeacherId == oldTeacherId)
@@ -41,12 +42,12 @@ public class ElementaryAssignmentSync(
         var qualified = (await teacherSubjects.GetSubjectIdsForTeacherAsync(newTeacherId.Value, ct))
             .ToHashSet();
 
-        foreach (var subject in allSubjects)
+        foreach (var subject in gradeSubjects)
         {
+            // Elementary teachers are generalists, so qualify the new teacher for anything they lack.
             if (!qualified.Contains(subject.Id))
             {
                 qualified.Add(subject.Id);
-
                 await teacherSubjects.AddAsync(new TeacherSubject
                 {
                     TeacherId = newTeacherId.Value,
@@ -57,6 +58,7 @@ public class ElementaryAssignmentSync(
 
             activeBySubject.TryGetValue(subject.Id, out var activeAssignment);
 
+            // A specialist already teaches this subject — leave them in place.
             if (activeAssignment is not null && activeAssignment.TeacherId != oldTeacherId)
                 continue;
 
@@ -76,7 +78,8 @@ public class ElementaryAssignmentSync(
         }
     }
 
-    public async Task SyncNewSubjectAsync(Guid schoolId, Guid subjectId, CancellationToken ct)
+    public async Task SyncCurriculumSubjectAddedAsync(
+        Guid schoolId, int grade, Guid subjectId, CancellationToken ct)
     {
         if (!await IsElementaryAsync(schoolId, ct))
             return;
@@ -86,12 +89,18 @@ public class ElementaryAssignmentSync(
 
         foreach (var classEntity in await classes.GetAllWithHomeroomTeacherAsync(ct))
         {
+            if (classEntity.Grade != grade)
+                continue;
+
+            // Don't duplicate: a class that already has an active teacher for the subject keeps them.
+            if (await assignments.GetActiveAsync(classEntity.Id, subjectId, ct) is not null)
+                continue;
+
             var teacherId = classEntity.HomeroomTeacherId!.Value;
 
             if (!qualified.Contains(teacherId))
             {
                 qualified.Add(teacherId);
-
                 await teacherSubjects.AddAsync(new TeacherSubject
                 {
                     TeacherId = teacherId,

@@ -95,5 +95,13 @@ public static class StudentRecordsEndpoints
                         CancellationToken ct) =>
                     Results.Ok(await service.UpsertAsync(studentId, dto, ct)))
             .RequireAuthorization(Policies.Directorate);
+
+        // A guardian maintains their own child's record; the service verifies the link and notifies
+        // the directorate to review the change.
+        students.MapPut("/{studentId:guid}/medical/by-guardian",
+                async (Guid studentId, StudentMedicalRecordUpsertDto dto, IStudentMedicalRecordService service,
+                        CancellationToken ct) =>
+                    Results.Ok(await service.UpsertByGuardianAsync(studentId, dto, ct)))
+            .RequireAuthorization(Policies.Guardian);
     }
 }
