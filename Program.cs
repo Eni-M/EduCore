@@ -1,5 +1,6 @@
 using EduCore.Helpers;
 using EduCore.Services.Assignment;
+using System.Net;
 using System.Text;
 using System.Threading.RateLimiting;
 using System.Security.Claims;
@@ -276,9 +277,15 @@ builder.Services.AddRateLimiter(options =>
         });
     });
 
-    // Login-specific stricter policy to prevent brute-force attempts
+    // Login-specific stricter policy to prevent brute-force attempts. Partitioned by client
+    // IP: a single fixed partition would make every failed login anywhere on the instance
+    // share one 5/minute bucket, so one attacker -- or one class starting at the same time --
+    // locks everybody out. The address is the one UseForwardedHeaders derived from a *trusted*
+    // proxy, never a raw client-supplied X-Forwarded-For; see the forwarded-headers setup below.
     options.AddPolicy("LoginPolicy", context =>
-        RateLimitPartition.GetTokenBucketLimiter("login", _ => new TokenBucketRateLimiterOptions
+        RateLimitPartition.GetTokenBucketLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new TokenBucketRateLimiterOptions
         {
             TokenLimit = 5,
             TokensPerPeriod = 5,
@@ -311,14 +318,39 @@ if (app.Environment.IsDevelopment())
 
 await PlatformOwnerSeeder.SeedAsync(app.Services, app.Configuration);
 
-// Honour the reverse proxy's scheme/IP headers so the app knows the real client
-// protocol when TLS is terminated upstream (nginx / a load balancer).
+// Honour the reverse proxy's scheme/IP headers so the app knows the real client protocol
+// and address when TLS is terminated upstream (nginx / a load balancer).
+//
+// Trust is explicit. Clearing KnownNetworks/KnownProxies -- as this used to -- trusts every
+// peer, so any client could set X-Forwarded-For and have it believed. That matters beyond
+// logging: UseForwardedHeaders rewrites Connection.RemoteIpAddress, which is what both rate
+// limiters partition on, so a forged header meant an attacker could mint a fresh quota per
+// request.
+//
+// When the configuration names any proxy the trusted set becomes exactly that: the framework's
+// implicit 127.0.0.0/8 default is dropped rather than added to, so the deployed trust boundary
+// is the one written down and nothing else. With nothing configured that default stands, which
+// keeps a bare `dotnet run` behind a local proxy working.
 var forwardedOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 };
-forwardedOptions.KnownNetworks.Clear();
-forwardedOptions.KnownProxies.Clear();
+
+var trustedNetworks = app.Configuration.GetSection("ForwardedHeaders:KnownNetworks").Get<string[]>() ?? [];
+var trustedProxies = app.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [];
+
+if (trustedNetworks.Length > 0 || trustedProxies.Length > 0)
+{
+    forwardedOptions.KnownIPNetworks.Clear();
+    forwardedOptions.KnownProxies.Clear();
+}
+
+foreach (var network in trustedNetworks)
+    forwardedOptions.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
+
+foreach (var proxy in trustedProxies)
+    forwardedOptions.KnownProxies.Add(IPAddress.Parse(proxy));
+
 app.UseForwardedHeaders(forwardedOptions);
 
 app.UseExceptionHandler();
@@ -337,7 +369,10 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 
-app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
+// Liveness only: no database, no auth, no rate limit. It must stay answerable while the
+// database is down (a health check that fails with its dependencies turns one outage into a
+// restart loop), and it must not be able to consume a client's request quota.
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok" })).DisableRateLimiting();
 
 app.MapAuthEndpoints();
 

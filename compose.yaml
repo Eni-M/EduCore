@@ -34,6 +34,12 @@ services:
       # Cookies are marked Secure only under HTTPS. Leave false for a plain-HTTP start;
       # set true once TLS terminates in front of the web service.
       Session__Secure: ${Session__Secure:-false}
+      # Requests reach the API through nginx in the `web` container, so its X-Forwarded-For
+      # is the only source of the real client IP -- and the rate limiters partition on that.
+      # Trust the compose bridge network and nothing else: a client that sets the header
+      # itself is not on this network, so its forged value is ignored. Widen this only to
+      # the real edge proxy's network if you put a load balancer in front.
+      ForwardedHeaders__KnownNetworks__0: ${TRUSTED_PROXY_NETWORK:-172.16.0.0/12}
     depends_on:
       db:
         condition: service_healthy
