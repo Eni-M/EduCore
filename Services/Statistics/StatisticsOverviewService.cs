@@ -1,6 +1,8 @@
 using EduCore.Repositories.Interfaces;
+using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Aggregate;
+using EduCore.Helpers;
 using EduCore.Repositories.Statistics.Interfaces;
 using EduCore.Services.Statistics.Interfaces;
 
@@ -16,15 +18,35 @@ public class StatisticsOverviewService(
     IStatisticsScopeResolver scope,
     ISchoolRepository schools) : IStatisticsOverviewService
 {
-    public async Task<SchoolOverviewDto> GetSchoolOverviewAsync(
-        StatisticsFilter filter, CancellationToken ct) =>
-        new(
+    // No pagination params -> the whole class list (chart/export callers).
+    public Task<SchoolOverviewDto> GetSchoolOverviewAsync(StatisticsFilter filter, CancellationToken ct) =>
+        BuildAsync(filter, pagination: null, ct);
+
+    public Task<SchoolOverviewDto> GetSchoolOverviewAsync(
+        StatisticsFilter filter, PaginationQueryDto pagination, CancellationToken ct) =>
+        BuildAsync(filter, pagination, ct);
+
+    private async Task<SchoolOverviewDto> BuildAsync(
+        StatisticsFilter filter, PaginationQueryDto? pagination, CancellationToken ct)
+    {
+        var allClasses = await classes.GetSummariesAsync(filter, ct);
+
+        var classesPage = pagination is null
+            ? new PagedResultDto<ClassSummaryDto>(
+                allClasses, 1, allClasses.Count == 0 ? 1 : allClasses.Count, allClasses.Count)
+            : allClasses.ToPagedResult(pagination);
+
+        return new SchoolOverviewDto(
             await students.GetSummaryAsync(filter, ct),
             await enrollment.GetSummaryAsync(filter, ct),
             await attendance.GetSummaryAsync(filter, ct),
             await academic.GetSummaryAsync(filter, ct),
             await teachers.GetSummaryAsync(filter, ct),
-            await classes.GetSummariesAsync(filter, ct));
+            classesPage.Items,
+            classesPage.Page,
+            classesPage.PageSize,
+            classesPage.TotalCount);
+    }
 
     public async Task<PlatformOverviewDto> GetPlatformOverviewAsync(
         StatisticsFilter filter, CancellationToken ct)
