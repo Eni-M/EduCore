@@ -30,9 +30,16 @@ public static class AuthEndpoints
             return Results.NoContent();
         });
 
+        // These three sit outside the /api group, so they do not inherit its account-status
+        // filter and need the revocation check attached explicitly -- otherwise a deactivated
+        // user's /me kept answering 200 for up to an hour while every data route said 401.
+        // ActiveAccountEndpointFilter, not AccountStatusEndpointFilter: the password-rotation
+        // gate would lock a must-change-password user out of the very endpoints that let them
+        // finish rotating.
         group.MapGet("/me", async (IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
                 Results.Ok(await users.GetCurrentAsync(currentUser.UserId, ct)))
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
 
         group.MapPost("/change-password", async (
                 ChangePasswordDto dto,
@@ -46,7 +53,8 @@ public static class AuthEndpoints
                 cookies.Issue(response, result.Token, result.User.ExpiresAt);
                 return Results.Ok(result.User);
             })
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
 
         group.MapPut("/me", async (
                 UpdateMyCredentialsDto dto,
@@ -61,7 +69,8 @@ public static class AuthEndpoints
                 cookies.Issue(response, result.Token, result.User.ExpiresAt);
                 return Results.Ok(result.User);
             })
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
 
         var accounts = group.MapGroup("/users")
             .RequireAuthorization(Policies.ManageAccounts)
