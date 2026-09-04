@@ -1,244 +1,244 @@
 using EduCore.Data;
 using EduCore.Enums;
-using EduCore.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace EduCore.Services.Email;
 
-// loads a few whole tables per run and groups in memory. Fine for a once-a-day job at
-// school scale; push the filtering into SQL if a very large deployment makes the run slow.
+// Builds the scheduled digests with targeted EF projections: only the rows and columns a digest
+// needs leave PostgreSQL, joins run in SQL, and grouping/formatting happens on small records.
+//
+// IgnoreQueryFilters() is deliberate and required: this runs from a background scope with no
+// signed-in user, so the per-request school filter would otherwise match nothing. It is safe
+// because every email is grouped by its owning teacher/class/school -- a recipient only ever sees
+// their own school's data. Deactivated users are excluded explicitly instead.
 public class ScheduleDigestService(AppDbContext db, IEmailSender email) : IScheduleDigestService
 {
+    // Bounded so a real SMTP/provider transport is never hit with unlimited parallel sends.
+    private const int MaxConcurrentEmails = 5;
+
+    private sealed record LessonRow(
+        Guid SchoolId, DayOfWeek Day, int PeriodNumber, TimeOnly Start, TimeOnly End,
+        string Subject, Guid ClassId, string ClassName,
+        Guid TeacherId, string TeacherEmail, string TeacherFirstName);
+
+    private sealed record Recipient(Guid ClassId, string Email, string FirstName);
+    private sealed record MeetingRow(Guid SchoolId, string Title, TimeOnly? Start);
+    private sealed record Contact(Guid SchoolId, string Email, string FirstName);
+    private sealed record Mail(string Email, string Subject, string Body);
+
     public async Task SendDailyAsync(DateOnly today, CancellationToken ct)
     {
         var tomorrow = today.AddDays(1);
-        var lookups = await LoadLookupsAsync(ct);
+        var holidays = await HolidaysAsync([tomorrow], ct);
 
-        await SendDayScheduleAsync(tomorrow, "Your schedule for tomorrow", lookups, ct);
-        await SendMeetingRemindersAsync(tomorrow, lookups, ct);
+        var lessons = (await LessonsForDaysAsync([tomorrow.DayOfWeek], ct))
+            .Where(l => !holidays.Contains((l.SchoolId, tomorrow)))
+            .ToList();
+
+        var mails = new List<Mail>();
+        const string subject = "Your schedule for tomorrow";
+
+        foreach (var teacher in lessons.GroupBy(l => new { l.TeacherId, l.TeacherEmail, l.TeacherFirstName }))
+        {
+            var body = Format(teacher.OrderBy(l => l.PeriodNumber).Select(TeacherLine));
+            mails.Add(new Mail(teacher.Key.TeacherEmail, subject, Greeting(teacher.Key.TeacherFirstName, body)));
+        }
+
+        var byClass = lessons
+            .GroupBy(l => l.ClassId)
+            .ToDictionary(g => g.Key, g => Format(g.OrderBy(l => l.PeriodNumber).Select(StudentLine)));
+
+        foreach (var student in await StudentsForClassesAsync(byClass.Keys, ct))
+            if (byClass.TryGetValue(student.ClassId, out var body))
+                mails.Add(new Mail(student.Email, subject, Greeting(student.FirstName, body)));
+
+        mails.AddRange(await MeetingMailsAsync(tomorrow, ct));
+
+        await SendAllAsync(mails, ct);
     }
 
     public async Task SendWeeklyAsync(DateOnly today, CancellationToken ct)
     {
-        var lookups = await LoadLookupsAsync(ct);
+        var dates = Enumerable.Range(1, 7).Select(today.AddDays).ToList();
+        var days = dates.Select(d => d.DayOfWeek).Distinct().ToList();
+        var holidays = await HolidaysAsync(dates, ct);
 
-        // The seven days starting tomorrow.
-        var teacherBody = new Dictionary<Guid, List<string>>();
-        var classBody = new Dictionary<Guid, List<string>>();
+        // One query for the whole week, grouped by day in memory afterwards.
+        var lessons = await LessonsForDaysAsync(days, ct);
+        var students = (await StudentsForClassesAsync(lessons.Select(l => l.ClassId).Distinct().ToList(), ct))
+            .GroupBy(s => s.ClassId)
+            .ToDictionary(g => g.Key, g => g.ToList());
 
-        for (var offset = 1; offset <= 7; offset++)
+        var mails = new List<Mail>();
+        const string subject = "Your schedule for the week";
+
+        foreach (var teacher in lessons.GroupBy(l => new { l.TeacherId, l.TeacherEmail, l.TeacherFirstName }))
         {
-            var date = today.AddDays(offset);
-            var entries = await EntriesForDayAsync(date.DayOfWeek, ct);
-            if (entries.Count == 0) continue;
-
-            var header = $"{date:dddd d MMM}";
-
-            foreach (var group in entries.GroupBy(e => e.TeacherId))
-            {
-                var lines = group
-                    .OrderBy(e => PeriodNumber(e, lookups))
-                    .Select(e => "  " + TeacherLine(e, lookups));
-                Append(teacherBody, group.Key, header, lines);
-            }
-
-            foreach (var group in entries.GroupBy(e => e.ClassId))
-            {
-                var lines = group
-                    .OrderBy(e => PeriodNumber(e, lookups))
-                    .Select(e => "  " + StudentLine(e, lookups));
-                Append(classBody, group.Key, header, lines);
-            }
+            var body = WeekBody(dates, holidays, teacher, TeacherLine);
+            if (body is not null)
+                mails.Add(new Mail(teacher.Key.TeacherEmail, subject, Greeting(teacher.Key.TeacherFirstName, body)));
         }
 
-        foreach (var (teacherId, lines) in teacherBody)
-            await SendToTeacherAsync(teacherId, "Your schedule for the week", lines, lookups, ct);
+        foreach (var classGroup in lessons.GroupBy(l => l.ClassId))
+        {
+            var body = WeekBody(dates, holidays, classGroup, StudentLine);
+            if (body is null || !students.TryGetValue(classGroup.Key, out var recipients)) continue;
 
-        foreach (var (classId, lines) in classBody)
-            await SendToClassAsync(classId, "Your schedule for the week", lines, lookups, ct);
+            foreach (var student in recipients)
+                mails.Add(new Mail(student.Email, subject, Greeting(student.FirstName, body)));
+        }
+
+        await SendAllAsync(mails, ct);
     }
 
-    // ---- per-day schedule --------------------------------------------------
+    // ---- queries (projected, filtered, joined in SQL) ----------------------
 
-    private async Task SendDayScheduleAsync(
-        DateOnly date, string subject, Lookups lookups, CancellationToken ct)
+    private async Task<List<LessonRow>> LessonsForDaysAsync(
+        IReadOnlyCollection<DayOfWeek> days, CancellationToken ct)
     {
-        var entries = await EntriesForDayAsync(date.DayOfWeek, ct);
-        if (entries.Count == 0) return;
+        var query =
+            from e in db.ScheduleEntries.AsNoTracking()
+            where days.Contains(e.DayOfWeek)
+            join c in db.Classes on e.ClassId equals c.Id
+            join s in db.Subjects on e.SubjectId equals s.Id
+            join p in db.ShiftPeriods on e.ShiftPeriodId equals p.Id
+            join t in db.Teachers on e.TeacherId equals t.Id
+            join u in db.Users on t.UserId equals u.Id
+            where u.DeactivatedAt == null
+            select new LessonRow(
+                e.SchoolId, e.DayOfWeek, p.PeriodNumber, p.StartTime, p.EndTime,
+                s.Name, e.ClassId, c.Name, e.TeacherId, u.Email, u.FirstName);
 
-        foreach (var group in entries.GroupBy(e => e.TeacherId))
-        {
-            var lines = group.OrderBy(e => PeriodNumber(e, lookups)).Select(e => TeacherLine(e, lookups));
-            await SendToTeacherAsync(group.Key, subject, lines, lookups, ct);
-        }
-
-        foreach (var group in entries.GroupBy(e => e.ClassId))
-        {
-            var lines = group.OrderBy(e => PeriodNumber(e, lookups)).Select(e => StudentLine(e, lookups));
-            await SendToClassAsync(group.Key, subject, lines, lookups, ct);
-        }
+        return await query.IgnoreQueryFilters().ToListAsync(ct);
     }
 
-    // ---- meetings ----------------------------------------------------------
-
-    private async Task SendMeetingRemindersAsync(DateOnly date, Lookups lookups, CancellationToken ct)
+    private async Task<List<Recipient>> StudentsForClassesAsync(
+        IReadOnlyCollection<Guid> classIds, CancellationToken ct)
     {
-        var meetings = await db.CalendarEvents
-            .IgnoreQueryFilters()
-            .AsNoTracking()
+        if (classIds.Count == 0) return [];
+
+        var query =
+            from en in db.Enrollments.AsNoTracking()
+            where en.LeftAt == null && classIds.Contains(en.ClassId)
+            join st in db.Students on en.StudentId equals st.Id
+            join u in db.Users on st.UserId equals u.Id
+            where u.DeactivatedAt == null
+            select new Recipient(en.ClassId, u.Email, u.FirstName);
+
+        return await query.IgnoreQueryFilters().ToListAsync(ct);
+    }
+
+    private async Task<List<Mail>> MeetingMailsAsync(DateOnly date, CancellationToken ct)
+    {
+        var meetings = await db.CalendarEvents.AsNoTracking().IgnoreQueryFilters()
             .Where(e => e.Type == CalendarEventType.Meeting && e.Date == date)
+            .Select(e => new MeetingRow(e.SchoolId, e.Title, e.StartTime))
             .ToListAsync(ct);
 
-        if (meetings.Count == 0) return;
+        if (meetings.Count == 0) return [];
 
-        foreach (var bySchool in meetings.GroupBy(m => m.SchoolId))
-        {
-            var lines = bySchool
-                .OrderBy(m => m.StartTime ?? TimeOnly.MinValue)
-                .Select(m => MeetingLine(m));
+        var bodyBySchool = meetings
+            .GroupBy(m => m.SchoolId)
+            .ToDictionary(
+                g => g.Key,
+                g => "Meetings tomorrow:\n\n" +
+                     string.Join("\n", g.OrderBy(m => m.Start ?? TimeOnly.MinValue).Select(MeetingLine)));
 
-            var body = "Meetings tomorrow:\n\n" + string.Join("\n", lines);
+        var directorates = await DirectoratesForSchoolsAsync(bodyBySchool.Keys, ct);
 
-            // Directorate staff of the school oversee meetings.
-            foreach (var userId in DirectorateUserIds(bySchool.Key, lookups))
-                await SendToUserAsync(userId, "Meetings tomorrow", body, lookups, ct);
-        }
+        return directorates
+            .Where(d => bodyBySchool.ContainsKey(d.SchoolId))
+            .Select(d => new Mail(d.Email, "Meetings tomorrow", Greeting(d.FirstName, bodyBySchool[d.SchoolId])))
+            .ToList();
     }
 
-    // ---- sending helpers ---------------------------------------------------
-
-    private async Task SendToTeacherAsync(
-        Guid teacherId, string subject, IEnumerable<string> lines, Lookups lookups, CancellationToken ct)
+    private async Task<List<Contact>> DirectoratesForSchoolsAsync(
+        IReadOnlyCollection<Guid> schoolIds, CancellationToken ct)
     {
-        if (lookups.TeacherUserId.TryGetValue(teacherId, out var userId))
-            await SendToUserAsync(userId, subject, Body(lines), lookups, ct);
+        if (schoolIds.Count == 0) return [];
+
+        var query =
+            from d in db.Directorates.AsNoTracking()
+            where schoolIds.Contains(d.SchoolId)
+            join u in db.Users on d.UserId equals u.Id
+            where u.DeactivatedAt == null
+            select new Contact(d.SchoolId, u.Email, u.FirstName);
+
+        return await query.IgnoreQueryFilters().ToListAsync(ct);
     }
 
-    private async Task SendToClassAsync(
-        Guid classId, string subject, IEnumerable<string> lines, Lookups lookups, CancellationToken ct)
+    // School holidays on the given dates, so a schedule digest is not sent for a closed day.
+    // Only Holiday concept exists in the model; per-class overrides / substitutions / cancellations
+    // do not, so those are not applied (see the architectural note in the change summary).
+    private async Task<HashSet<(Guid School, DateOnly Date)>> HolidaysAsync(
+        IReadOnlyCollection<DateOnly> dates, CancellationToken ct)
     {
-        var body = Body(lines);
+        var rows = await db.CalendarEvents.AsNoTracking().IgnoreQueryFilters()
+            .Where(e => e.Type == CalendarEventType.Holiday && dates.Contains(e.Date))
+            .Select(e => new { e.SchoolId, e.Date })
+            .ToListAsync(ct);
 
-        if (!lookups.StudentUserIdsByClass.TryGetValue(classId, out var userIds)) return;
-
-        foreach (var userId in userIds)
-            await SendToUserAsync(userId, subject, body, lookups, ct);
+        return rows.Select(r => (r.SchoolId, r.Date)).ToHashSet();
     }
-
-    private async Task SendToUserAsync(
-        Guid userId, string subject, string body, Lookups lookups, CancellationToken ct)
-    {
-        if (lookups.Users.TryGetValue(userId, out var user) && !string.IsNullOrWhiteSpace(user.Email))
-            await email.SendAsync(user.Email, subject, $"Hello {user.FirstName},\n\n{body}", ct);
-    }
-
-    private IEnumerable<Guid> DirectorateUserIds(Guid schoolId, Lookups lookups) =>
-        lookups.DirectorateUserIdsBySchool.TryGetValue(schoolId, out var ids) ? ids : [];
 
     // ---- formatting --------------------------------------------------------
 
-    private static string Body(IEnumerable<string> lines)
+    private static string? WeekBody(
+        IReadOnlyList<DateOnly> dates,
+        HashSet<(Guid, DateOnly)> holidays,
+        IEnumerable<LessonRow> lessons,
+        Func<LessonRow, string> line)
+    {
+        var byDay = lessons.ToLookup(l => l.Day);
+        var sections = new List<string>();
+
+        foreach (var date in dates)
+        {
+            var forDay = byDay[date.DayOfWeek]
+                .Where(l => !holidays.Contains((l.SchoolId, date)))
+                .OrderBy(l => l.PeriodNumber)
+                .ToList();
+
+            if (forDay.Count == 0) continue;
+
+            sections.Add($"{date:dddd d MMM}");
+            sections.AddRange(forDay.Select(l => "  " + line(l)));
+            sections.Add("");
+        }
+
+        return sections.Count == 0 ? null : string.Join("\n", sections);
+    }
+
+    private static string Format(IEnumerable<string> lines)
     {
         var list = lines.ToList();
         return list.Count == 0 ? "Nothing scheduled." : string.Join("\n", list);
     }
 
-    private static void Append(Dictionary<Guid, List<string>> map, Guid key, string header, IEnumerable<string> lines)
+    private static string Greeting(string firstName, string body) => $"Hello {firstName},\n\n{body}";
+
+    private static string TeacherLine(LessonRow l) => $"{PeriodText(l)}: {l.Subject} — {l.ClassName}";
+    private static string StudentLine(LessonRow l) => $"{PeriodText(l)}: {l.Subject}";
+    private static string PeriodText(LessonRow l) =>
+        $"Period {l.PeriodNumber} ({l.Start:HH\\:mm}-{l.End:HH\\:mm})";
+    private static string MeetingLine(MeetingRow m) =>
+        m.Start is { } start ? $"- {m.Title} at {start:HH\\:mm}" : $"- {m.Title}";
+
+    // ---- delivery (bounded concurrency) ------------------------------------
+
+    private async Task SendAllAsync(IReadOnlyList<Mail> mails, CancellationToken ct)
     {
-        if (!map.TryGetValue(key, out var list))
-            map[key] = list = [];
-        list.Add(header);
-        list.AddRange(lines);
-        list.Add("");
-    }
+        if (mails.Count == 0) return;
 
-    private int PeriodNumber(ScheduleEntry e, Lookups lookups) =>
-        lookups.Periods.TryGetValue(e.ShiftPeriodId, out var p) ? p.PeriodNumber : 0;
+        using var gate = new SemaphoreSlim(MaxConcurrentEmails);
 
-    private string TeacherLine(ScheduleEntry e, Lookups lookups)
-    {
-        var period = PeriodText(e, lookups);
-        var subject = lookups.SubjectNames.GetValueOrDefault(e.SubjectId, "Subject");
-        var className = lookups.ClassNames.GetValueOrDefault(e.ClassId, "Class");
-        return $"{period}: {subject} — {className}";
-    }
-
-    private string StudentLine(ScheduleEntry e, Lookups lookups)
-    {
-        var period = PeriodText(e, lookups);
-        var subject = lookups.SubjectNames.GetValueOrDefault(e.SubjectId, "Subject");
-        return $"{period}: {subject}";
-    }
-
-    private string PeriodText(ScheduleEntry e, Lookups lookups) =>
-        lookups.Periods.TryGetValue(e.ShiftPeriodId, out var p)
-            ? $"Period {p.PeriodNumber} ({p.StartTime:HH\\:mm}-{p.EndTime:HH\\:mm})"
-            : "Lesson";
-
-    private static string MeetingLine(CalendarEvent m)
-    {
-        var time = m.StartTime is { } start ? $" at {start:HH\\:mm}" : "";
-        return $"- {m.Title}{time}";
-    }
-
-    // ---- lookups -----------------------------------------------------------
-
-    private async Task<List<ScheduleEntry>> EntriesForDayAsync(DayOfWeek day, CancellationToken ct) =>
-        await db.ScheduleEntries
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(e => e.DayOfWeek == day)
-            .ToListAsync(ct);
-
-    private async Task<Lookups> LoadLookupsAsync(CancellationToken ct)
-    {
-        var users = await db.Users.IgnoreQueryFilters().AsNoTracking()
-            .Where(u => u.DeactivatedAt == null)
-            .ToDictionaryAsync(u => u.Id, ct);
-
-        var teacherUserId = await db.Teachers.IgnoreQueryFilters().AsNoTracking()
-            .ToDictionaryAsync(t => t.Id, t => t.UserId, ct);
-
-        var directorates = await db.Directorates.IgnoreQueryFilters().AsNoTracking()
-            .ToListAsync(ct);
-        var directorateBySchool = directorates
-            .GroupBy(d => d.SchoolId)
-            .ToDictionary(g => g.Key, g => (IReadOnlyList<Guid>)g.Select(d => d.UserId).ToList());
-
-        var students = await db.Students.IgnoreQueryFilters().AsNoTracking()
-            .ToDictionaryAsync(s => s.Id, s => s.UserId, ct);
-
-        var studentUserIdsByClass = new Dictionary<Guid, List<Guid>>();
-        var activeEnrollments = await db.Enrollments.IgnoreQueryFilters().AsNoTracking()
-            .Where(e => e.LeftAt == null)
-            .ToListAsync(ct);
-        foreach (var e in activeEnrollments)
+        var sends = mails.Select(async m =>
         {
-            if (!students.TryGetValue(e.StudentId, out var userId)) continue;
-            if (!studentUserIdsByClass.TryGetValue(e.ClassId, out var list))
-                studentUserIdsByClass[e.ClassId] = list = [];
-            list.Add(userId);
-        }
+            await gate.WaitAsync(ct);
+            try { await email.SendAsync(m.Email, m.Subject, m.Body, ct); }
+            finally { gate.Release(); }
+        });
 
-        var subjectNames = await db.Subjects.IgnoreQueryFilters().AsNoTracking()
-            .ToDictionaryAsync(s => s.Id, s => s.Name, ct);
-        var classNames = await db.Classes.IgnoreQueryFilters().AsNoTracking()
-            .ToDictionaryAsync(c => c.Id, c => c.Name, ct);
-        var periods = await db.ShiftPeriods.IgnoreQueryFilters().AsNoTracking()
-            .ToDictionaryAsync(p => p.Id, ct);
-
-        return new Lookups(
-            users, teacherUserId, directorateBySchool,
-            studentUserIdsByClass.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<Guid>)kv.Value),
-            subjectNames, classNames, periods);
+        await Task.WhenAll(sends);
     }
-
-    private sealed record Lookups(
-        IReadOnlyDictionary<Guid, User> Users,
-        IReadOnlyDictionary<Guid, Guid> TeacherUserId,
-        IReadOnlyDictionary<Guid, IReadOnlyList<Guid>> DirectorateUserIdsBySchool,
-        IReadOnlyDictionary<Guid, IReadOnlyList<Guid>> StudentUserIdsByClass,
-        IReadOnlyDictionary<Guid, string> SubjectNames,
-        IReadOnlyDictionary<Guid, string> ClassNames,
-        IReadOnlyDictionary<Guid, ShiftPeriod> Periods);
 }
