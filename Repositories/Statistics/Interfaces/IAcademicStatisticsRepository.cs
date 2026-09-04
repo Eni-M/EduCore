@@ -1,3 +1,4 @@
+using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Rows;
 using EduCore.Dtos.Statistics.Aggregate;
@@ -20,6 +21,11 @@ public interface IAcademicStatisticsRepository
     Task<IReadOnlyList<AcademicGroup>> GetByGradeAsync(StatisticsQuery ctx, CancellationToken ct);
     Task<GradeDistributionResultDto> GetDistributionAsync(StatisticsQuery ctx, CancellationToken ct);
     Task<IReadOnlyList<AtRiskStudentDto>> GetAtRiskAsync(StatisticsQuery ctx, CancellationToken ct);
+
+    // Same rows as GetAtRiskAsync, ordered by average with a deterministic tie-break,
+    // aggregated per page in the database: concatenated pages hold the same students.
+    Task<PagedResultDto<AtRiskStudentDto>> GetAtRiskPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct);
 
     // Same student-level risk rule as GetAtRiskAsync, but grouped to per-class counts in
     // the database. The class summary only needs the count, never the per-student rows.

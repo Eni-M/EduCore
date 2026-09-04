@@ -1,3 +1,4 @@
+using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics.Rows;
 using EduCore.Data;
 using EduCore.Dtos.Statistics;
@@ -231,6 +232,84 @@ public class AcademicStatisticsRepository(
                 r.Failed,
                 r.AtRisk))
             .ToList();
+    }
+
+    public async Task<PagedResultDto<AtRiskStudentDto>> GetAtRiskPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct)
+    {
+        var (page, pageSize) = ListPagination.Normalize(pagination);
+
+        // Same student-level rows as GetAtRiskAsync via the shared builder below.
+        // Ordering is by raw average — Math.Round applies only when projecting DTOs,
+        // exactly as GetAtRiskAsync does — tie-broken by student id so LIMIT/OFFSET
+        // pages are deterministic.
+        var matches = AtRiskAverages(ctx);
+
+        var totalCount = await matches.CountAsync(ct);
+
+        var items = await matches
+            .OrderBy(x => x.Average)
+            .ThenBy(x => x.StudentId)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return new PagedResultDto<AtRiskStudentDto>(
+            items.Select(r => new AtRiskStudentDto(
+                r.StudentId,
+                r.FirstName + " " + r.LastName,
+                r.ClassId,
+                r.ClassName,
+                r.Grade,
+                Math.Round(r.Average, 2),
+                r.Failed,
+                r.AtRisk)).ToList(),
+            page, pageSize, totalCount);
+    }
+
+    private sealed record AtRiskAverage(
+        Guid StudentId,
+        string FirstName,
+        string LastName,
+        Guid ClassId,
+        string ClassName,
+        int Grade,
+        double Average,
+        int Failed,
+        int AtRisk);
+
+    private IQueryable<AtRiskAverage> AtRiskAverages(StatisticsQuery ctx)
+    {
+        var (first, second) = (grading.FirstMarkWeight, grading.SecondMarkWeight);
+        var (pass, atRiskUpper) = (grading.PassValue, grading.AtRiskUpperValue);
+
+        return from m in GradedMarks(ctx)
+               join e in Scope(_context.Enrollments, ctx) on m.EnrollmentId equals e.Id
+               join st in Scope(_context.Students, ctx) on e.StudentId equals st.Id
+               join u in _context.Users on st.UserId equals u.Id
+               join c in ClassesInScope(ctx) on m.ClassId equals c.Id
+               group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+                   by new
+                   {
+                       st.Id,
+                       u.FirstName,
+                       u.LastName,
+                       ClassId = c.Id,
+                       ClassName = c.Name,
+                       c.Grade
+                   }
+               into g
+               where g.Average() < atRiskUpper
+               select new AtRiskAverage(
+                   g.Key.Id,
+                   g.Key.FirstName,
+                   g.Key.LastName,
+                   g.Key.ClassId,
+                   g.Key.ClassName,
+                   g.Key.Grade,
+                   g.Average(),
+                   g.Count(value => value < pass),
+                   g.Count(value => value >= pass && value < atRiskUpper));
     }
 
     public async Task<IReadOnlyList<AtRiskClassCount>> GetAtRiskCountsByClassAsync(

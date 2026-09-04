@@ -1,3 +1,4 @@
+using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Rows;
 using EduCore.Dtos.Statistics.Individual;
@@ -25,4 +26,12 @@ public interface IAttendanceStatisticsRepository
 
     Task<IReadOnlyList<ExcessiveAbsenceStudentDto>> GetExcessiveAbsencesAsync(
         StatisticsQuery ctx, double absenceRateThreshold, CancellationToken ct);
+
+    // Same students as GetExcessiveAbsencesAsync, filtered/ordered per page in the
+    // database: concatenated pages hold the same students.
+    Task<PagedResultDto<ExcessiveAbsenceStudentDto>> GetExcessiveAbsencesPagedAsync(
+        StatisticsQuery ctx,
+        double absenceRateThreshold,
+        PaginationQueryDto pagination,
+        CancellationToken ct);
 }

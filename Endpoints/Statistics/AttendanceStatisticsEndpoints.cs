@@ -49,11 +49,9 @@ public static class AttendanceStatisticsEndpoints
                 double? thresholdPercent,
                 IAttendanceStatisticsService service,
                 CancellationToken ct) =>
-        {
-            var all = await service.GetExcessiveAbsencesAsync(filter, thresholdPercent, ct);
-            return page is null && pageSize is null
-                ? Results.Ok(all)
-                : Results.Ok(all.ToPagedResult(new PaginationQueryDto(page ?? 1, pageSize ?? 20)));
-        });
+            page is null && pageSize is null
+                ? Results.Ok(await service.GetExcessiveAbsencesAsync(filter, thresholdPercent, ct))
+                : Results.Ok(await service.GetExcessiveAbsencesPagedAsync(
+                    filter, thresholdPercent, new PaginationQueryDto(page ?? 1, pageSize ?? 20), ct)));
     }
 }

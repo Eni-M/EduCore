@@ -1,7 +1,9 @@
+using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Rows;
 using EduCore.Data;
 using EduCore.Dtos.Statistics.Individual;
+using EduCore.Helpers;
 using EduCore.Repositories.Statistics.Interfaces;
 using EduCore.Services.Statistics;
 using Microsoft.EntityFrameworkCore;
@@ -173,46 +175,74 @@ public class AttendanceStatisticsRepository(AppDbContext context)
             .ToList();
     }
 
-    private async Task<List<StudentAttendanceRow>> StudentAttendanceRowsAsync(StatisticsQuery ctx, CancellationToken ct)
+    private async Task<List<StudentAttendanceRow>> StudentAttendanceRowsAsync(StatisticsQuery ctx, CancellationToken ct) =>
+        await StudentAttendanceAggregates(ctx).ToListAsync(ct);
+
+    public async Task<PagedResultDto<ExcessiveAbsenceStudentDto>> GetExcessiveAbsencesPagedAsync(
+        StatisticsQuery ctx,
+        double absenceRateThreshold,
+        PaginationQueryDto pagination,
+        CancellationToken ct)
     {
-        var rows = await (from a in AttendanceInWindow(ctx)
-                          join e in Scope(_context.Enrollments, ctx) on a.EnrollmentId equals e.Id
-                          join st in Scope(_context.Students, ctx) on e.StudentId equals st.Id
-                          join u in _context.Users on st.UserId equals u.Id
-                          join c in ClassesInScope(ctx) on a.ClassId equals c.Id
-                          group a by new
-                          {
-                              st.Id,
-                              u.FirstName,
-                              u.LastName,
-                              ClassId = c.Id,
-                              ClassName = c.Name
-                          }
-                          into g
-                          select new
-                          {
-                              g.Key.Id,
-                              g.Key.FirstName,
-                              g.Key.LastName,
-                              g.Key.ClassId,
-                              g.Key.ClassName,
-                              Records = g.Count(),
-                              Present = g.Count(x => x.IsPresent),
-                              Excused = g.Count(x => !x.IsPresent && x.IsExcused)
-                          })
+        var (page, pageSize) = ListPagination.Normalize(pagination);
+
+        // Same per-student rows as GetExcessiveAbsencesAsync via the shared builder.
+        // The threshold and ordering use Math.Round exactly like the full-list path
+        // (EF translates it), so filtering and ordering match bit for bit; tie-broken
+        // by student then class so LIMIT/OFFSET pages are deterministic. Note the two
+        // different rates, preserved here: the filter uses the *unexcused* share while
+        // the DTO reports the overall absence share.
+        var matches = StudentAttendanceAggregates(ctx)
+            .Where(s => s.Records > 0
+                && Math.Round((s.Records - s.Present - s.Excused) * 100.0 / s.Records, 2)
+                    >= absenceRateThreshold);
+
+        var totalCount = await matches.CountAsync(ct);
+
+        var items = await matches
+            .OrderByDescending(s => Math.Round((s.Records - s.Present - s.Excused) * 100.0 / s.Records, 2))
+            .ThenBy(s => s.StudentId)
+            .ThenBy(s => s.ClassId)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(ct);
 
-        return rows
-            .Select(r => new StudentAttendanceRow(
-                r.Id,
-                r.FirstName + " " + r.LastName,
+        return new PagedResultDto<ExcessiveAbsenceStudentDto>(
+            items.Select(r => new ExcessiveAbsenceStudentDto(
+                r.StudentId,
+                r.Name,
                 r.ClassId,
                 r.ClassName,
                 r.Records,
-                r.Present,
-                r.Excused))
-            .ToList();
+                r.Records - r.Present,
+                r.Excused,
+                Rate(r.Records - r.Present, r.Records))).ToList(),
+            page, pageSize, totalCount);
     }
+
+    private IQueryable<StudentAttendanceRow> StudentAttendanceAggregates(StatisticsQuery ctx) =>
+        from a in AttendanceInWindow(ctx)
+        join e in Scope(_context.Enrollments, ctx) on a.EnrollmentId equals e.Id
+        join st in Scope(_context.Students, ctx) on e.StudentId equals st.Id
+        join u in _context.Users on st.UserId equals u.Id
+        join c in ClassesInScope(ctx) on a.ClassId equals c.Id
+        group a by new
+        {
+            st.Id,
+            u.FirstName,
+            u.LastName,
+            ClassId = c.Id,
+            ClassName = c.Name
+        }
+        into g
+        select new StudentAttendanceRow(
+            g.Key.Id,
+            g.Key.FirstName + " " + g.Key.LastName,
+            g.Key.ClassId,
+            g.Key.ClassName,
+            g.Count(),
+            g.Count(x => x.IsPresent),
+            g.Count(x => !x.IsPresent && x.IsExcused));
 
     private static double Rate(int part, int total) =>
         total == 0 ? 0 : Math.Round(part * 100.0 / total, 2);

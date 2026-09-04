@@ -119,6 +119,10 @@ public sealed class ClassStatisticsServiceTests
         public Task<IReadOnlyList<AtRiskStudentDto>> GetAtRiskAsync(
             StatisticsQuery ctx, CancellationToken ct) => Task.FromResult(AtRiskStudents);
 
+        public Task<PagedResultDto<AtRiskStudentDto>> GetAtRiskPagedAsync(
+            StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct) =>
+            throw new NotImplementedException();
+
         public Task<IReadOnlyList<AtRiskClassCount>> GetAtRiskCountsByClassAsync(
             StatisticsQuery ctx, IReadOnlyCollection<Guid> classIds, CancellationToken ct)
         {
@@ -177,6 +181,12 @@ public sealed class ClassStatisticsServiceTests
         public Task<IReadOnlyList<ExcessiveAbsenceStudentDto>> GetExcessiveAbsencesAsync(
             StatisticsQuery ctx, double absenceRateThreshold, CancellationToken ct) =>
             throw new NotImplementedException();
+
+        public Task<PagedResultDto<ExcessiveAbsenceStudentDto>> GetExcessiveAbsencesPagedAsync(
+            StatisticsQuery ctx,
+            double absenceRateThreshold,
+            PaginationQueryDto pagination,
+            CancellationToken ct) => throw new NotImplementedException();
     }
 
     private static ClassStatisticsService Service(

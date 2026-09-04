@@ -1,3 +1,4 @@
+using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Rows;
 using EduCore.Dtos.Statistics.Aggregate;
@@ -73,6 +74,10 @@ public class AcademicStatisticsService(
     public async Task<IReadOnlyList<AtRiskStudentDto>> GetAtRiskAsync(
         StatisticsFilter filter, CancellationToken ct) =>
         await academic.GetAtRiskAsync(await scope.ResolveAsync(filter, ct), ct);
+
+    public async Task<PagedResultDto<AtRiskStudentDto>> GetAtRiskPagedAsync(
+        StatisticsFilter filter, PaginationQueryDto pagination, CancellationToken ct) =>
+        await academic.GetAtRiskPagedAsync(await scope.ResolveAsync(filter, ct), pagination, ct);
 
     public async Task<SubjectComparisonDto> GetSubjectComparisonAsync(
         StatisticsFilter filter, Guid subjectId, CancellationToken ct)

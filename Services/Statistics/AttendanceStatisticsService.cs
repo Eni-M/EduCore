@@ -1,3 +1,4 @@
+using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Rows;
 using EduCore.Dtos.Statistics.Aggregate;
@@ -96,6 +97,14 @@ public class AttendanceStatisticsService(
         await attendance.GetExcessiveAbsencesAsync(
             await scope.ResolveAsync(filter, ct),
             thresholdPercent ?? DefaultExcessiveAbsenceRate,
+            ct);
+
+    public async Task<PagedResultDto<ExcessiveAbsenceStudentDto>> GetExcessiveAbsencesPagedAsync(
+        StatisticsFilter filter, double? thresholdPercent, PaginationQueryDto pagination, CancellationToken ct) =>
+        await attendance.GetExcessiveAbsencesPagedAsync(
+            await scope.ResolveAsync(filter, ct),
+            thresholdPercent ?? DefaultExcessiveAbsenceRate,
+            pagination,
             ct);
 
     private IReadOnlyList<AttendanceByKeyDto> WithBaseline(
