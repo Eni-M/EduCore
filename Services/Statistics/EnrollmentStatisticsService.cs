@@ -1,3 +1,5 @@
+using EduCore.Dtos.Pagination;
+using EduCore.Dtos.Statistics.Rows;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Aggregate;
 using EduCore.Repositories.Statistics.Interfaces;
@@ -38,13 +40,21 @@ public class EnrollmentStatisticsService(
         .ToList();
 
     public async Task<IReadOnlyList<ClassCapacityDto>> GetCapacityAsync(
-        StatisticsFilter filter, CancellationToken ct)
-    {
-        var ctx = await scope.ResolveAsync(filter, ct);
-        var rows = await enrollments.GetCapacityAsync(ctx, ct);
+        StatisticsFilter filter, CancellationToken ct) =>
+        Map(await enrollments.GetCapacityAsync(await scope.ResolveAsync(filter, ct), ct));
 
-        return rows
-            .Select(r => new ClassCapacityDto(
+    public async Task<PagedResultDto<ClassCapacityDto>> GetCapacityPagedAsync(
+        StatisticsFilter filter, PaginationQueryDto pagination, CancellationToken ct)
+    {
+        var page = await enrollments.GetCapacityPagedAsync(
+            await scope.ResolveAsync(filter, ct), pagination, ct);
+
+        return new PagedResultDto<ClassCapacityDto>(
+            Map(page.Items), page.Page, page.PageSize, page.TotalCount);
+    }
+
+    private static IReadOnlyList<ClassCapacityDto> Map(IEnumerable<ClassCapacityRow> rows) =>
+        rows.Select(r => new ClassCapacityDto(
                 r.ClassId,
                 r.ClassName,
                 r.Grade,
@@ -54,5 +64,4 @@ public class EnrollmentStatisticsService(
                     ? Measure.None("no capacity recorded")
                     : Measures.Rate(r.Enrolled, r.Capacity.Value)))
             .ToList();
-    }
 }

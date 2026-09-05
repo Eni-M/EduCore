@@ -42,45 +42,60 @@ public class AcademicStatisticsRepository(
                 v => v >= grading.AtRiskLowerValue && v < grading.AtRiskUpperValue, ct));
     }
 
-    public async Task<IReadOnlyList<AcademicGroup>> GetBySubjectAsync(
-        StatisticsQuery ctx, CancellationToken ct)
+    // Subject and class aggregates share their whole shape, so both the full-list and the
+    // paged reader are built from one query each. Ordering by Name then Id: names are not
+    // unique across schools, and an unbroken tie lets a row slip or repeat across a page edge.
+    private IQueryable<AcademicGroup> BySubjectQuery(StatisticsQuery ctx)
     {
         var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
 
-        return await (from m in GradedMarks(ctx)
-                      join s in Scope(_context.Subjects, ctx) on m.SubjectId equals s.Id
-                      group m.FirstMark!.Value * first + m.SecondMark!.Value * second
-                          by new { s.Id, s.Name }
-                      into g
-                      orderby g.Key.Name
-                      select new AcademicGroup(
-                          g.Key.Id.ToString(),
-                          g.Key.Name,
-                          g.Count(),
-                          g.Average(),
-                          g.Count(value => value >= pass)))
-            .ToListAsync(ct);
+        return from m in GradedMarks(ctx)
+               join s in Scope(_context.Subjects, ctx) on m.SubjectId equals s.Id
+               group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+                   by new { s.Id, s.Name }
+               into g
+               orderby g.Key.Name, g.Key.Id
+               select new AcademicGroup(
+                   g.Key.Id.ToString(),
+                   g.Key.Name,
+                   g.Count(),
+                   g.Average(),
+                   g.Count(value => value >= pass));
+    }
+
+    public async Task<IReadOnlyList<AcademicGroup>> GetBySubjectAsync(
+        StatisticsQuery ctx, CancellationToken ct) =>
+        await BySubjectQuery(ctx).ToListAsync(ct);
+
+    public Task<PagedResultDto<AcademicGroup>> GetBySubjectPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct) =>
+        PageAsync(BySubjectQuery(ctx), pagination, ct);
+
+    public Task<PagedResultDto<AcademicGroup>> GetByClassPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct) =>
+        PageAsync(ByClassQuery(ctx), pagination, ct);
+
+    private IQueryable<AcademicGroup> ByClassQuery(StatisticsQuery ctx)
+    {
+        var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
+
+        return from m in GradedMarks(ctx)
+               join c in ClassesInScope(ctx) on m.ClassId equals c.Id
+               group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+                   by new { c.Id, c.Name }
+               into g
+               orderby g.Key.Name, g.Key.Id
+               select new AcademicGroup(
+                   g.Key.Id.ToString(),
+                   g.Key.Name,
+                   g.Count(),
+                   g.Average(),
+                   g.Count(value => value >= pass));
     }
 
     public async Task<IReadOnlyList<AcademicGroup>> GetByClassAsync(
-        StatisticsQuery ctx, CancellationToken ct)
-    {
-        var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
-
-        return await (from m in GradedMarks(ctx)
-                      join c in ClassesInScope(ctx) on m.ClassId equals c.Id
-                      group m.FirstMark!.Value * first + m.SecondMark!.Value * second
-                          by new { c.Id, c.Name }
-                      into g
-                      orderby g.Key.Name
-                      select new AcademicGroup(
-                          g.Key.Id.ToString(),
-                          g.Key.Name,
-                          g.Count(),
-                          g.Average(),
-                          g.Count(value => value >= pass)))
-            .ToListAsync(ct);
-    }
+        StatisticsQuery ctx, CancellationToken ct) =>
+        await ByClassQuery(ctx).ToListAsync(ct);
 
     public async Task<IReadOnlyList<AcademicGroup>> GetByClassAsync(
         StatisticsQuery ctx, IReadOnlyCollection<Guid> classIds, CancellationToken ct)

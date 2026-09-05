@@ -40,6 +40,9 @@ public class SchoolServiceLocationTests
         public Task<School?> GetWithLocationAsync(Guid schoolId, CancellationToken ct) => Task.FromResult<School?>(Added);
         public Task<IEnumerable<School>> GetAllOrderedAsync(bool activeOnly, CancellationToken ct) =>
             Task.FromResult<IEnumerable<School>>([]);
+        public Task<EduCore.Dtos.Pagination.PagedResultDto<School>> GetOrderedPagedAsync(
+            bool activeOnly, EduCore.Dtos.Pagination.PaginationQueryDto pagination, CancellationToken ct) =>
+            Task.FromResult(new EduCore.Dtos.Pagination.PagedResultDto<School>([], 1, 20, 0));
         public Task<IEnumerable<School>> GetByCityAsync(Guid cityId, bool activeOnly, CancellationToken ct) =>
             Task.FromResult<IEnumerable<School>>([]);
         public Task<IEnumerable<School>> GetByStateAsync(Guid stateId, bool activeOnly, CancellationToken ct) =>

@@ -139,6 +139,12 @@ public sealed class ClassStatisticsServiceTests
 
         public Task<IReadOnlyList<AcademicGroup>> GetBySubjectAsync(
             StatisticsQuery ctx, CancellationToken ct) => throw new NotImplementedException();
+        public Task<PagedResultDto<AcademicGroup>> GetBySubjectPagedAsync(
+            StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct) =>
+            throw new NotImplementedException();
+        public Task<PagedResultDto<AcademicGroup>> GetByClassPagedAsync(
+            StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct) =>
+            throw new NotImplementedException();
         public Task<IReadOnlyList<AcademicGroup>> GetByGradeAsync(
             StatisticsQuery ctx, CancellationToken ct) => throw new NotImplementedException();
         public Task<GradeDistributionResultDto> GetDistributionAsync(
@@ -174,10 +180,19 @@ public sealed class ClassStatisticsServiceTests
             StatisticsQuery ctx, CancellationToken ct) => throw new NotImplementedException();
         public Task<IReadOnlyList<AttendanceGroup>> GetBySubjectAsync(
             StatisticsQuery ctx, CancellationToken ct) => throw new NotImplementedException();
+        public Task<PagedResultDto<AttendanceGroup>> GetByClassPagedAsync(
+            StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct) =>
+            throw new NotImplementedException();
+        public Task<PagedResultDto<AttendanceGroup>> GetBySubjectPagedAsync(
+            StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct) =>
+            throw new NotImplementedException();
         public Task<IReadOnlyList<(DateOnly Day, int Records, int Present)>> GetDailyTrendAsync(
             StatisticsQuery ctx, CancellationToken ct) => throw new NotImplementedException();
         public Task<IReadOnlyList<StudentAttendanceSummaryDto>> GetByStudentAsync(
             StatisticsQuery ctx, CancellationToken ct) => throw new NotImplementedException();
+        public Task<PagedResultDto<StudentAttendanceSummaryDto>> GetByStudentPagedAsync(
+            StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct) =>
+            throw new NotImplementedException();
         public Task<IReadOnlyList<ExcessiveAbsenceStudentDto>> GetExcessiveAbsencesAsync(
             StatisticsQuery ctx, double absenceRateThreshold, CancellationToken ct) =>
             throw new NotImplementedException();

@@ -10,6 +10,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<Student> Students => Set<Student>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
     public DbSet<Directorate> Directorates => Set<Directorate>();
@@ -42,6 +43,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<TeacherSubject> TeacherSubjects => Set<TeacherSubject>();
     public DbSet<ClassSubjectTeacher> ClassSubjectTeachers => Set<ClassSubjectTeacher>();
     public DbSet<GradeCurriculum> GradeCurricula => Set<GradeCurriculum>();
+    public DbSet<SchoolStatisticsSnapshot> SchoolStatisticsSnapshots => Set<SchoolStatisticsSnapshot>();
 
     public DbSet<SchoolShift> SchoolShifts => Set<SchoolShift>();
     public DbSet<ShiftPeriod> ShiftPeriods => Set<ShiftPeriod>();
@@ -59,6 +61,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
 
         modelBuilder.Entity<AuditLog>().Property(a => a.Action).HasMaxLength(1000);
         modelBuilder.Entity<AuditLog>().Property(a => a.TraceId).HasMaxLength(200);
+
+        // The admin listing sorts Timestamp DESC, Id and pages 20 rows. Without this the
+        // dominant unfiltered case is a parallel sequential scan over the whole table followed
+        // by a top-N sort — measured at 1177 ms cold on 170k rows, to return twenty of them.
+        // Descending to match the sort, with Id as the tie-break the query already applies.
+        modelBuilder.Entity<AuditLog>()
+            .HasIndex(a => new { a.Timestamp, a.Id })
+            .IsDescending(true, false);
     }
 
     private void ScopeToSchool<T>(ModelBuilder modelBuilder) where T : class, ISchoolScoped =>
@@ -79,6 +89,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         modelBuilder.Entity<User>().Property(u => u.Email).HasMaxLength(320);
         modelBuilder.Entity<User>().Property(u => u.PasswordHash).HasMaxLength(500);
         modelBuilder.Entity<User>().Property<uint>("Version").IsRowVersion();
+
+        modelBuilder.Entity<PasswordResetToken>()
+            .HasOne(t => t.User).WithMany()
+            .HasForeignKey(t => t.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+        // Redemption looks a token up by its hash and nothing else, so this index is the
+        // whole read path. Unique because two live tokens must never collide.
+        modelBuilder.Entity<PasswordResetToken>().HasIndex(t => t.TokenHash).IsUnique();
+        modelBuilder.Entity<PasswordResetToken>().Property(t => t.TokenHash).HasMaxLength(64);
+        // Backs both "invalidate this user's outstanding tokens" and the expiry sweep.
+        modelBuilder.Entity<PasswordResetToken>().HasIndex(t => new { t.UserId, t.ExpiresAt });
 
         modelBuilder.Entity<Student>()
             .HasOne(s => s.User).WithOne()
@@ -350,6 +371,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .HasIndex(gc => new { gc.SchoolId, gc.Grade, gc.SubjectId }).IsUnique();
         modelBuilder.Entity<GradeCurriculum>().Property<uint>("Version").IsRowVersion();
         ScopeToSchool<GradeCurriculum>(modelBuilder);
+
+        // One row per (school, window). The lookup is always by the whole key, and it must be
+        // unique or two concurrent recomputes would leave duplicates that disagree.
+        modelBuilder.Entity<SchoolStatisticsSnapshot>()
+            .HasIndex(s => new { s.SchoolId, s.From, s.To, s.AcademicYearId, s.GradingPeriodId })
+            .IsUnique();
+        // Deliberately no row version: a snapshot is derived data. Two requests racing to
+        // refresh the same row both write the same numbers, so last-writer-wins is correct
+        // and a concurrency exception would only fail a read for no benefit.
+        ScopeToSchool<SchoolStatisticsSnapshot>(modelBuilder);
     }
 
     private void ConfigureScheduling(ModelBuilder modelBuilder)

@@ -15,6 +15,11 @@ public static class CurriculumEndpoints
         group.MapGet("/", async (ICurriculumService service, CancellationToken ct) =>
             Results.Ok(await service.GetAllAsync(ct)));
 
+        // What a class of this grade may be assigned a teacher for. The assignment picker
+        // reads this so it offers exactly the subjects the API will accept.
+        group.MapGet("/grade/{grade:int}", async (int grade, ICurriculumService service, CancellationToken ct) =>
+            Results.Ok(await service.GetSubjectsForGradeAsync(grade, ct)));
+
         group.MapPost("/", async (GradeCurriculumAddDto dto, ICurriculumService service, CancellationToken ct) =>
             Results.Ok(await service.AddAsync(dto, ct)));
 

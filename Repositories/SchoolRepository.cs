@@ -1,3 +1,5 @@
+using EduCore.Dtos.Pagination;
+using EduCore.Helpers;
 using EduCore.Data;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
@@ -19,6 +21,34 @@ public class SchoolRepository(AppDbContext context) : Repository<School>(context
             query = query.Where(s => s.DeactivatedAt == null);
 
         return await query.OrderBy(s => s.Name).ToListAsync(ct);
+    }
+
+    public async Task<PagedResultDto<School>> GetOrderedPagedAsync(
+        bool activeOnly, PaginationQueryDto pagination, CancellationToken ct)
+    {
+        var (page, pageSize) = ListPagination.Normalize(pagination);
+
+        var query = _context.Schools
+            .AsNoTracking()
+            .Include(s => s.City).ThenInclude(c => c!.State)
+            .Include(s => s.Zone)
+            .AsQueryable();
+
+        if (activeOnly)
+            query = query.Where(s => s.DeactivatedAt == null);
+
+        var totalCount = await query.CountAsync(ct);
+
+        // Id after Name: school names are not unique nationwide, and without a tie-breaker
+        // equal names can swap places between two LIMIT/OFFSET queries, so a row shows twice
+        // on one page and never on the next.
+        var items = await query
+            .OrderBy(s => s.Name).ThenBy(s => s.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return new PagedResultDto<School>(items, page, pageSize, totalCount);
     }
 
     public async Task<IEnumerable<School>> GetByCityAsync(Guid cityId, bool activeOnly, CancellationToken ct)

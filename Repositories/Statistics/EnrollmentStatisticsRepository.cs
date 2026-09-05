@@ -1,3 +1,4 @@
+using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Rows;
 using EduCore.Data;
@@ -68,23 +69,27 @@ public class EnrollmentStatisticsRepository(AppDbContext context)
         return rows.Select(r => new CountRow(r.Id.ToString(), r.Name, r.Count)).ToList();
     }
 
-    public async Task<IReadOnlyList<(Guid ClassId, string ClassName, int Grade, int? Capacity, int Enrolled)>>
-        GetCapacityAsync(StatisticsQuery ctx, CancellationToken ct)
+    // Id after Grade and Name: class names repeat across schools, and an unbroken tie lets
+    // LIMIT/OFFSET rearrange rows between pages, dropping some and duplicating others.
+    private IQueryable<ClassCapacityRow> CapacityQuery(StatisticsQuery ctx)
     {
         var enrollments = EnrollmentsInWindow(ctx).Where(e => e.LeftAt == null);
 
-        var rows = await (from c in ClassesInScope(ctx)
-                          orderby c.Grade, c.Name
-                          select new
-                          {
-                              c.Id,
-                              c.Name,
-                              c.Grade,
-                              c.Capacity,
-                              Enrolled = enrollments.Count(e => e.ClassId == c.Id)
-                          })
-            .ToListAsync(ct);
-
-        return rows.Select(r => (r.Id, r.Name, r.Grade, r.Capacity, r.Enrolled)).ToList();
+        return from c in ClassesInScope(ctx)
+               orderby c.Grade, c.Name, c.Id
+               select new ClassCapacityRow(
+                   c.Id,
+                   c.Name,
+                   c.Grade,
+                   c.Capacity,
+                   enrollments.Count(e => e.ClassId == c.Id));
     }
+
+    public async Task<IReadOnlyList<ClassCapacityRow>> GetCapacityAsync(
+        StatisticsQuery ctx, CancellationToken ct) =>
+        await CapacityQuery(ctx).ToListAsync(ct);
+
+    public Task<PagedResultDto<ClassCapacityRow>> GetCapacityPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct) =>
+        PageAsync(CapacityQuery(ctx), pagination, ct);
 }

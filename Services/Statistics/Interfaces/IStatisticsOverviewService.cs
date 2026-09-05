@@ -10,5 +10,6 @@ public interface IStatisticsOverviewService
     Task<SchoolOverviewDto> GetSchoolOverviewAsync(StatisticsFilter filter, CancellationToken ct);
     Task<SchoolOverviewDto> GetSchoolOverviewAsync(
         StatisticsFilter filter, PaginationQueryDto pagination, CancellationToken ct);
-    Task<PlatformOverviewDto> GetPlatformOverviewAsync(StatisticsFilter filter, CancellationToken ct);
+    Task<PlatformOverviewDto> GetPlatformOverviewAsync(
+        StatisticsFilter filter, PaginationQueryDto? pagination, CancellationToken ct);
 }

@@ -13,6 +13,12 @@ public interface IAcademicStatisticsRepository
     Task<IReadOnlyList<AcademicGroup>> GetBySubjectAsync(StatisticsQuery ctx, CancellationToken ct);
     Task<IReadOnlyList<AcademicGroup>> GetByClassAsync(StatisticsQuery ctx, CancellationToken ct);
 
+    // Same aggregations, ordered totally and sliced in the database.
+    Task<PagedResultDto<AcademicGroup>> GetBySubjectPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct);
+    Task<PagedResultDto<AcademicGroup>> GetByClassPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct);
+
     // Same aggregation as GetByClassAsync, restricted to the requested classes so a
     // paged caller only pays for the page it returns.
     Task<IReadOnlyList<AcademicGroup>> GetByClassAsync(

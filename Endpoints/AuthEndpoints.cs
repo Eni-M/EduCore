@@ -24,6 +24,25 @@ public static class AuthEndpoints
             return Results.Ok(result.User);
         }).RequireRateLimiting("LoginPolicy");
 
+        // Anonymous by necessity — someone who cannot sign in is the only caller. Always 204,
+        // whether or not the address matches an account: a 404 here would let anyone test
+        // which email addresses hold accounts.
+        group.MapPost("/forgot-password", async (
+                ForgotPasswordDto dto, IPasswordResetService service, CancellationToken ct) =>
+            {
+                await service.RequestAsync(dto, ct);
+                return Results.NoContent();
+            })
+            .RequireRateLimiting("PasswordResetPolicy");
+
+        group.MapPost("/reset-password", async (
+                ResetPasswordDto dto, IPasswordResetService service, CancellationToken ct) =>
+            {
+                await service.ResetAsync(dto, ct);
+                return Results.NoContent();
+            })
+            .RequireRateLimiting("PasswordResetPolicy");
+
         group.MapPost("/logout", (ISessionCookies cookies, HttpResponse response) =>
         {
             cookies.Clear(response);

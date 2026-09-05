@@ -1,3 +1,4 @@
+using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
 using EduCore.Helpers;
 using EduCore.Data;
@@ -47,100 +48,101 @@ public class TeacherStatisticsRepository(
                select u.FirstName + " " + u.LastName)
             .FirstOrDefaultAsync(ct);
 
-    public async Task<IReadOnlyList<TeacherWorkloadDto>> GetWorkloadAsync(
-        StatisticsQuery ctx, CancellationToken ct)
+    // Projected straight into the DTO rather than into an anonymous type that is mapped after
+    // materialising, so the full-list and paged readers below are the same query and cannot
+    // drift apart. Ordered by school then name, tie-broken on the teacher id: two teachers can
+    // share a name, and an unbroken tie lets LIMIT/OFFSET show one twice and the other never.
+    private IQueryable<TeacherWorkloadDto> WorkloadQuery(StatisticsQuery ctx)
     {
         var assignments = AssignmentsInWindow(ctx);
         var lessons = LessonsInWindow(ctx);
         var activeEnrollments = EnrollmentsInWindow(ctx).Where(e => e.LeftAt == null);
 
-        var rows = await (from t in TeachersInScope(ctx)
-                          join u in _context.Users on t.UserId equals u.Id
-                          join sc in _context.Schools.IgnoreQueryFilters() on t.SchoolId equals sc.Id
-                          orderby sc.Name, u.LastName, u.FirstName
-                          select new
-                          {
-                              t.Id,
-                              u.FirstName,
-                              u.LastName,
-                              t.SchoolId,
-                              SchoolName = sc.Name,
-                              Classes = assignments
-                                  .Where(a => a.TeacherId == t.Id)
-                                  .Select(a => a.ClassId)
-                                  .Distinct()
-                                  .Count(),
-                              Subjects = assignments
-                                  .Where(a => a.TeacherId == t.Id)
-                                  .Select(a => a.SubjectId)
-                                  .Distinct()
-                                  .Count(),
-                              Students = activeEnrollments
-                                  .Where(e => assignments
-                                      .Where(a => a.TeacherId == t.Id)
-                                      .Select(a => a.ClassId)
-                                      .Contains(e.ClassId))
-                                  .Select(e => e.StudentId)
-                                  .Distinct()
-                                  .Count(),
-                              Lessons = lessons.Count(d => d.TeacherId == t.Id)
-                          })
-            .ToListAsync(ct);
-
-        return rows
-            .Select(r => new TeacherWorkloadDto(
-                r.Id, r.FirstName + " " + r.LastName, r.SchoolId, r.SchoolName,
-                r.Classes, r.Subjects, r.Students, r.Lessons))
-            .ToList();
+        return from t in TeachersInScope(ctx)
+               join u in _context.Users on t.UserId equals u.Id
+               join sc in _context.Schools.IgnoreQueryFilters() on t.SchoolId equals sc.Id
+               orderby sc.Name, u.LastName, u.FirstName, t.Id
+               select new TeacherWorkloadDto(
+                   t.Id,
+                   u.FirstName + " " + u.LastName,
+                   t.SchoolId,
+                   sc.Name,
+                   assignments
+                       .Where(a => a.TeacherId == t.Id)
+                       .Select(a => a.ClassId)
+                       .Distinct()
+                       .Count(),
+                   assignments
+                       .Where(a => a.TeacherId == t.Id)
+                       .Select(a => a.SubjectId)
+                       .Distinct()
+                       .Count(),
+                   activeEnrollments
+                       .Where(e => assignments
+                           .Where(a => a.TeacherId == t.Id)
+                           .Select(a => a.ClassId)
+                           .Contains(e.ClassId))
+                       .Select(e => e.StudentId)
+                       .Distinct()
+                       .Count(),
+                   lessons.Count(d => d.TeacherId == t.Id));
     }
 
-    public async Task<IReadOnlyList<TeacherCoverageDto>> GetCoverageAsync(
-        StatisticsQuery ctx, CancellationToken ct)
+    public async Task<IReadOnlyList<TeacherWorkloadDto>> GetWorkloadAsync(
+        StatisticsQuery ctx, CancellationToken ct) =>
+        await WorkloadQuery(ctx).ToListAsync(ct);
+
+    public Task<PagedResultDto<TeacherWorkloadDto>> GetWorkloadPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct) =>
+        PageAsync(WorkloadQuery(ctx), pagination, ct);
+
+    // Same shape as WorkloadQuery: projected into the DTO in the database so the paged reader
+    // slices the identical query, with the same total ordering.
+    private IQueryable<TeacherCoverageDto> CoverageQuery(StatisticsQuery ctx)
     {
         var lessons = LessonsInWindow(ctx);
         var attendances = Scope(_context.Attendances, ctx);
         var activeEnrollments = EnrollmentsInWindow(ctx).Where(e => e.LeftAt == null);
         var periodMarks = MarksInWindow(ctx);
 
-        var rows = await (from t in TeachersInScope(ctx)
-                          join u in _context.Users on t.UserId equals u.Id
-                          join sc in _context.Schools.IgnoreQueryFilters() on t.SchoolId equals sc.Id
-                          orderby sc.Name, u.LastName, u.FirstName
-                          select new
-                          {
-                              t.Id,
-                              u.FirstName,
-                              u.LastName,
-                              t.SchoolId,
-                              SchoolName = sc.Name,
-                              Lessons = lessons.Count(d => d.TeacherId == t.Id),
-
-                              Incomplete = lessons
-                                  .Where(d => d.TeacherId == t.Id)
-                                  .Count(d => attendances.Count(a => a.DiaryEntryId == d.Id)
-                                              < activeEnrollments.Count(e => e.ClassId == d.ClassId)),
-
-                              MarksTotal = periodMarks.Count(m => m.TeacherId == t.Id),
-                              MarksComplete = periodMarks.Count(m => m.TeacherId == t.Id
-                                                                     && m.FirstMark != null
-                                                                     && m.SecondMark != null)
-                          })
-            .ToListAsync(ct);
-
-        return rows
-            .Select(r => new TeacherCoverageDto(
-                r.Id,
-                r.FirstName + " " + r.LastName,
-                r.SchoolId,
-                r.SchoolName,
-                r.Lessons,
-                r.Incomplete,
-                r.MarksTotal,
-                r.MarksComplete,
-                r.MarksTotal - r.MarksComplete,
-                r.MarksTotal == 0 ? 0 : Math.Round(r.MarksComplete * 100.0 / r.MarksTotal, 2)))
-            .ToList();
+        return from t in TeachersInScope(ctx)
+               join u in _context.Users on t.UserId equals u.Id
+               join sc in _context.Schools.IgnoreQueryFilters() on t.SchoolId equals sc.Id
+               orderby sc.Name, u.LastName, u.FirstName, t.Id
+               select new TeacherCoverageDto(
+                   t.Id,
+                   u.FirstName + " " + u.LastName,
+                   t.SchoolId,
+                   sc.Name,
+                   lessons.Count(d => d.TeacherId == t.Id),
+                   lessons
+                       .Where(d => d.TeacherId == t.Id)
+                       .Count(d => attendances.Count(a => a.DiaryEntryId == d.Id)
+                                   < activeEnrollments.Count(e => e.ClassId == d.ClassId)),
+                   periodMarks.Count(m => m.TeacherId == t.Id),
+                   periodMarks.Count(m => m.TeacherId == t.Id
+                                          && m.FirstMark != null
+                                          && m.SecondMark != null),
+                   periodMarks.Count(m => m.TeacherId == t.Id)
+                   - periodMarks.Count(m => m.TeacherId == t.Id
+                                            && m.FirstMark != null
+                                            && m.SecondMark != null),
+                   periodMarks.Count(m => m.TeacherId == t.Id) == 0
+                       ? 0
+                       : Math.Round(
+                           periodMarks.Count(m => m.TeacherId == t.Id
+                                                  && m.FirstMark != null
+                                                  && m.SecondMark != null) * 100.0
+                           / periodMarks.Count(m => m.TeacherId == t.Id), 2));
     }
+
+    public async Task<IReadOnlyList<TeacherCoverageDto>> GetCoverageAsync(
+        StatisticsQuery ctx, CancellationToken ct) =>
+        await CoverageQuery(ctx).ToListAsync(ct);
+
+    public Task<PagedResultDto<TeacherCoverageDto>> GetCoveragePagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct) =>
+        PageAsync(CoverageQuery(ctx), pagination, ct);
 
     public async Task<IReadOnlyList<(Guid ClassId, string ClassName, int Grade, Guid SubjectId,
         string SubjectName, int GradedMarks, double? Average, int Passed)>> GetPerformanceAsync(

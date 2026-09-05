@@ -1,3 +1,4 @@
+using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Rows;
 using EduCore.Services.Statistics;
@@ -15,6 +16,9 @@ public interface IEnrollmentStatisticsRepository
     Task<IReadOnlyList<CountRow>> GetExitsByReasonAsync(StatisticsQuery ctx, CancellationToken ct);
     Task<IReadOnlyList<CountRow>> GetByAcademicYearAsync(StatisticsQuery ctx, CancellationToken ct);
 
-    Task<IReadOnlyList<(Guid ClassId, string ClassName, int Grade, int? Capacity, int Enrolled)>>
-        GetCapacityAsync(StatisticsQuery ctx, CancellationToken ct);
+    Task<IReadOnlyList<ClassCapacityRow>> GetCapacityAsync(StatisticsQuery ctx, CancellationToken ct);
+
+    // Same classes as GetCapacityAsync, ordered totally and sliced in the database.
+    Task<PagedResultDto<ClassCapacityRow>> GetCapacityPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct);
 }

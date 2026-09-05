@@ -1,4 +1,5 @@
 using EduCore.Dtos.Curriculum;
+using EduCore.Dtos.Subject;
 using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
@@ -18,6 +19,10 @@ public class CurriculumService(
     public async Task<IEnumerable<GradeCurriculumEntryDto>> GetAllAsync(CancellationToken ct) =>
         (await curriculum.GetAllAsync(ct))
         .Select(gc => new GradeCurriculumEntryDto(gc.Id, gc.Grade, gc.SubjectId, gc.Subject.Name));
+
+    public async Task<IEnumerable<SubjectListDto>> GetSubjectsForGradeAsync(int grade, CancellationToken ct) =>
+        (await curriculum.GetSubjectsForGradeAsync(grade, ct))
+        .Select(s => new SubjectListDto(s.Id, s.Name));
 
     public async Task<GradeCurriculumEntryDto> AddAsync(GradeCurriculumAddDto dto, CancellationToken ct)
     {
