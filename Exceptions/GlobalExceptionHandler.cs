@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using EduCore.Dtos.Errors;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +10,20 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        var traceId = httpContext.TraceIdentifier;
+        // Prefer the W3C trace id over ASP.NET's TraceIdentifier. Both identify the request, but
+        // only this one is the id the trace is filed under in whatever collects traces -- so when
+        // a user reports "it said error a1b2c3", that string leads straight to the recorded
+        // request, its database statements and its exception. TraceIdentifier is a per-process
+        // connection:request counter that means nothing outside this instance's own log file.
+        var traceId = Activity.Current?.TraceId.ToString() ?? httpContext.TraceIdentifier;
+
+        // Marks the span itself as failed, so the trace shows up in an "errors only" view rather
+        // than having to be found by timestamp.
+        if (Activity.Current is { } activity)
+        {
+            activity.SetStatus(ActivityStatusCode.Error, exception.Message);
+            activity.AddException(exception);
+        }
 
         if (exception is DbUpdateException dbEx && dbEx.InnerException is PostgresException { SqlState: "23505" } pgEx)
         {

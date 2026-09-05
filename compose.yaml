@@ -74,6 +74,12 @@ services:
       Email__Username: ${Email__Username:-}
       Email__Password: ${Email__Password:-}
       Email__UseSslOnConnect: ${Email__UseSslOnConnect:-false}
+      # Metrics on /metrics for anything that scrapes Prometheus format, and traces collected in
+      # process. Set Observability__OtlpEndpoint to ship traces to a collector when one exists.
+      Observability__ServiceName: ${Observability__ServiceName:-educore-api}
+      Observability__OtlpEndpoint: ${Observability__OtlpEndpoint:-}
+      Observability__TraceSampleRatio: ${Observability__TraceSampleRatio:-1.0}
+      Observability__MetricsRequireAuthentication: ${Observability__MetricsRequireAuthentication:-false}
       # Requests reach the API through nginx in the `web` container, so its X-Forwarded-For
       # is the only source of the real client IP -- and the rate limiters partition on that.
       # Trust the compose bridge network and nothing else: a client that sets the header

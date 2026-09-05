@@ -8,6 +8,7 @@ using System.Security.Claims;
 using AutoMapper;
 using EduCore.Data;
 using EduCore.Endpoints;
+using EduCore.Observability;
 using EduCore.Endpoints.Statistics;
 using EduCore.Exceptions;
 using EduCore.Models;
@@ -52,6 +53,9 @@ builder.WebHost.ConfigureKestrel(kestrel =>
     // Do not name the server software in every response.
     kestrel.AddServerHeader = false;
 });
+
+// Metrics and traces. Returns the resolved options so the metrics endpoint can be mapped below.
+var observability = builder.AddEduCoreObservability();
 
 builder.Services.AddOpenApi();
 
@@ -503,6 +507,10 @@ app.UseAuthorization();
 // database is down (a health check that fails with its dependencies turns one outage into a
 // restart loop), and it must not be able to consume a client's request quota.
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" })).DisableRateLimiting();
+
+// Counters and timings for whatever scrapes them. Placed after authentication so the option to
+// require a signed-in caller actually applies.
+app.MapEduCoreMetrics(observability);
 
 app.MapAuthEndpoints();
 
