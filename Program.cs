@@ -112,6 +112,7 @@ builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
 builder.Services.AddScoped<IStudentRepository, StudentRepository>();
+builder.Services.AddScoped<IStudentAcademicRecordRepository, StudentAcademicRecordRepository>();
 builder.Services.AddScoped<ITeacherRepository, TeacherRepository>();
 builder.Services.AddScoped<IDirectorateRepository, DirectorateRepository>();
 builder.Services.AddScoped<IRegionalAdminRepository, RegionalAdminRepository>();
@@ -259,6 +260,7 @@ else
     builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
 builder.Services.AddScoped<IScheduleDigestService, ScheduleDigestService>();
 builder.Services.AddHostedService<ScheduledEmailBackgroundService>();
+builder.Services.AddScoped<IStudentAcademicHistoryService, StudentAcademicHistoryService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<IGuardianService, GuardianService>();
 builder.Services.AddScoped<ITeacherService, TeacherService>();

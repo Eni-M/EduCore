@@ -1292,6 +1292,93 @@ namespace EduCore.Migrations
                     b.ToTable("Students");
                 });
 
+            modelBuilder.Entity("EduCore.Models.StudentAcademicRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AcademicYearId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AcademicYearName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ClassName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CompiledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("EnrolledAt")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("ExitReason")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Grade")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("LeftAt")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SchoolName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudentId", "EnrolledAt");
+
+                    b.HasIndex("StudentId", "SchoolId", "AcademicYearId")
+                        .IsUnique();
+
+                    b.ToTable("StudentAcademicRecords");
+                });
+
+            modelBuilder.Entity("EduCore.Models.StudentAcademicRecordSubject", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("AnnualMark")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("StudentAcademicRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SubjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SubjectName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudentAcademicRecordId", "SubjectName");
+
+                    b.ToTable("StudentAcademicRecordSubjects");
+                });
+
             modelBuilder.Entity("EduCore.Models.StudentDocument", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2024,6 +2111,26 @@ namespace EduCore.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("EduCore.Models.StudentAcademicRecord", b =>
+                {
+                    b.HasOne("EduCore.Models.Student", null)
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EduCore.Models.StudentAcademicRecordSubject", b =>
+                {
+                    b.HasOne("EduCore.Models.StudentAcademicRecord", "Record")
+                        .WithMany("Subjects")
+                        .HasForeignKey("StudentAcademicRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Record");
+                });
+
             modelBuilder.Entity("EduCore.Models.StudentDocument", b =>
                 {
                     b.HasOne("EduCore.Models.Student", null)
@@ -2127,6 +2234,11 @@ namespace EduCore.Migrations
                     b.Navigation("Enrollments");
 
                     b.Navigation("Guardians");
+                });
+
+            modelBuilder.Entity("EduCore.Models.StudentAcademicRecord", b =>
+                {
+                    b.Navigation("Subjects");
                 });
 
             modelBuilder.Entity("EduCore.Models.Teacher", b =>

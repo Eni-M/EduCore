@@ -29,6 +29,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<SchoolingHistory> SchoolingHistories => Set<SchoolingHistory>();
     public DbSet<StudentDocument> StudentDocuments => Set<StudentDocument>();
     public DbSet<StudentMedicalRecord> StudentMedicalRecords => Set<StudentMedicalRecord>();
+    public DbSet<StudentAcademicRecord> StudentAcademicRecords => Set<StudentAcademicRecord>();
+    public DbSet<StudentAcademicRecordSubject> StudentAcademicRecordSubjects =>
+        Set<StudentAcademicRecordSubject>();
     public DbSet<Notice> Notices => Set<Notice>();
     public DbSet<CalendarEvent> CalendarEvents => Set<CalendarEvent>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -573,6 +576,44 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.Notes).HasMaxLength(4000);
         modelBuilder.Entity<StudentMedicalRecord>().Property<uint>("Version").IsRowVersion();
         ScopeToSchool<StudentMedicalRecord>(modelBuilder);
+
+        // Transcript rows. The only student-owned table here that is NOT school-scoped, and the
+        // only one keyed on StudentId alone rather than the composite (StudentId, SchoolId).
+        //
+        // Both differences are the point. The composite key used above ties a row to the student's
+        // *current* school; a transcript row belongs to a school the student has usually already
+        // left, so that key would reject exactly the rows worth keeping. Restrict on delete, so
+        // removing a student is refused while history exists rather than silently erasing it.
+        modelBuilder.Entity<StudentAcademicRecord>()
+            .HasOne<Student>().WithMany()
+            .HasForeignKey(r => r.StudentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // One row per student per school per year. Rebuilding a record must update the existing
+        // row rather than accumulate duplicates, and this is what makes that detectable.
+        modelBuilder.Entity<StudentAcademicRecord>()
+            .HasIndex(r => new { r.StudentId, r.SchoolId, r.AcademicYearId })
+            .IsUnique();
+
+        // The read path is always "this student's whole history, newest first".
+        modelBuilder.Entity<StudentAcademicRecord>().HasIndex(r => new { r.StudentId, r.EnrolledAt });
+
+        modelBuilder.Entity<StudentAcademicRecord>().Property(r => r.SchoolName).HasMaxLength(200);
+        modelBuilder.Entity<StudentAcademicRecord>().Property(r => r.AcademicYearName).HasMaxLength(100);
+        modelBuilder.Entity<StudentAcademicRecord>().Property(r => r.ClassName).HasMaxLength(100);
+        modelBuilder.Entity<StudentAcademicRecord>().Property<uint>("Version").IsRowVersion();
+
+        // Cascade, unlike everything else in this method: a subject line has no meaning without
+        // the record it belongs to, and rebuilding a record replaces its lines wholesale.
+        modelBuilder.Entity<StudentAcademicRecordSubject>()
+            .HasOne(s => s.Record).WithMany(r => r.Subjects)
+            .HasForeignKey(s => s.StudentAcademicRecordId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<StudentAcademicRecordSubject>()
+            .HasIndex(s => new { s.StudentAcademicRecordId, s.SubjectName });
+
+        modelBuilder.Entity<StudentAcademicRecordSubject>().Property(s => s.SubjectName).HasMaxLength(200);
     }
 
     // The notice board and the shared calendar. Both are school-scoped; AuthorUserId/CreatedByUserId
