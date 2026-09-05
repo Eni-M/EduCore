@@ -1,4 +1,5 @@
 using EduCore.Helpers;
+using EduCore.Services.Account;
 using EduCore.Services.Assignment;
 using System.Net;
 using System.Text;
@@ -37,28 +38,79 @@ DotEnvFile.Load(Path.Combine(AppContext.BaseDirectory, ".env"));
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Kestrel hardening. Both of these matter even behind nginx: nginx is the edge in the compose
+// stack, but a local `dotnet run`, a future direct deployment, or anything that reaches the
+// container on port 8080 has no proxy in front of it at all.
+builder.WebHost.ConfigureKestrel(kestrel =>
+{
+    // Student documents are capped at 10 MB by Storage:MaxFileSizeBytes, which is enforced
+    // after the body has been read. This refuses an oversized body at the transport instead,
+    // so a client cannot make the server buffer 30 MB (the framework default) to be told no.
+    // Kept above the application limit so the application stays the component that decides.
+    kestrel.Limits.MaxRequestBodySize = 12 * 1024 * 1024;
+
+    // Do not name the server software in every response.
+    kestrel.AddServerHeader = false;
+});
+
 builder.Services.AddOpenApi();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 
+// Backing store for the account-status cache below. Nothing else uses IMemoryCache today; if
+// something does later, note that entries here are bounded by their 60-second lifetime rather
+// than by a configured SizeLimit -- setting one would require every other caller to declare a
+// Size, which is a trap worth avoiding.
+builder.Services.AddMemoryCache();
+
+// Removes the per-request Users SELECT that every authenticated /api call used to make, without
+// making revocation eventually-consistent: see AccountStatusCache and AccountStatusInvalidationInterceptor.
+builder.Services.AddScoped<IAccountStatusCache, AccountStatusCache>();
+
 builder.Services.AddScoped<AuditSaveChangesInterceptor>();
 builder.Services.AddScoped<SchoolScopeInterceptor>();
+builder.Services.AddScoped<StatisticsInvalidationInterceptor>();
+builder.Services.AddScoped<AccountStatusInvalidationInterceptor>();
 
 var defaultConnectionString = builder.Configuration.GetConnectionString("Default")
     ?? builder.Configuration["DATABASE_URL"]
     ?? builder.Configuration["ConnectionStrings:Default"];
 
 builder.Services.AddDbContext<AppDbContext>((sp, options) =>
-    options.UseNpgsql(defaultConnectionString)
+    options.UseNpgsql(defaultConnectionString, npgsql =>
+        {
+            // A transient failure here is not hypothetical: a managed database that scales down
+            // when idle drops its connections, so the first request after a quiet spell fails
+            // for no reason the user can act on. Retry those, and only those -- EF classifies
+            // which errors are transient, and never retries one that might have committed.
+            //
+            // This works because the application opens no explicit transactions anywhere (a
+            // property worth keeping): the execution strategy can safely replay a whole
+            // operation. If a BeginTransaction is ever added, it has to be wrapped in
+            // strategy.ExecuteAsync or EF will refuse it at run time.
+            npgsql.EnableRetryOnFailure(
+                maxRetryCount: 3,
+                maxRetryDelay: TimeSpan.FromSeconds(5),
+                errorCodesToAdd: null);
+
+            // A query that runs longer than this is not going to finish usefully -- it is going
+            // to hold a connection while a user stares at a spinner. Fail it and free the
+            // connection instead. Above the slowest legitimate screen (the statistics overview
+            // on a cold snapshot), well below any human's patience.
+            npgsql.CommandTimeout(30);
+        })
         .AddInterceptors(
             sp.GetRequiredService<AuditSaveChangesInterceptor>(),
-            sp.GetRequiredService<SchoolScopeInterceptor>()));
+            sp.GetRequiredService<SchoolScopeInterceptor>(),
+            sp.GetRequiredService<StatisticsInvalidationInterceptor>(),
+            sp.GetRequiredService<AccountStatusInvalidationInterceptor>()));
 
 builder.Services.AddAutoMapper(cfg => { }, typeof(Program).Assembly);
 builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
 builder.Services.AddScoped<IStudentRepository, StudentRepository>();
 builder.Services.AddScoped<ITeacherRepository, TeacherRepository>();
 builder.Services.AddScoped<IDirectorateRepository, DirectorateRepository>();
@@ -131,6 +183,18 @@ builder.Services.AddOptions<StorageOptions>()
 builder.Services.AddSingleton<IValidateOptions<StorageOptions>, StorageOptionsValidator>();
 builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();
 
+// How long an emailed reset link lives, and where it points.
+// How stale a statistics snapshot may get before the next read recomputes it.
+builder.Services.AddOptions<StatisticsSnapshotOptions>()
+    .Bind(builder.Configuration.GetSection(StatisticsSnapshotOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<StatisticsSnapshotOptions>, StatisticsSnapshotOptionsValidator>();
+
+builder.Services.AddOptions<PasswordResetOptions>()
+    .Bind(builder.Configuration.GetSection(PasswordResetOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<PasswordResetOptions>, PasswordResetOptionsValidator>();
+
 builder.Services.AddOptions<SessionCookieOptions>()
     .Bind(builder.Configuration.GetSection(SessionCookieOptions.SectionName))
     .ValidateOnStart();
@@ -144,6 +208,8 @@ builder.Services.AddScoped<IGradingCalculator, GradingCalculator>();
 builder.Services.AddScoped<ICellSuppressor, CellSuppressor>();
 builder.Services.AddScoped<IStatisticsPeriodResolver, StatisticsPeriodResolver>();
 builder.Services.AddScoped<IStatisticsScopeResolver, StatisticsScopeResolver>();
+builder.Services.AddScoped<IStatisticsSnapshotRepository, StatisticsSnapshotRepository>();
+builder.Services.AddScoped<IStatisticsSnapshotService, StatisticsSnapshotService>();
 
 builder.Services.AddScoped<IStudentStatisticsRepository, StudentStatisticsRepository>();
 builder.Services.AddScoped<IEnrollmentStatisticsRepository, EnrollmentStatisticsRepository>();
@@ -163,6 +229,7 @@ builder.Services.AddScoped<IStatisticsOverviewService, StatisticsOverviewService
 
 builder.Services.AddScoped<IAccessGuard, AccessGuard>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
 builder.Services.AddScoped<ISchoolService, SchoolService>();
 builder.Services.AddScoped<IDirectorateService, DirectorateService>();
 builder.Services.AddScoped<IRegionalAdminService, RegionalAdminService>();
@@ -174,7 +241,22 @@ builder.Services.AddScoped<IClassService, ClassService>();
 builder.Services.AddScoped<IClassSubjectTeacherService, ClassSubjectTeacherService>();
 builder.Services.AddScoped<ICurriculumService, CurriculumService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
-builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
+// Mail transport. "Log" delivers nothing and writes what would have been sent -- fine for
+// development, and a silent failure in production, so the choice is explicit configuration
+// rather than an environment check. Password reset and the schedule digests are the only
+// callers; both go through IEmailSender and neither knows which transport is registered.
+builder.Services.AddOptions<EmailOptions>()
+    .Bind(builder.Configuration.GetSection(EmailOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<EmailOptions>, EmailOptionsValidator>();
+
+var emailOptions = builder.Configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>()
+    ?? new EmailOptions();
+
+if (emailOptions.IsSmtp)
+    builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+else
+    builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
 builder.Services.AddScoped<IScheduleDigestService, ScheduleDigestService>();
 builder.Services.AddHostedService<ScheduledEmailBackgroundService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
@@ -295,6 +377,22 @@ builder.Services.AddRateLimiter(options =>
             QueueLimit = 0
         }));
 
+    // Password reset is a mail-sending endpoint reachable without any credential, so it is
+    // rate-limited harder than login: the abuse to stop is flooding somebody else's inbox,
+    // not guessing a secret. Same per-IP partition and trust story as LoginPolicy.
+    options.AddPolicy("PasswordResetPolicy", context =>
+        RateLimitPartition.GetTokenBucketLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new TokenBucketRateLimiterOptions
+            {
+                TokenLimit = 3,
+                TokensPerPeriod = 3,
+                ReplenishmentPeriod = TimeSpan.FromMinutes(15),
+                AutoReplenishment = true,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
     // Add a Retry-After header when rejected
     options.OnRejected = async (context, ct) =>
     {
@@ -338,6 +436,15 @@ if (app.Environment.IsDevelopment())
 }
 
 await PlatformOwnerSeeder.SeedAsync(app.Services, app.Configuration);
+
+// A stub mail transport in production is invisible from the outside: password resets appear to
+// work, and nobody receives one. Say so at start-up rather than letting a user discover it.
+if (!emailOptions.IsSmtp && !app.Environment.IsDevelopment())
+    app.Logger.LogWarning(
+        "Email:Provider is '{Provider}', so no mail is delivered -- password reset links and "
+        + "schedule digests are written to this log instead. Set Email:Provider=Smtp with a host "
+        + "and credentials to deliver them.",
+        emailOptions.Provider);
 
 // Honour the reverse proxy's scheme/IP headers so the app knows the real client protocol
 // and address when TLS is terminated upstream (nginx / a load balancer).

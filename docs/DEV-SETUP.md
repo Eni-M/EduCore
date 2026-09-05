@@ -122,8 +122,13 @@ migrate step when the model changed (new migration), not on every run.
 To run the whole stack the way production does (no hot reload — rebuilds on change):
 
 ```bash
-docker compose up -d --build   # app at http://localhost:8080
+docker compose up -d --build   # app at https://localhost:8443
 ```
+
+nginx terminates TLS in that stack, so it needs `certs/fullchain.pem` and
+`certs/privkey.pem` first — the README has the one-line `openssl` command for a
+self-signed local pair. The dev loop above (5173 + 5128) stays on plain http and needs
+no certificate.
 
 The one-shot `migrate` container applies pending migrations before the API starts,
 and the frontend waits for a healthy API. If the API refuses to boot, check
@@ -173,5 +178,5 @@ The merge is what ships it to production.
 |---|---|
 | Frontend (dev) | http://localhost:5173 |
 | Backend (dev) | http://localhost:5128 |
-| Full Docker stack | http://localhost:8080 |
+| Full Docker stack | https://localhost:8443 (8080 redirects here) |
 | Postgres | localhost:5434 (user `educore`, db `EduCoreDB`) |
