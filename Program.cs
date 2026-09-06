@@ -264,6 +264,7 @@ else
     builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
 builder.Services.AddScoped<IScheduleDigestService, ScheduleDigestService>();
 builder.Services.AddHostedService<ScheduledEmailBackgroundService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IStudentAcademicHistoryService, StudentAcademicHistoryService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<IGuardianService, GuardianService>();
@@ -519,6 +520,7 @@ var api = app.MapGroup("/api")
     .AddEndpointFilter<AccountStatusEndpointFilter>()
     .AddEndpointFilter<ValidationEndpointFilter>();
 
+api.MapDashboardEndpoints();
 api.MapSchoolEndpoints();
 api.MapSubjectEndpoints();
 api.MapLocationEndpoints();
