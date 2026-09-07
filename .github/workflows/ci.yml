@@ -24,10 +24,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
 
@@ -53,25 +53,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
 
       - name: Install EF tools
         run: dotnet tool install --global dotnet-ef
 
-      # Throwaway values. Design-time model building resolves the options graph, so the app
-      # refuses to start without these -- but nothing here connects to a database.
+      # Restore and build explicitly, and separately from the check below. Each job gets a clean
+      # runner, so nothing here is inherited from the build-and-test job -- and the check reads
+      # the compiled model, so without this it fails on a missing assets file. It did exactly
+      # that on first run, and reported it as a missing migration, which is the wrong thing to
+      # send somebody off to fix.
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      # --no-build so this step can only fail for one reason. A compilation error here would
+      # otherwise surface as "the model has drifted", which is both untrue and actively
+      # misleading: the fix it suggests is to scaffold a migration that is not needed.
+      #
+      # Throwaway values: design-time model building resolves the options graph, so the app
+      # refuses to start without them. Nothing here connects to a database.
       - name: Check for un-scaffolded model changes
         env:
           Jwt__Key: ci-placeholder-key-at-least-32-bytes-long-for-validation
           Encryption__Key: Y2ktcGxhY2Vob2xkZXIta2V5LTMyLWJ5dGVzIQ==
           ConnectionStrings__Default: "Host=localhost;Port=5432;Database=ci;Username=ci;Password=ci"
         run: |
-          if dotnet ef migrations has-pending-model-changes; then
+          if dotnet ef migrations has-pending-model-changes --no-build --configuration Release; then
             echo "Model and migrations are in step."
           else
             echo "::error::The EF model has changes with no matching migration."
