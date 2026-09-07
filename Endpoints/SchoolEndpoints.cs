@@ -1,4 +1,4 @@
-using EduCore.Dtos.Directorate;
+﻿using EduCore.Dtos.Directorate;
 using EduCore.Dtos.School;
 using EduCore.Security;
 using EduCore.Services.Interfaces;
@@ -15,7 +15,9 @@ public static class SchoolEndpoints
                 Results.Ok(await service.GetByIdAsync(currentUser.RequireSchoolId(), ct)))
             .RequireAuthorization(Policies.AnySchoolUser);
 
-        var managedSchools = schools.RequireAuthorization(Policies.RegionalOrState);
+        // MapGroup("") makes this a real nested group. Calling RequireAuthorization on `schools`
+        // directly would add the convention to the whole group, including "/me" above.
+        var managedSchools = schools.MapGroup("").RequireAuthorization(Policies.RegionalOrState);
 
         managedSchools.MapGet("/", async (bool? activeOnly, int? page, int? pageSize, string? search,
                 ISchoolService service, CancellationToken ct) =>
