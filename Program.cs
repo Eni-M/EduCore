@@ -76,6 +76,7 @@ builder.Services.AddScoped<AuditSaveChangesInterceptor>();
 builder.Services.AddScoped<SchoolScopeInterceptor>();
 builder.Services.AddScoped<StatisticsInvalidationInterceptor>();
 builder.Services.AddScoped<AccountStatusInvalidationInterceptor>();
+builder.Services.AddScoped<AccountMailInterceptor>();
 
 var defaultConnectionString = builder.Configuration.GetConnectionString("Default")
     ?? builder.Configuration["DATABASE_URL"]
@@ -108,7 +109,8 @@ builder.Services.AddDbContext<AppDbContext>((sp, options) =>
             sp.GetRequiredService<AuditSaveChangesInterceptor>(),
             sp.GetRequiredService<SchoolScopeInterceptor>(),
             sp.GetRequiredService<StatisticsInvalidationInterceptor>(),
-            sp.GetRequiredService<AccountStatusInvalidationInterceptor>()));
+            sp.GetRequiredService<AccountStatusInvalidationInterceptor>(),
+            sp.GetRequiredService<AccountMailInterceptor>()));
 
 builder.Services.AddAutoMapper(cfg => { }, typeof(Program).Assembly);
 builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
@@ -264,6 +266,12 @@ else
     builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
 builder.Services.AddScoped<IScheduleDigestService, ScheduleDigestService>();
 builder.Services.AddHostedService<ScheduledEmailBackgroundService>();
+
+// Account emails -- welcome, password changed -- are queued by AccountMailInterceptor from the
+// write that causes them and sent here, off the request path. A singleton queue, because the
+// interceptor writing to it is scoped and the sender draining it is a background service.
+builder.Services.AddSingleton<IAccountMailQueue, AccountMailQueue>();
+builder.Services.AddHostedService<AccountMailBackgroundService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IStudentAcademicHistoryService, StudentAcademicHistoryService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
