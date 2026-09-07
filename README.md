@@ -1,5 +1,7 @@
 # EduCore
 
+[![CI](https://github.com/EniMirenaCacttus/EduCore/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EniMirenaCacttus/EduCore/actions/workflows/ci.yml?query=branch%3Amain)
+
 School management platform — REST API (.NET) with a React front end and PostgreSQL.
 
 ## Run it (Docker)
