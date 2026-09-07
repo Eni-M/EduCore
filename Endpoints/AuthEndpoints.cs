@@ -75,6 +75,18 @@ public static class AuthEndpoints
             .RequireAuthorization()
             .AddEndpointFilter<ActiveAccountEndpointFilter>();
 
+
+        // Turning scheduled mail off is a self-service action, deliberately available to every
+        // signed-in role rather than only guardians -- teachers and students receive the daily
+        // schedule digest and have the same claim on being left alone.
+        group.MapPut("/me/email-digests", async (
+                DigestPreferenceDto dto, IUserService users, CancellationToken ct) =>
+            {
+                await users.SetDigestPreferenceAsync(dto.OptOut, ct);
+                return Results.NoContent();
+            })
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
         group.MapPut("/me", async (
                 UpdateMyCredentialsDto dto,
                 IUserService users,

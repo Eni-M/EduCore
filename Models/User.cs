@@ -13,6 +13,13 @@ public class User
     public string PasswordHash { get; private set; } = null!;
 
     public bool MustChangePassword { get; set; } = true;
+
+    // Opt-out from every scheduled digest -- the daily schedule mail, the Sunday week-ahead, and
+    // the guardian weekly summary. One flag rather than one per digest: a person who does not
+    // want scheduled mail does not want it broken down by kind, and a per-digest matrix is a
+    // settings screen nobody will build. Default false, so digests are opt-out, not opt-in --
+    // they are the reason most guardians have an account at all.
+    public bool EmailDigestsOptOut { get; set; }
     public UserRole Role { get; set; }
     public DateTime? DeactivatedAt { get; set; }
 

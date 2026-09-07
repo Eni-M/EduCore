@@ -265,6 +265,7 @@ if (emailOptions.IsSmtp)
 else
     builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
 builder.Services.AddScoped<IScheduleDigestService, ScheduleDigestService>();
+builder.Services.AddScoped<IGuardianDigestService, GuardianDigestService>();
 builder.Services.AddHostedService<ScheduledEmailBackgroundService>();
 
 // Account emails -- welcome, password changed -- are queued by AccountMailInterceptor from the

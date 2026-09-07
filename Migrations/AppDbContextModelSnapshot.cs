@@ -649,6 +649,9 @@ namespace EduCore.Migrations
                     b.Property<Guid>("GradingPeriodId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("SchoolId")
                         .HasColumnType("uuid");
 
@@ -1596,6 +1599,9 @@ namespace EduCore.Migrations
                         .IsRequired()
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
+
+                    b.Property<bool>("EmailDigestsOptOut")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
