@@ -55,6 +55,9 @@ services:
       # deliberately put the stack back on plain HTTP -- a browser will not send a Secure
       # cookie over http, so these two decisions have to be made together.
       Session__Secure: ${Session__Secure:-true}
+      # Deliberately false here: the one-shot `migrate` service above already applies migrations
+      # before this service starts, which is the shape that survives more than one replica.
+      MigrateOnStart: ${MigrateOnStart:-false}
       # Password-reset links are built from this template and mailed out, so it has to be
       # the public https origin. The localhost default in appsettings.json is for the dev
       # loop; a http link here would put a single-use token through one more cleartext hop.

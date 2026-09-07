@@ -436,13 +436,34 @@ if (args.Contains("--migrate"))
 await using (var startupScope = app.Services.CreateAsyncScope())
 {
     var db = startupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    // MigrateOnStart exists for hosts that offer no separate migration step -- Render's
+    // pre-deploy command is a paid feature, and without it there is nowhere else to put this.
+    // Off by default, because the separate one-shot job in compose.yaml is the better shape and
+    // remains the default one.
+    //
+    // ONLY SAFE ON A SINGLE INSTANCE. Two replicas starting together both migrate, and they race:
+    // that is the specific defect the compose `migrate` service was introduced to remove. Before
+    // scaling past one instance, turn this off and run migrations as their own step again.
+    //
+    // A failure here stops start-up, which is the intent: a deploy that cannot migrate should be
+    // visibly dead rather than quietly serving against a schema it does not match.
+    if (app.Configuration.GetValue<bool>("MigrateOnStart"))
+    {
+        app.Logger.LogInformation(
+            "MigrateOnStart is set; applying any pending migrations before serving traffic.");
+
+        await db.Database.MigrateAsync();
+    }
+
     var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
 
     if (pending.Count > 0)
         throw new InvalidOperationException(
             $"The database is missing {pending.Count} migration(s), starting with {pending[0]}. " +
-            "Run `dotnet EduCore.dll --migrate` (compose does this in the `migrate` service) " +
-            "before starting the API.");
+            "Run `dotnet EduCore.dll --migrate` before starting the API -- compose does this in "
+            + "the `migrate` service. On a single-instance host with no separate migration step, "
+            + "set MigrateOnStart=true instead.");
 }
 
 if (app.Environment.IsDevelopment())
