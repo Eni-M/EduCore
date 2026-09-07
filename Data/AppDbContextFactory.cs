@@ -11,6 +11,9 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
 {
     public AppDbContext CreateDbContext(string[] args)
     {
+        // dotnet ef bypasses Program.cs, so load .env here too.
+        DotEnvFile.Load(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
+
         var config = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: true)
