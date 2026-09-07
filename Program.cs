@@ -2,6 +2,7 @@ using EduCore.Helpers;
 using EduCore.Services.Account;
 using EduCore.Services.Assignment;
 using System.Net;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using AutoMapper;
