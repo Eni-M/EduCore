@@ -1,13 +1,12 @@
-using EduCore.Helpers;
-using EduCore.Services.Assignment;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
-using System.Security.Claims;
 using AutoMapper;
 using EduCore.Data;
 using EduCore.Endpoints;
 using EduCore.Endpoints.Statistics;
 using EduCore.Exceptions;
+using EduCore.Helpers;
 using EduCore.Models;
 using EduCore.Repositories;
 using EduCore.Repositories.Interfaces;
@@ -16,6 +15,8 @@ using EduCore.Repositories.Statistics.Interfaces;
 using EduCore.Security;
 using EduCore.Security.Encryption;
 using EduCore.Services;
+using EduCore.Services.Assignment;
+using EduCore.Services.Assignments;
 using EduCore.Services.Email;
 using EduCore.Services.Interfaces;
 using EduCore.Services.Statistics;
@@ -26,10 +27,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.AspNetCore.RateLimiting;
 
 DotEnvFile.Load(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
 DotEnvFile.Load(Path.Combine(AppContext.BaseDirectory, ".env"));
@@ -150,6 +151,8 @@ builder.Services.AddScoped<IAttendanceStatisticsRepository, AttendanceStatistics
 builder.Services.AddScoped<IAcademicStatisticsRepository, AcademicStatisticsRepository>();
 builder.Services.AddScoped<ITeacherStatisticsRepository, TeacherStatisticsRepository>();
 builder.Services.AddScoped<IDemographicsStatisticsRepository, DemographicsStatisticsRepository>();
+builder.Services.AddScoped<IAssignmentRepository, AssignmentRepository>();
+builder.Services.AddScoped<IAssignmentSubmissionRepository, AssignmentSubmissionRepository>();
 
 builder.Services.AddScoped<IStudentStatisticsService, StudentStatisticsService>();
 builder.Services.AddScoped<IEnrollmentStatisticsService, EnrollmentStatisticsService>();
@@ -159,6 +162,8 @@ builder.Services.AddScoped<ITeacherStatisticsService, TeacherStatisticsService>(
 builder.Services.AddScoped<IClassStatisticsService, ClassStatisticsService>();
 builder.Services.AddScoped<IDemographicsStatisticsService, DemographicsStatisticsService>();
 builder.Services.AddScoped<IStatisticsOverviewService, StatisticsOverviewService>();
+builder.Services.AddScoped<IAssignmentService, AssignmentService>();
+builder.Services.AddScoped<IAssignmentSubmissionService, AssignmentSubmissionService>();
 
 builder.Services.AddScoped<IAccessGuard, AccessGuard>();
 builder.Services.AddScoped<IUserService, UserService>();
@@ -359,6 +364,8 @@ api.MapNoticeEndpoints();
 api.MapCalendarEndpoints();
 api.MapTeacherEndpoints();
 api.MapLessonEndpoints();
+api.MapAssignmentEndpoints();
+api.MapAssignmentSubmissionEndpoints();
 api.MapScheduleEndpoints();
 api.MapGuardianEndpoints();
 api.MapAccountTierEndpoints();

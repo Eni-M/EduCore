@@ -12,6 +12,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<User> Users => Set<User>();
     public DbSet<Student> Students => Set<Student>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
+    public DbSet<Assignment> Assignments => Set<Assignment>();
+    public DbSet<AssignmentSubmission> AssignmentSubmissions => Set<AssignmentSubmission>();
     public DbSet<Directorate> Directorates => Set<Directorate>();
     public DbSet<RegionalAdmin> RegionalAdmins => Set<RegionalAdmin>();
     public DbSet<StateAdmin> StateAdmins => Set<StateAdmin>();
@@ -56,6 +58,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         ConfigureScheduling(modelBuilder);
         ConfigureStudentRecords(modelBuilder);
         ConfigureCommunication(modelBuilder);
+        ConfigureAssignments(modelBuilder);
 
         modelBuilder.Entity<AuditLog>().Property(a => a.Action).HasMaxLength(1000);
         modelBuilder.Entity<AuditLog>().Property(a => a.TraceId).HasMaxLength(200);
@@ -591,4 +594,137 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         modelBuilder.Entity<Notification>().Property<uint>("Version").IsRowVersion();
         ScopeToSchool<Notification>(modelBuilder);
     }
+
+    
+private void ConfigureAssignments(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Assignment>()
+            .HasAlternateKey(a => new { a.Id, a.SchoolId });
+
+        modelBuilder.Entity<Assignment>()
+            .HasOne<ClassSubjectTeacher>()
+            .WithMany()
+            .HasForeignKey(a => new
+            {
+                a.ClassSubjectTeacherId,
+                a.ClassId,
+                a.SubjectId,
+                a.TeacherId,
+                a.SchoolId
+            })
+            .HasPrincipalKey(cst => new
+            {
+                cst.Id,
+                cst.ClassId,
+                cst.SubjectId,
+                cst.TeacherId,
+                cst.SchoolId
+            })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Assignment>()
+            .HasIndex(a => new
+            {
+                a.SchoolId,
+                a.ClassId,
+                a.SubjectId,
+                a.DueDate
+            });
+
+        modelBuilder.Entity<Assignment>()
+            .Property(a => a.Title)
+            .HasMaxLength(200);
+
+        modelBuilder.Entity<Assignment>()
+            .Property(a => a.Description)
+            .HasMaxLength(8000);
+
+        modelBuilder.Entity<Assignment>()
+            .Property(a => a.FileName)
+            .HasMaxLength(260);
+
+        modelBuilder.Entity<Assignment>()
+            .Property(a => a.ContentType)
+            .HasMaxLength(150);
+
+        modelBuilder.Entity<Assignment>()
+            .Property(a => a.StorageKey)
+            .HasMaxLength(400);
+
+        modelBuilder.Entity<Assignment>()
+            .Property<uint>("Version")
+            .IsRowVersion();
+
+        ScopeToSchool<Assignment>(modelBuilder);
+
+
+        modelBuilder.Entity<AssignmentSubmission>()
+            .HasOne<Assignment>()
+            .WithMany()
+            .HasForeignKey(s => new
+            {
+                s.AssignmentId,
+                s.SchoolId
+            })
+            .HasPrincipalKey(a => new
+            {
+                a.Id,
+                a.SchoolId
+            })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<AssignmentSubmission>()
+            .HasOne<Student>()
+            .WithMany()
+            .HasForeignKey(s => new
+            {
+                s.StudentId,
+                s.SchoolId
+            })
+            .HasPrincipalKey(s => new
+            {
+                s.Id,
+                s.SchoolId
+            })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<AssignmentSubmission>()
+            .HasIndex(s => new
+            {
+                s.AssignmentId,
+                s.StudentId
+            })
+            .IsUnique();
+
+        modelBuilder.Entity<AssignmentSubmission>()
+            .HasIndex(s => new
+            {
+                s.SchoolId,
+                s.StudentId
+            });
+
+        modelBuilder.Entity<AssignmentSubmission>()
+            .Property(s => s.FileName)
+            .HasMaxLength(260);
+
+        modelBuilder.Entity<AssignmentSubmission>()
+            .Property(s => s.ContentType)
+            .HasMaxLength(150);
+
+        modelBuilder.Entity<AssignmentSubmission>()
+            .Property(s => s.StorageKey)
+            .HasMaxLength(400);
+
+        modelBuilder.Entity<AssignmentSubmission>()
+            .Property(s => s.Feedback)
+            .HasMaxLength(4000);
+
+        modelBuilder.Entity<AssignmentSubmission>()
+            .Property<uint>("Version")
+            .IsRowVersion();
+
+        ScopeToSchool<AssignmentSubmission>(modelBuilder);
+    }
+
+
 }
