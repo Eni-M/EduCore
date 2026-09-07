@@ -12,7 +12,6 @@ namespace EduCore.Repositories.Statistics;
 
 public class TeacherStatisticsRepository(
     AppDbContext context,
-    IMarkRepository marks,
     IGradingCalculator grading) : StatisticsRepositoryBase(context), ITeacherStatisticsRepository
 {
 

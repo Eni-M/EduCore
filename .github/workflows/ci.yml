@@ -1,0 +1,80 @@
+name: CI
+
+# Runs on every push to a shared branch and on every pull request. The pull-request trigger is
+# the one that matters: Render deploys from this repository, so a change that reaches the default
+# branch is a change that reaches production.
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+    branches: [main]
+  # Lets a run be started by hand from the Actions tab, which is useful when a failure looks like
+  # infrastructure rather than code.
+  workflow_dispatch:
+
+# A second push to the same branch cancels the first. Nobody needs the results of a run against a
+# commit that has already been replaced.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      # Restore separately from build so a dependency failure is distinguishable from a
+      # compilation failure in the log.
+      - name: Restore
+        run: dotnet restore
+
+      # Warnings as errors. The build is clean today, and the cheapest moment to keep it that way
+      # is before the first warning is merged rather than after fifty have accumulated.
+      - name: Build
+        run: dotnet build --no-restore --configuration Release -warnaserror
+
+      - name: Test
+        run: dotnet run --project EduCore.Tests/EduCore.Tests.csproj --configuration Release --no-build
+
+  # Fails the run if the EF model and the migrations have drifted apart. This catches the mistake
+  # of changing an entity and forgetting to scaffold the migration -- which does not break the
+  # build, and instead surfaces at start-up in production, where the API refuses to serve against
+  # a schema it does not match.
+  migrations-up-to-date:
+    name: Migrations match the model
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install EF tools
+        run: dotnet tool install --global dotnet-ef
+
+      # Throwaway values. Design-time model building resolves the options graph, so the app
+      # refuses to start without these -- but nothing here connects to a database.
+      - name: Check for un-scaffolded model changes
+        env:
+          Jwt__Key: ci-placeholder-key-at-least-32-bytes-long-for-validation
+          Encryption__Key: Y2ktcGxhY2Vob2xkZXIta2V5LTMyLWJ5dGVzIQ==
+          ConnectionStrings__Default: "Host=localhost;Port=5432;Database=ci;Username=ci;Password=ci"
+        run: |
+          if dotnet ef migrations has-pending-model-changes; then
+            echo "Model and migrations are in step."
+          else
+            echo "::error::The EF model has changes with no matching migration."
+            echo "Run: dotnet ef migrations add <Name>"
+            exit 1
+          fi
