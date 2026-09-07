@@ -15,33 +15,41 @@ public static class AttendanceStatisticsEndpoints
                 [AsParameters] StatisticsFilter filter, IAttendanceStatisticsService service, CancellationToken ct) =>
             Results.Ok(await service.GetSummaryAsync(filter, ct)));
 
+        // One row per class in scope — thousands across a region. Paged in the database;
+        // no paging params → full list, for chart and export callers.
         attendance.MapGet("/by-class", async (
+                int? page, int? pageSize,
                 [AsParameters] StatisticsFilter filter, IAttendanceStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetByClassAsync(filter, ct)));
+            page is null && pageSize is null
+                ? Results.Ok(await service.GetByClassAsync(filter, ct))
+                : Results.Ok(await service.GetByClassPagedAsync(
+                    filter, new PaginationQueryDto(page ?? 1, pageSize ?? 20), ct)));
 
         attendance.MapGet("/by-grade", async (
                 [AsParameters] StatisticsFilter filter, IAttendanceStatisticsService service, CancellationToken ct) =>
             Results.Ok(await service.GetByGradeAsync(filter, ct)));
 
         attendance.MapGet("/by-subject", async (
+                int? page, int? pageSize,
                 [AsParameters] StatisticsFilter filter, IAttendanceStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetBySubjectAsync(filter, ct)));
+            page is null && pageSize is null
+                ? Results.Ok(await service.GetBySubjectAsync(filter, ct))
+                : Results.Ok(await service.GetBySubjectPagedAsync(
+                    filter, new PaginationQueryDto(page ?? 1, pageSize ?? 20), ct)));
 
         attendance.MapGet("/trend", async (
                 [AsParameters] StatisticsFilter filter, IAttendanceStatisticsService service, CancellationToken ct) =>
             Results.Ok(await service.GetTrendAsync(filter, ct)));
 
-        // Per-student rows across the whole scope — vast. Page for the table; no paging params → full list.
-        // paging trims the payload, not the DB read; push into SQL if the aggregation gets slow.
+        // Per-student rows across the whole scope — vast. Paged in the database; no paging
+        // params → full list, for the chart and export callers that need every student.
         attendance.MapGet("/by-student", async (
                 int? page, int? pageSize,
                 [AsParameters] StatisticsFilter filter, IAttendanceStatisticsService service, CancellationToken ct) =>
-        {
-            var all = await service.GetByStudentAsync(filter, ct);
-            return page is null && pageSize is null
-                ? Results.Ok(all)
-                : Results.Ok(all.ToPagedResult(new PaginationQueryDto(page ?? 1, pageSize ?? 20)));
-        });
+            page is null && pageSize is null
+                ? Results.Ok(await service.GetByStudentAsync(filter, ct))
+                : Results.Ok(await service.GetByStudentPagedAsync(
+                    filter, new PaginationQueryDto(page ?? 1, pageSize ?? 20), ct)));
 
         attendance.MapGet("/excessive-absences", async (
                 int? page, int? pageSize,

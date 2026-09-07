@@ -1,0 +1,126 @@
+name: CI
+
+# Runs on every push to a shared branch and on every pull request. The pull-request trigger is
+# the one that matters: Render deploys from this repository, so a change that reaches the default
+# branch is a change that reaches production.
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+    branches: [main]
+  # Lets a run be started by hand from the Actions tab, which is useful when a failure looks like
+  # infrastructure rather than code.
+  workflow_dispatch:
+
+# A second push to the same branch cancels the first. Nobody needs the results of a run against a
+# commit that has already been replaced.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      # Restore from the test project, not the repository root. EduCore.slnx contains only
+      # EduCore.csproj -- the test project is not in the solution -- so a root restore leaves it
+      # untouched and the test step then has nothing to run. Restoring the test project pulls the
+      # app in through its ProjectReference, so this covers both.
+      #
+      # Separate from build so a dependency failure is distinguishable from a compilation failure.
+      - name: Restore
+        run: dotnet restore EduCore.Tests/EduCore.Tests.csproj
+
+      # Warnings as errors, on the application. The build is clean today, and the cheapest moment
+      # to keep it that way is before the first warning is merged rather than after fifty have
+      # accumulated.
+      - name: Build
+        run: dotnet build --no-restore --configuration Release -warnaserror
+
+      # Explicit, for the same reason the restore is: the root build stops at the solution, which
+      # does not include this project.
+      - name: Build tests
+        run: dotnet build EduCore.Tests/EduCore.Tests.csproj --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet run --project EduCore.Tests/EduCore.Tests.csproj --configuration Release --no-build
+
+  # Fails the run if the EF model and the migrations have drifted apart. This catches the mistake
+  # of changing an entity and forgetting to scaffold the migration -- which does not break the
+  # build, and instead surfaces at start-up in production, where the API refuses to serve against
+  # a schema it does not match.
+  migrations-up-to-date:
+    name: Migrations match the model
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install EF tools
+        run: dotnet tool install --global dotnet-ef
+
+      # Restore and build explicitly, and separately from the check below. Each job gets a clean
+      # runner, so nothing here is inherited from the build-and-test job -- and the check reads
+      # the compiled model, so without this it fails on a missing assets file. It did exactly
+      # that on first run, and reported it as a missing migration, which is the wrong thing to
+      # send somebody off to fix.
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      # --no-build so this step can only fail for one reason. A compilation error here would
+      # otherwise surface as "the model has drifted", which is both untrue and actively
+      # misleading: the fix it suggests is to scaffold a migration that is not needed.
+      #
+      # Throwaway values: design-time model building resolves the options graph, so the app
+      # refuses to start without them. Nothing here connects to a database.
+      - name: Check for un-scaffolded model changes
+        env:
+          Jwt__Key: ci-placeholder-key-at-least-32-bytes-long-for-validation
+          # Decodes to exactly 32 bytes ("ci-placeholder-key-32-bytes-long"), which the options
+          # validator requires. The previous value was 28 and failed here while passing locally,
+          # where the key came from `openssl rand -base64 32` instead.
+          Encryption__Key: Y2ktcGxhY2Vob2xkZXIta2V5LTMyLWJ5dGVzLWxvbmc=
+          ConnectionStrings__Default: "Host=localhost;Port=5432;Database=ci;Username=ci;Password=ci"
+        run: |
+          set +e
+          output=$(dotnet ef migrations has-pending-model-changes --no-build --configuration Release 2>&1)
+          set -e
+
+          echo "$output"
+
+          # Three outcomes, told apart by what EF actually printed rather than by exit status
+          # alone. Treating any failure as drift is what made the earlier runs report "add a
+          # migration" when the real causes were a missing restore and then a bad placeholder
+          # key -- advice that would have had someone scaffold an empty migration to fix an
+          # unrelated problem.
+          #
+          # Order matters: the success message contains the failure message as a substring
+          # ("No changes have been made..." vs "Changes have been made...").
+          if grep -qi "No changes have been made to the model" <<<"$output"; then
+            echo "Model and migrations are in step."
+          elif grep -qi "Changes have been made to the model" <<<"$output"; then
+            echo "::error::The EF model has changes with no matching migration."
+            echo "Run: dotnet ef migrations add <Name>"
+            exit 1
+          else
+            echo "::error::Could not determine whether the model matches the migrations."
+            echo "This is a tooling or configuration failure, not model drift -- see the output above."
+            exit 1
+          fi

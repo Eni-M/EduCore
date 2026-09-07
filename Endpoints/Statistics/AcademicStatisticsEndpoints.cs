@@ -14,14 +14,26 @@ public static class AcademicStatisticsEndpoints
                 [AsParameters] StatisticsFilter filter, IAcademicStatisticsService service, CancellationToken ct) =>
             Results.Ok(await service.GetSummaryAsync(filter, ct)));
 
+        // Subjects and classes both scale with the size of the scope, so both are paged in the
+        // database. No paging params → full list, for the chart and export callers.
         academic.MapGet("/by-subject", async (
+                int? page, int? pageSize,
                 [AsParameters] StatisticsFilter filter, IAcademicStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetBySubjectAsync(filter, ct)));
+            page is null && pageSize is null
+                ? Results.Ok(await service.GetBySubjectAsync(filter, ct))
+                : Results.Ok(await service.GetBySubjectPagedAsync(
+                    filter, new PaginationQueryDto(page ?? 1, pageSize ?? 20), ct)));
 
         academic.MapGet("/by-class", async (
+                int? page, int? pageSize,
                 [AsParameters] StatisticsFilter filter, IAcademicStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetByClassAsync(filter, ct)));
+            page is null && pageSize is null
+                ? Results.Ok(await service.GetByClassAsync(filter, ct))
+                : Results.Ok(await service.GetByClassPagedAsync(
+                    filter, new PaginationQueryDto(page ?? 1, pageSize ?? 20), ct)));
 
+        // Grade levels and the 1-5 mark scale are both fixed by the domain — about a dozen
+        // rows and five buckets. Not paged: the charts read them whole.
         academic.MapGet("/by-grade", async (
                 [AsParameters] StatisticsFilter filter, IAcademicStatisticsService service, CancellationToken ct) =>
             Results.Ok(await service.GetByGradeAsync(filter, ct)));

@@ -104,7 +104,7 @@ public class ScheduleDigestService(AppDbContext db, IEmailSender email) : ISched
             join p in db.ShiftPeriods on e.ShiftPeriodId equals p.Id
             join t in db.Teachers on e.TeacherId equals t.Id
             join u in db.Users on t.UserId equals u.Id
-            where u.DeactivatedAt == null
+            where u.DeactivatedAt == null && !u.EmailDigestsOptOut
             select new LessonRow(
                 e.SchoolId, e.DayOfWeek, p.PeriodNumber, p.StartTime, p.EndTime,
                 s.Name, e.ClassId, c.Name, e.TeacherId, u.Email, u.FirstName);
@@ -122,7 +122,7 @@ public class ScheduleDigestService(AppDbContext db, IEmailSender email) : ISched
             where en.LeftAt == null && classIds.Contains(en.ClassId)
             join st in db.Students on en.StudentId equals st.Id
             join u in db.Users on st.UserId equals u.Id
-            where u.DeactivatedAt == null
+            where u.DeactivatedAt == null && !u.EmailDigestsOptOut
             select new Recipient(en.ClassId, u.Email, u.FirstName);
 
         return await query.IgnoreQueryFilters().ToListAsync(ct);
@@ -161,7 +161,7 @@ public class ScheduleDigestService(AppDbContext db, IEmailSender email) : ISched
             from d in db.Directorates.AsNoTracking()
             where schoolIds.Contains(d.SchoolId)
             join u in db.Users on d.UserId equals u.Id
-            where u.DeactivatedAt == null
+            where u.DeactivatedAt == null && !u.EmailDigestsOptOut
             select new Contact(d.SchoolId, u.Email, u.FirstName);
 
         return await query.IgnoreQueryFilters().ToListAsync(ct);

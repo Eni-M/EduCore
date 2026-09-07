@@ -19,6 +19,25 @@ services:
       timeout: 5s
       retries: 10
 
+  migrate:
+    build:
+      context: .
+    # One-shot schema migration. Applies pending migrations and exits 0 on success,
+    # non-zero on failure. The api service below only starts after this completes, so
+    # no replica ever races to migrate and a broken migration fails here -- visibly --
+    # instead of crash-looping the API. Same environment as api: the migrate path
+    # returns before seeding or serving, but Build() still resolves all options.
+    command: ["dotnet", "EduCore.dll", "--migrate"]
+    restart: "no"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=${POSTGRES_DB:-EduCoreDB};Username=${POSTGRES_USER:-educore};Password=${POSTGRES_PASSWORD:-educore123}"
+      Jwt__Key: ${Jwt__Key:?set Jwt__Key in .env — at least 32 bytes, e.g. openssl rand -base64 32}
+      Encryption__Key: ${Encryption__Key:?set Encryption__Key in .env — exactly 32 bytes base64, e.g. openssl rand -base64 32}
+    depends_on:
+      db:
+        condition: service_healthy
+
   api:
     build:
       context: .
@@ -31,21 +50,82 @@ services:
       # First run only: creates the initial super administrator, then leave blank.
       SuperAdmin__Email: ${SuperAdmin__Email:-}
       SuperAdmin__Password: ${SuperAdmin__Password:-}
-      # Cookies are marked Secure only under HTTPS. Leave false for a plain-HTTP start;
-      # set true once TLS terminates in front of the web service.
-      Session__Secure: ${Session__Secure:-false}
+      # nginx terminates TLS in the web service, so the public scheme is https and the
+      # session and CSRF cookies are marked Secure. Only set this false if you have
+      # deliberately put the stack back on plain HTTP -- a browser will not send a Secure
+      # cookie over http, so these two decisions have to be made together.
+      Session__Secure: ${Session__Secure:-true}
+      # Deliberately false here: the one-shot `migrate` service above already applies migrations
+      # before this service starts, which is the shape that survives more than one replica.
+      MigrateOnStart: ${MigrateOnStart:-false}
+      # Password-reset links are built from this template and mailed out, so it has to be
+      # the public https origin. The localhost default in appsettings.json is for the dev
+      # loop; a http link here would put a single-use token through one more cleartext hop.
+      PasswordReset__ResetUrlTemplate: ${PUBLIC_ORIGIN:-https://localhost:8443}/reset-password
+      # The SPA is served same-origin behind nginx, so CORS is not on the request path in
+      # this stack -- pin it to the public origin anyway rather than shipping the localhost
+      # dev default into a deployment.
+      Cors__Origins__0: ${PUBLIC_ORIGIN:-https://localhost:8443}
+      # Mail transport. Defaults to Log (delivers nothing, writes to the container log) so the
+      # stack starts without mail credentials; set Email__Provider=Smtp in .env with a host and
+      # a from-address to deliver password resets and the daily digests for real.
+      Email__Provider: ${Email__Provider:-Log}
+      Email__Host: ${Email__Host:-}
+      Email__Port: ${Email__Port:-587}
+      Email__FromAddress: ${Email__FromAddress:-}
+      Email__FromName: ${Email__FromName:-EduCore}
+      Email__Username: ${Email__Username:-}
+      Email__Password: ${Email__Password:-}
+      Email__UseSslOnConnect: ${Email__UseSslOnConnect:-false}
+      # Metrics on /metrics for anything that scrapes Prometheus format, and traces collected in
+      # process. Set Observability__OtlpEndpoint to ship traces to a collector when one exists.
+      Observability__ServiceName: ${Observability__ServiceName:-educore-api}
+      Observability__OtlpEndpoint: ${Observability__OtlpEndpoint:-}
+      Observability__TraceSampleRatio: ${Observability__TraceSampleRatio:-1.0}
+      Observability__MetricsRequireAuthentication: ${Observability__MetricsRequireAuthentication:-false}
+      # Requests reach the API through nginx in the `web` container, so its X-Forwarded-For
+      # is the only source of the real client IP -- and the rate limiters partition on that.
+      # Trust the compose bridge network and nothing else: a client that sets the header
+      # itself is not on this network, so its forged value is ignored. Widen this only to
+      # the real edge proxy's network if you put a load balancer in front.
+      ForwardedHeaders__KnownNetworks__0: ${TRUSTED_PROXY_NETWORK:-172.16.0.0/12}
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
+  # The only service published to the host, and the only one that speaks TLS: it
+  # terminates https and proxies /api to the api service over the compose network.
   web:
     build:
       context: ../EduCoreFront
     restart: unless-stopped
+    environment:
+      # Substituted into nginx.conf.template at start-up by the nginx image's envsubst
+      # entrypoint. PUBLIC_ORIGIN is where the :80 listener sends browsers, so it has to
+      # match how people actually reach the stack -- scheme, host and port. Keep it in
+      # step with the published https port below and with the certificate's own name.
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-https://localhost:8443}
+      # 0 disables HSTS, which is right for a self-signed local stack; see the note in
+      # nginx.conf.template. Use 31536000 on a real domain.
+      HSTS_MAX_AGE: ${HSTS_MAX_AGE:-0}
+      # Substitute exactly these two and nothing else. Without a filter the nginx
+      # entrypoint runs envsubst over every environment variable in the container, which
+      # is a wider blast radius than this config needs.
+      NGINX_ENVSUBST_FILTER: "^(PUBLIC_ORIGIN|HSTS_MAX_AGE)$$"
     ports:
+      # :80 serves nothing but the redirect to :443.
       - "${WEB_PORT:-8080}:80"
+      - "${WEB_HTTPS_PORT:-8443}:443"
+    volumes:
+      # TLS material, read-only, never in the image and never committed. Drop a
+      # fullchain.pem/privkey.pem pair here -- self-signed for local use, or the real
+      # certificate for a deployment. See README for the openssl command.
+      - ${CERT_DIR:-./certs}:/etc/nginx/certs:ro
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   educore_pg_data:

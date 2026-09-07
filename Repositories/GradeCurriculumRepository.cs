@@ -27,4 +27,14 @@ public class GradeCurriculumRepository(AppDbContext context)
     public async Task<GradeCurriculum?> GetAsync(int grade, Guid subjectId, CancellationToken ct) =>
         await _context.GradeCurricula
             .FirstOrDefaultAsync(gc => gc.Grade == grade && gc.SubjectId == subjectId, ct);
+
+    public Task<bool> IsInCurriculumAsync(int grade, Guid subjectId, CancellationToken ct) =>
+        _context.GradeCurricula
+            .AsNoTracking()
+            .AnyAsync(gc => gc.Grade == grade && gc.SubjectId == subjectId, ct);
+
+    public Task<bool> HasCurriculumAsync(int grade, CancellationToken ct) =>
+        _context.GradeCurricula
+            .AsNoTracking()
+            .AnyAsync(gc => gc.Grade == grade, ct);
 }

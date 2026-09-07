@@ -138,6 +138,19 @@ public class UserService(
         return new ResetPasswordResponseDto("Password reset successfully.", temporaryPassword);
     }
 
+
+    // The unsubscribe. A digest people cannot turn off is one they report as spam, which costs
+    // the sending domain its reputation and takes the password-reset mail down with it.
+    public async Task SetDigestPreferenceAsync(bool optOut, CancellationToken ct)
+    {
+        var user = await userRepository.GetByIdAsync(currentUser.UserId, ct)
+                   ?? throw new NotFoundException("User", currentUser.UserId);
+
+        user.EmailDigestsOptOut = optOut;
+
+        userRepository.Update(user);
+        await userRepository.SaveChangesAsync(ct);
+    }
     public async Task SetActiveAsync(Guid userId, bool isActive, CancellationToken ct)
     {
         var user = await userRepository.GetByIdAsync(userId, ct)

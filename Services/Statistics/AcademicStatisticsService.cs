@@ -51,6 +51,32 @@ public class AcademicStatisticsService(
             "school average across all classes");
     }
 
+    public async Task<PagedResultDto<AcademicByKeyDto>> GetBySubjectPagedAsync(
+        StatisticsFilter filter, PaginationQueryDto pagination, CancellationToken ct)
+    {
+        var ctx = await scope.ResolveAsync(filter, ct);
+        var page = await academic.GetBySubjectPagedAsync(ctx, pagination, ct);
+
+        // The baseline is the whole scope, not the page: a subject is compared against the
+        // school average, which must not change as the reader turns the page.
+        return Repage(page, WithOverallBaseline(
+            page.Items, await academic.GetTotalsAsync(ctx, ct), "school average across all subjects"));
+    }
+
+    public async Task<PagedResultDto<AcademicByKeyDto>> GetByClassPagedAsync(
+        StatisticsFilter filter, PaginationQueryDto pagination, CancellationToken ct)
+    {
+        var ctx = await scope.ResolveAsync(filter, ct);
+        var page = await academic.GetByClassPagedAsync(ctx, pagination, ct);
+
+        return Repage(page, WithOverallBaseline(
+            page.Items, await academic.GetTotalsAsync(ctx, ct), "school average across all classes"));
+    }
+
+    private static PagedResultDto<AcademicByKeyDto> Repage(
+        PagedResultDto<AcademicGroup> source, IReadOnlyList<AcademicByKeyDto> items) =>
+        new(items, source.Page, source.PageSize, source.TotalCount);
+
     public async Task<IReadOnlyList<AcademicByKeyDto>> GetByGradeAsync(
         StatisticsFilter filter, CancellationToken ct)
     {

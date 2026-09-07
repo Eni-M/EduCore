@@ -45,6 +45,22 @@ public static class StudentRecordsEndpoints
                 })
             .RequireAuthorization(Policies.Directorate);
 
+
+        // ---- Academic history (cross-school) -----------------------------
+        // StudentReadable, the same audience as documents: directorate, teacher, the student and
+        // their guardian. The service re-checks with IAccessGuard, because the policy only says
+        // what kind of user this is, not which students they may see.
+        students.MapGet("/{studentId:guid}/academic-history",
+                async (Guid studentId, IStudentAcademicHistoryService service, CancellationToken ct) =>
+                    Results.Ok(await service.GetAsync(studentId, ct)))
+            .RequireAuthorization(Policies.StudentReadable);
+
+        // Recompiles this student's records from the live enrollment and mark tables. Idempotent,
+        // so it is safe to retry; restricted to directorate because it writes.
+        students.MapPost("/{studentId:guid}/academic-history/rebuild",
+                async (Guid studentId, IStudentAcademicHistoryService service, CancellationToken ct) =>
+                    Results.Ok(new { years = await service.RebuildAsync(studentId, ct) }))
+            .RequireAuthorization(Policies.Directorate);
         // ---- Documents ---------------------------------------------------
         students.MapGet("/{studentId:guid}/documents",
                 async (Guid studentId, IStudentDocumentService service, CancellationToken ct) =>

@@ -14,6 +14,8 @@ public class StatisticsOverviewService(
     IAcademicStatisticsService academic,
     ITeacherStatisticsService teachers,
     IClassStatisticsService classes,
+    IStatisticsSnapshotService snapshotService,
+    ICellSuppressor suppressor,
     IStatisticsScopeResolver scope,
     ISchoolRepository schools) : IStatisticsOverviewService
 {
@@ -34,12 +36,31 @@ public class StatisticsOverviewService(
             ? await FullClassListAsync(filter, ct)
             : await classes.GetSummariesPagedAsync(filter, pagination, ct);
 
+        var ctx = await scope.ResolveAsync(filter, ct);
+        var snapshot = await snapshotService.GetAsync(ctx, ct);
+
+        // A snapshot answers all five summary blocks from one row. Without one — because the
+        // caller narrowed the query, or the feature is off — fall through to the services,
+        // which recompute the same figures live.
+        var (studentSummary, enrollmentSummary, attendanceSummary, academicSummary, teacherSummary) =
+            snapshot is not null
+                ? (SnapshotProjection.Students(snapshot),
+                    SnapshotProjection.Enrollment(snapshot),
+                    SnapshotProjection.Attendance(snapshot, suppressor),
+                    SnapshotProjection.Academic(snapshot, suppressor),
+                    SnapshotProjection.Teachers(snapshot, suppressor))
+                : (await students.GetSummaryAsync(filter, ct),
+                    await enrollment.GetSummaryAsync(filter, ct),
+                    await attendance.GetSummaryAsync(filter, ct),
+                    await academic.GetSummaryAsync(filter, ct),
+                    await teachers.GetSummaryAsync(filter, ct));
+
         return new SchoolOverviewDto(
-            await students.GetSummaryAsync(filter, ct),
-            await enrollment.GetSummaryAsync(filter, ct),
-            await attendance.GetSummaryAsync(filter, ct),
-            await academic.GetSummaryAsync(filter, ct),
-            await teachers.GetSummaryAsync(filter, ct),
+            studentSummary,
+            enrollmentSummary,
+            attendanceSummary,
+            academicSummary,
+            teacherSummary,
             classesPage.Items,
             classesPage.Page,
             classesPage.PageSize,
@@ -55,22 +76,60 @@ public class StatisticsOverviewService(
             allClasses, 1, allClasses.Count == 0 ? 1 : allClasses.Count, allClasses.Count);
     }
 
-    public async Task<PlatformOverviewDto> GetPlatformOverviewAsync(
-        StatisticsFilter filter, CancellationToken ct)
+    private async Task<PagedResultDto<Models.School>> FullSchoolListAsync(CancellationToken ct)
     {
-        await scope.ResolveAsync(filter, ct);
+        var all = (await schools.GetAllOrderedAsync(activeOnly: false, ct)).ToList();
 
-        var allSchools = (await schools.GetAllOrderedAsync(activeOnly: false, ct)).ToList();
+        return new PagedResultDto<Models.School>(all, 1, all.Count == 0 ? 1 : all.Count, all.Count);
+    }
+
+    public async Task<PlatformOverviewDto> GetPlatformOverviewAsync(
+        StatisticsFilter filter, PaginationQueryDto? pagination, CancellationToken ct)
+    {
+        var ctx = await scope.ResolveAsync(filter, ct);
+
+        // The comparison table is one row per school and the country has many, so it is paged
+        // in the database rather than built for every school and then trimmed.
+        var page = pagination is null
+            ? await FullSchoolListAsync(ct)
+            : await schools.GetOrderedPagedAsync(activeOnly: false, pagination, ct);
+
+        var schoolIds = page.Items.Select(s => s.Id).ToList();
+
+        // One query for the whole page's figures. This replaced a loop that ran five statistics
+        // services per school — roughly 2,500 sequential statements for 80 schools, each one a
+        // separate round trip to the database.
+        var bySchoolSnapshot = await snapshotService.GetManyAsync(ctx, schoolIds, ct);
+
         var bySchool = new List<SchoolComparisonDto>();
 
-        foreach (var school in allSchools)
+        foreach (var school in page.Items)
         {
+            if (bySchoolSnapshot.TryGetValue(school.Id, out var snapshot))
+            {
+                var schoolAcademic = SnapshotProjection.Academic(snapshot, suppressor);
+
+                bySchool.Add(new SchoolComparisonDto(
+                    school.Id,
+                    school.Name,
+                    school.Type,
+                    snapshot.StudentsActive,
+                    snapshot.Teachers,
+                    snapshot.Classes,
+                    SnapshotProjection.Attendance(snapshot, suppressor).AttendanceRate,
+                    schoolAcademic.AverageFinalMark,
+                    schoolAcademic.PassRate));
+
+                continue;
+            }
+
+            // Snapshots switched off: compute this school the old way.
             var scoped = filter with { SchoolId = school.Id };
 
             var schoolStudents = await students.GetSummaryAsync(scoped, ct);
             var schoolTeachers = await teachers.GetSummaryAsync(scoped, ct);
             var schoolAttendance = await attendance.GetSummaryAsync(scoped, ct);
-            var schoolAcademic = await academic.GetSummaryAsync(scoped, ct);
+            var liveAcademic = await academic.GetSummaryAsync(scoped, ct);
             var schoolClasses = await classes.GetSummariesAsync(scoped, ct);
 
             bySchool.Add(new SchoolComparisonDto(
@@ -81,16 +140,19 @@ public class StatisticsOverviewService(
                 schoolTeachers.Teachers,
                 schoolClasses.Count,
                 schoolAttendance.AttendanceRate,
-                schoolAcademic.AverageFinalMark,
-                schoolAcademic.PassRate));
+                liveAcademic.AverageFinalMark,
+                liveAcademic.PassRate));
         }
 
         return new PlatformOverviewDto(
-            allSchools.Count,
+            page.TotalCount,
             await students.GetSummaryAsync(filter, ct),
             await attendance.GetSummaryAsync(filter, ct),
             await academic.GetSummaryAsync(filter, ct),
             await teachers.GetSummaryAsync(filter, ct),
-            bySchool);
+            bySchool,
+            page.Page,
+            page.PageSize,
+            page.TotalCount);
     }
 }

@@ -79,7 +79,8 @@ public class MarkService(
                 TeacherId = assignment.TeacherId,
                 GradingPeriodId = gradingPeriod.Id,
                 FirstMark = dto.FirstMark,
-                SecondMark = dto.SecondMark
+                SecondMark = dto.SecondMark,
+                RecordedAt = DateTime.UtcNow
             };
 
             await marks.AddAsync(mark);
@@ -88,6 +89,7 @@ public class MarkService(
         {
             mark.FirstMark = dto.FirstMark ?? mark.FirstMark;
             mark.SecondMark = dto.SecondMark ?? mark.SecondMark;
+            mark.RecordedAt = DateTime.UtcNow;
             marks.Update(mark);
         }
 

@@ -13,6 +13,7 @@ public class ClassSubjectTeacherService(
     IClassRepository classes,
     ISchoolRepository schools,
     ISubjectRepository subjects,
+    IGradeCurriculumRepository curriculum,
     ITeacherSubjectRepository teacherSubjects,
     IAccessGuard access,
     ICurrentUser currentUser,
@@ -44,11 +45,22 @@ public class ClassSubjectTeacherService(
     {
         var classEntity = await classes.GetByIdAsync(dto.ClassId, ct)
                            ?? throw new NotFoundException("Class", dto.ClassId);
-        _ = await subjects.GetByIdAsync(dto.SubjectId, ct) ?? throw new NotFoundException("Subject", dto.SubjectId);
+        var subject = await subjects.GetByIdAsync(dto.SubjectId, ct)
+                      ?? throw new NotFoundException("Subject", dto.SubjectId);
 
         var school = await schools.GetByIdAsync(classEntity.SchoolId, ct)
                      ?? throw new NotFoundException("School", classEntity.SchoolId);
         GradeBands.Validate(school.Type, classEntity.Grade);
+
+        // A class only teaches what its grade's curriculum says it teaches. Without this the
+        // curriculum is advisory, and a class can drift onto subjects the grade never sits.
+        if (!await curriculum.IsInCurriculumAsync(classEntity.Grade, dto.SubjectId, ct))
+            throw new BusinessException(
+                await curriculum.HasCurriculumAsync(classEntity.Grade, ct)
+                    ? $"{subject.Name} is not in the grade {classEntity.Grade} curriculum. "
+                      + "Add it to the curriculum first, then assign a teacher."
+                    : $"Grade {classEntity.Grade} has no curriculum yet. "
+                      + "Define which subjects the grade is taught before assigning teachers.");
 
         if (!await teacherSubjects.ExistsAsync(dto.TeacherId, dto.SubjectId, ct))
             throw new BusinessException("This teacher is not qualified to teach that subject.");

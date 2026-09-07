@@ -14,6 +14,7 @@ public interface IUserService
     Task<AuthResponseDto> GetCurrentAsync(Guid userId, CancellationToken ct);
 
     Task<ResetPasswordResponseDto> AdminResetPasswordAsync(Guid userId, CancellationToken ct);
+    Task SetDigestPreferenceAsync(bool optOut, CancellationToken ct);
     Task SetActiveAsync(Guid userId, bool isActive, CancellationToken ct);
 
     Task<User> BuildLoginAsync(

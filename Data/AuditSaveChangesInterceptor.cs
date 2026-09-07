@@ -31,7 +31,10 @@ public class AuditSaveChangesInterceptor(IHttpContextAccessor httpContextAccesso
             return;
 
         var changes = context.ChangeTracker.Entries()
-            .Where(e => e.Entity is not AuditLog
+            // Statistics snapshots are derived data that the app rewrites on its own schedule,
+            // not something a user did. Auditing them would bury real activity under refresh
+            // noise in the table that is already the largest in the database.
+            .Where(e => e.Entity is not AuditLog and not SchoolStatisticsSnapshot
                         && e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
             .Select(e => $"{e.State} {e.Entity.GetType().Name} ({Key(e)})")
             .ToList();

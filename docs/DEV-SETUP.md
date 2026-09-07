@@ -105,16 +105,35 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:5173**. Edits reload automatically. The backend applies any
-pending database migrations on startup, so you never set up the schema by hand.
+Open **http://localhost:5173**. Edits reload automatically. The backend refuses to
+start against a schema it does not match, so apply migrations explicitly first:
+
+```bash
+cd EduCore
+dotnet run -- --migrate   # one-shot: applies pending migrations and exits
+dotnet run                # normal dev server
+```
+
+Forget the flag and the startup error tells you exactly this. You only need the
+migrate step when the model changed (new migration), not on every run.
 
 ### Alternative: run everything in Docker
 
 To run the whole stack the way production does (no hot reload — rebuilds on change):
 
 ```bash
-docker compose up -d --build   # app at http://localhost:8080
+docker compose up -d --build   # app at https://localhost:8443
 ```
+
+nginx terminates TLS in that stack, so it needs `certs/fullchain.pem` and
+`certs/privkey.pem` first — the README has the one-line `openssl` command for a
+self-signed local pair. The dev loop above (5173 + 5128) stays on plain http and needs
+no certificate.
+
+The one-shot `migrate` container applies pending migrations before the API starts,
+and the frontend waits for a healthy API. If the API refuses to boot, check
+`docker compose logs migrate` first — a failed migration stops everything downstream
+by design.
 
 Use this to sanity-check the production build; use the dev mode above for actual work.
 
@@ -141,10 +160,15 @@ The merge is what ships it to production.
 
 ### Two things to be careful about
 
-1. **Database migrations hit production automatically.** When you add an EF migration
-   and it merges to `main`, Render runs it against the **Neon** database on the next
-   deploy. Test migrations locally first; be very deliberate with anything that drops
-   columns or tables.
+1. **Database migrations no longer run on their own.** The API (and `dotnet run`)
+   refuses to start when the database is behind the code. Flow: add the EF migration,
+   test it locally (`dotnet run -- --migrate` against your dev DB), then merge.
+   `docker compose` migrates automatically via the one-shot `migrate` service before
+   the API starts. **Render needs a Pre-Deploy Command** running the same step
+   (`dotnet <publish-path>/EduCore.dll --migrate` — adjust the path to match the
+   service's existing Start Command): without it, a deploy with pending migrations
+   crash-loops the API by design. Test migrations locally first; be very deliberate
+   with anything that drops columns or tables.
 2. **Never edit the Neon / Render / Vercel settings by hand** to "try something." Change
    things through code + a Pull Request so the whole team stays in sync.
 
@@ -154,5 +178,5 @@ The merge is what ships it to production.
 |---|---|
 | Frontend (dev) | http://localhost:5173 |
 | Backend (dev) | http://localhost:5128 |
-| Full Docker stack | http://localhost:8080 |
+| Full Docker stack | https://localhost:8443 (8080 redirects here) |
 | Postgres | localhost:5434 (user `educore`, db `EduCoreDB`) |

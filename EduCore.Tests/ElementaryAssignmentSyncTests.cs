@@ -22,6 +22,9 @@ public class ElementaryAssignmentSyncTests
         public Task<School?> GetWithLocationAsync(Guid schoolId, CancellationToken ct) => Task.FromResult<School?>(null);
         public Task<IEnumerable<School>> GetAllOrderedAsync(bool activeOnly, CancellationToken ct) =>
             Task.FromResult<IEnumerable<School>>([]);
+        public Task<EduCore.Dtos.Pagination.PagedResultDto<School>> GetOrderedPagedAsync(
+            bool activeOnly, EduCore.Dtos.Pagination.PaginationQueryDto pagination, CancellationToken ct) =>
+            Task.FromResult(new EduCore.Dtos.Pagination.PagedResultDto<School>([], 1, 20, 0));
         public Task<IEnumerable<School>> GetByCityAsync(Guid cityId, bool activeOnly, CancellationToken ct) =>
             Task.FromResult<IEnumerable<School>>([]);
         public Task<IEnumerable<School>> GetByStateAsync(Guid stateId, bool activeOnly, CancellationToken ct) =>
@@ -41,6 +44,10 @@ public class ElementaryAssignmentSyncTests
             Task.FromResult<IReadOnlyList<GradeCurriculum>>([]);
         public Task<GradeCurriculum?> GetAsync(int grade, Guid subjectId, CancellationToken ct) =>
             Task.FromResult<GradeCurriculum?>(null);
+        public Task<bool> IsInCurriculumAsync(int grade, Guid subjectId, CancellationToken ct) =>
+            Task.FromResult(true);
+        public Task<bool> HasCurriculumAsync(int grade, CancellationToken ct) =>
+            Task.FromResult(true);
         public Task<GradeCurriculum?> GetByIdAsync(Guid id, CancellationToken ct) => Task.FromResult<GradeCurriculum?>(null);
         public Task AddAsync(GradeCurriculum entity) => Task.CompletedTask;
         public void Update(GradeCurriculum entity) { }

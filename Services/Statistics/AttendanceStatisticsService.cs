@@ -41,6 +41,32 @@ public class AttendanceStatisticsService(
             "school attendance rate");
     }
 
+    public async Task<PagedResultDto<AttendanceByKeyDto>> GetByClassPagedAsync(
+        StatisticsFilter filter, PaginationQueryDto pagination, CancellationToken ct)
+    {
+        var ctx = await scope.ResolveAsync(filter, ct);
+        var page = await attendance.GetByClassPagedAsync(ctx, pagination, ct);
+
+        // Baseline over the whole scope, not the page: the school rate a class is compared
+        // against must not shift as the reader turns the page.
+        return Repage(page, WithBaseline(
+            page.Items, await attendance.GetTotalsAsync(ctx, ct), "school attendance rate"));
+    }
+
+    public async Task<PagedResultDto<AttendanceByKeyDto>> GetBySubjectPagedAsync(
+        StatisticsFilter filter, PaginationQueryDto pagination, CancellationToken ct)
+    {
+        var ctx = await scope.ResolveAsync(filter, ct);
+        var page = await attendance.GetBySubjectPagedAsync(ctx, pagination, ct);
+
+        return Repage(page, WithBaseline(
+            page.Items, await attendance.GetTotalsAsync(ctx, ct), "school attendance rate"));
+    }
+
+    private static PagedResultDto<AttendanceByKeyDto> Repage(
+        PagedResultDto<AttendanceGroup> source, IReadOnlyList<AttendanceByKeyDto> items) =>
+        new(items, source.Page, source.PageSize, source.TotalCount);
+
     public async Task<IReadOnlyList<AttendanceByKeyDto>> GetByGradeAsync(
         StatisticsFilter filter, CancellationToken ct)
     {
@@ -91,6 +117,10 @@ public class AttendanceStatisticsService(
     public async Task<IReadOnlyList<StudentAttendanceSummaryDto>> GetByStudentAsync(
         StatisticsFilter filter, CancellationToken ct) =>
         await attendance.GetByStudentAsync(await scope.ResolveAsync(filter, ct), ct);
+
+    public async Task<PagedResultDto<StudentAttendanceSummaryDto>> GetByStudentPagedAsync(
+        StatisticsFilter filter, PaginationQueryDto pagination, CancellationToken ct) =>
+        await attendance.GetByStudentPagedAsync(await scope.ResolveAsync(filter, ct), pagination, ct);
 
     public async Task<IReadOnlyList<ExcessiveAbsenceStudentDto>> GetExcessiveAbsencesAsync(
         StatisticsFilter filter, double? thresholdPercent, CancellationToken ct) =>

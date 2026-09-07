@@ -10,6 +10,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<Student> Students => Set<Student>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
     public DbSet<Assignment> Assignments => Set<Assignment>();
@@ -30,6 +31,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<SchoolingHistory> SchoolingHistories => Set<SchoolingHistory>();
     public DbSet<StudentDocument> StudentDocuments => Set<StudentDocument>();
     public DbSet<StudentMedicalRecord> StudentMedicalRecords => Set<StudentMedicalRecord>();
+    public DbSet<StudentAcademicRecord> StudentAcademicRecords => Set<StudentAcademicRecord>();
+    public DbSet<StudentAcademicRecordSubject> StudentAcademicRecordSubjects =>
+        Set<StudentAcademicRecordSubject>();
     public DbSet<Notice> Notices => Set<Notice>();
     public DbSet<CalendarEvent> CalendarEvents => Set<CalendarEvent>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -44,6 +48,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<TeacherSubject> TeacherSubjects => Set<TeacherSubject>();
     public DbSet<ClassSubjectTeacher> ClassSubjectTeachers => Set<ClassSubjectTeacher>();
     public DbSet<GradeCurriculum> GradeCurricula => Set<GradeCurriculum>();
+    public DbSet<SchoolStatisticsSnapshot> SchoolStatisticsSnapshots => Set<SchoolStatisticsSnapshot>();
 
     public DbSet<SchoolShift> SchoolShifts => Set<SchoolShift>();
     public DbSet<ShiftPeriod> ShiftPeriods => Set<ShiftPeriod>();
@@ -62,6 +67,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
 
         modelBuilder.Entity<AuditLog>().Property(a => a.Action).HasMaxLength(1000);
         modelBuilder.Entity<AuditLog>().Property(a => a.TraceId).HasMaxLength(200);
+
+        // The admin listing sorts Timestamp DESC, Id and pages 20 rows. Without this the
+        // dominant unfiltered case is a parallel sequential scan over the whole table followed
+        // by a top-N sort — measured at 1177 ms cold on 170k rows, to return twenty of them.
+        // Descending to match the sort, with Id as the tie-break the query already applies.
+        modelBuilder.Entity<AuditLog>()
+            .HasIndex(a => new { a.Timestamp, a.Id })
+            .IsDescending(true, false);
     }
 
     private void ScopeToSchool<T>(ModelBuilder modelBuilder) where T : class, ISchoolScoped =>
@@ -82,6 +95,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         modelBuilder.Entity<User>().Property(u => u.Email).HasMaxLength(320);
         modelBuilder.Entity<User>().Property(u => u.PasswordHash).HasMaxLength(500);
         modelBuilder.Entity<User>().Property<uint>("Version").IsRowVersion();
+
+        modelBuilder.Entity<PasswordResetToken>()
+            .HasOne(t => t.User).WithMany()
+            .HasForeignKey(t => t.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+        // Redemption looks a token up by its hash and nothing else, so this index is the
+        // whole read path. Unique because two live tokens must never collide.
+        modelBuilder.Entity<PasswordResetToken>().HasIndex(t => t.TokenHash).IsUnique();
+        modelBuilder.Entity<PasswordResetToken>().Property(t => t.TokenHash).HasMaxLength(64);
+        // Backs both "invalidate this user's outstanding tokens" and the expiry sweep.
+        modelBuilder.Entity<PasswordResetToken>().HasIndex(t => new { t.UserId, t.ExpiresAt });
 
         modelBuilder.Entity<Student>()
             .HasOne(s => s.User).WithOne()
@@ -353,6 +377,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .HasIndex(gc => new { gc.SchoolId, gc.Grade, gc.SubjectId }).IsUnique();
         modelBuilder.Entity<GradeCurriculum>().Property<uint>("Version").IsRowVersion();
         ScopeToSchool<GradeCurriculum>(modelBuilder);
+
+        // One row per (school, window). The lookup is always by the whole key, and it must be
+        // unique or two concurrent recomputes would leave duplicates that disagree.
+        modelBuilder.Entity<SchoolStatisticsSnapshot>()
+            .HasIndex(s => new { s.SchoolId, s.From, s.To, s.AcademicYearId, s.GradingPeriodId })
+            .IsUnique();
+        // Deliberately no row version: a snapshot is derived data. Two requests racing to
+        // refresh the same row both write the same numbers, so last-writer-wins is correct
+        // and a concurrency exception would only fail a read for no benefit.
+        ScopeToSchool<SchoolStatisticsSnapshot>(modelBuilder);
     }
 
     private void ConfigureScheduling(ModelBuilder modelBuilder)
@@ -545,6 +579,44 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.Notes).HasMaxLength(4000);
         modelBuilder.Entity<StudentMedicalRecord>().Property<uint>("Version").IsRowVersion();
         ScopeToSchool<StudentMedicalRecord>(modelBuilder);
+
+        // Transcript rows. The only student-owned table here that is NOT school-scoped, and the
+        // only one keyed on StudentId alone rather than the composite (StudentId, SchoolId).
+        //
+        // Both differences are the point. The composite key used above ties a row to the student's
+        // *current* school; a transcript row belongs to a school the student has usually already
+        // left, so that key would reject exactly the rows worth keeping. Restrict on delete, so
+        // removing a student is refused while history exists rather than silently erasing it.
+        modelBuilder.Entity<StudentAcademicRecord>()
+            .HasOne<Student>().WithMany()
+            .HasForeignKey(r => r.StudentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // One row per student per school per year. Rebuilding a record must update the existing
+        // row rather than accumulate duplicates, and this is what makes that detectable.
+        modelBuilder.Entity<StudentAcademicRecord>()
+            .HasIndex(r => new { r.StudentId, r.SchoolId, r.AcademicYearId })
+            .IsUnique();
+
+        // The read path is always "this student's whole history, newest first".
+        modelBuilder.Entity<StudentAcademicRecord>().HasIndex(r => new { r.StudentId, r.EnrolledAt });
+
+        modelBuilder.Entity<StudentAcademicRecord>().Property(r => r.SchoolName).HasMaxLength(200);
+        modelBuilder.Entity<StudentAcademicRecord>().Property(r => r.AcademicYearName).HasMaxLength(100);
+        modelBuilder.Entity<StudentAcademicRecord>().Property(r => r.ClassName).HasMaxLength(100);
+        modelBuilder.Entity<StudentAcademicRecord>().Property<uint>("Version").IsRowVersion();
+
+        // Cascade, unlike everything else in this method: a subject line has no meaning without
+        // the record it belongs to, and rebuilding a record replaces its lines wholesale.
+        modelBuilder.Entity<StudentAcademicRecordSubject>()
+            .HasOne(s => s.Record).WithMany(r => r.Subjects)
+            .HasForeignKey(s => s.StudentAcademicRecordId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<StudentAcademicRecordSubject>()
+            .HasIndex(s => new { s.StudentAcademicRecordId, s.SubjectName });
+
+        modelBuilder.Entity<StudentAcademicRecordSubject>().Property(s => s.SubjectName).HasMaxLength(200);
     }
 
     // The notice board and the shared calendar. Both are school-scoped; AuthorUserId/CreatedByUserId

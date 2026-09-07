@@ -52,7 +52,17 @@ public class ScheduledEmailBackgroundService(
             await digests.SendDailyAsync(today, ct);
 
             if (today.DayOfWeek == DayOfWeek.Sunday)
+            {
                 await digests.SendWeeklyAsync(today, ct);
+
+                // Guardians get one summary a week rather than a mail per mark or absence. A
+                // parent of three would otherwise receive dozens, and the reliable result of that
+                // is a filter rule hiding all of them -- including the one that mattered.
+                var guardianDigests = scope.ServiceProvider.GetRequiredService<IGuardianDigestService>();
+                var sent = await guardianDigests.SendWeeklyAsync(today, ct);
+
+                logger.LogInformation("Sent {Count} guardian weekly digests.", sent);
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

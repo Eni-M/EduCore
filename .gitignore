@@ -21,3 +21,8 @@ riderModule.iml
 # User data, never committed.
 /storage/
 .neon
+
+# TLS material for the compose stack (mounted into nginx read-only). The private key
+# never belongs in git; generate a self-signed pair or drop a real certificate here --
+# see .env.example for the openssl command.
+/certs/

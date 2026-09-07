@@ -1,3 +1,4 @@
+using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Rows;
 using EduCore.Dtos.Statistics.Aggregate;
@@ -23,6 +24,17 @@ public class StudentStatisticsService(
         (await students.GetByClassAsync(await scope.ResolveAsync(filter, ct), ct))
             .Select(r => new CountByKeyDto(r.ClassId.ToString(), r.ClassName, r.Count))
             .ToList();
+
+    public async Task<PagedResultDto<CountByKeyDto>> GetByClassPagedAsync(
+        StatisticsFilter filter, PaginationQueryDto pagination, CancellationToken ct)
+    {
+        var page = await students.GetByClassPagedAsync(
+            await scope.ResolveAsync(filter, ct), pagination, ct);
+
+        return new PagedResultDto<CountByKeyDto>(
+            page.Items.Select(r => new CountByKeyDto(r.ClassId.ToString(), r.ClassName, r.Count)).ToList(),
+            page.Page, page.PageSize, page.TotalCount);
+    }
 
     public async Task<IReadOnlyList<CountByKeyDto>> GetByAgeAsync(
         StatisticsFilter filter, CancellationToken ct) =>

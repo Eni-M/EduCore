@@ -18,11 +18,21 @@ public interface IAttendanceStatisticsRepository
     Task<IReadOnlyList<AttendanceGroup>> GetByGradeAsync(StatisticsQuery ctx, CancellationToken ct);
     Task<IReadOnlyList<AttendanceGroup>> GetBySubjectAsync(StatisticsQuery ctx, CancellationToken ct);
 
+    // Same aggregations, ordered totally and sliced in the database.
+    Task<PagedResultDto<AttendanceGroup>> GetByClassPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct);
+    Task<PagedResultDto<AttendanceGroup>> GetBySubjectPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct);
+
     Task<IReadOnlyList<(DateOnly Day, int Records, int Present)>> GetDailyTrendAsync(
         StatisticsQuery ctx, CancellationToken ct);
 
     Task<IReadOnlyList<StudentAttendanceSummaryDto>> GetByStudentAsync(
         StatisticsQuery ctx, CancellationToken ct);
+
+    // Same students as GetByStudentAsync, grouped and sliced in the database.
+    Task<PagedResultDto<StudentAttendanceSummaryDto>> GetByStudentPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct);
 
     Task<IReadOnlyList<ExcessiveAbsenceStudentDto>> GetExcessiveAbsencesAsync(
         StatisticsQuery ctx, double absenceRateThreshold, CancellationToken ct);

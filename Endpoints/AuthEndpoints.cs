@@ -24,15 +24,41 @@ public static class AuthEndpoints
             return Results.Ok(result.User);
         }).RequireRateLimiting("LoginPolicy");
 
+        // Anonymous by necessity — someone who cannot sign in is the only caller. Always 204,
+        // whether or not the address matches an account: a 404 here would let anyone test
+        // which email addresses hold accounts.
+        group.MapPost("/forgot-password", async (
+                ForgotPasswordDto dto, IPasswordResetService service, CancellationToken ct) =>
+            {
+                await service.RequestAsync(dto, ct);
+                return Results.NoContent();
+            })
+            .RequireRateLimiting("PasswordResetPolicy");
+
+        group.MapPost("/reset-password", async (
+                ResetPasswordDto dto, IPasswordResetService service, CancellationToken ct) =>
+            {
+                await service.ResetAsync(dto, ct);
+                return Results.NoContent();
+            })
+            .RequireRateLimiting("PasswordResetPolicy");
+
         group.MapPost("/logout", (ISessionCookies cookies, HttpResponse response) =>
         {
             cookies.Clear(response);
             return Results.NoContent();
         });
 
+        // These three sit outside the /api group, so they do not inherit its account-status
+        // filter and need the revocation check attached explicitly -- otherwise a deactivated
+        // user's /me kept answering 200 for up to an hour while every data route said 401.
+        // ActiveAccountEndpointFilter, not AccountStatusEndpointFilter: the password-rotation
+        // gate would lock a must-change-password user out of the very endpoints that let them
+        // finish rotating.
         group.MapGet("/me", async (IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
                 Results.Ok(await users.GetCurrentAsync(currentUser.UserId, ct)))
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
 
         group.MapPost("/change-password", async (
                 ChangePasswordDto dto,
@@ -46,8 +72,21 @@ public static class AuthEndpoints
                 cookies.Issue(response, result.Token, result.User.ExpiresAt);
                 return Results.Ok(result.User);
             })
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
 
+
+        // Turning scheduled mail off is a self-service action, deliberately available to every
+        // signed-in role rather than only guardians -- teachers and students receive the daily
+        // schedule digest and have the same claim on being left alone.
+        group.MapPut("/me/email-digests", async (
+                DigestPreferenceDto dto, IUserService users, CancellationToken ct) =>
+            {
+                await users.SetDigestPreferenceAsync(dto.OptOut, ct);
+                return Results.NoContent();
+            })
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
         group.MapPut("/me", async (
                 UpdateMyCredentialsDto dto,
                 IUserService users,
@@ -61,7 +100,8 @@ public static class AuthEndpoints
                 cookies.Issue(response, result.Token, result.User.ExpiresAt);
                 return Results.Ok(result.User);
             })
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
 
         var accounts = group.MapGroup("/users")
             .RequireAuthorization(Policies.ManageAccounts)

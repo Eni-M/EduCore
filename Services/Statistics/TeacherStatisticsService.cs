@@ -1,3 +1,4 @@
+using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Aggregate;
 using EduCore.Dtos.Statistics.Individual;
@@ -43,6 +44,14 @@ public class TeacherStatisticsService(
     public async Task<IReadOnlyList<TeacherCoverageDto>> GetCoverageAsync(
         StatisticsFilter filter, CancellationToken ct) =>
         await teachers.GetCoverageAsync(await scope.ResolveAsync(filter, ct), ct);
+
+    public async Task<PagedResultDto<TeacherWorkloadDto>> GetWorkloadPagedAsync(
+        StatisticsFilter filter, PaginationQueryDto pagination, CancellationToken ct) =>
+        await teachers.GetWorkloadPagedAsync(await scope.ResolveAsync(filter, ct), pagination, ct);
+
+    public async Task<PagedResultDto<TeacherCoverageDto>> GetCoveragePagedAsync(
+        StatisticsFilter filter, PaginationQueryDto pagination, CancellationToken ct) =>
+        await teachers.GetCoveragePagedAsync(await scope.ResolveAsync(filter, ct), pagination, ct);
 
     public async Task<TeacherDetailStatisticsDto> GetDetailAsync(
         StatisticsFilter filter, Guid teacherId, CancellationToken ct)

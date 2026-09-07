@@ -42,20 +42,32 @@ public class AttendanceStatisticsRepository(AppDbContext context)
             behaviorMarkCount);
     }
 
+    // Name then Id: class and subject names are not unique across schools, and LIMIT/OFFSET
+    // over a tie is free to reorder rows between pages, hiding some and repeating others.
+    private IQueryable<AttendanceGroup> ByClassQuery(StatisticsQuery ctx) =>
+        from a in AttendanceInWindow(ctx)
+        join c in ClassesInScope(ctx) on a.ClassId equals c.Id
+        group a by new { c.Id, c.Name }
+        into g
+        orderby g.Key.Name, g.Key.Id
+        select new AttendanceGroup(
+            g.Key.Id.ToString(),
+            g.Key.Name,
+            g.Count(),
+            g.Count(x => x.IsPresent),
+            g.Count(x => !x.IsPresent && x.IsExcused));
+
     public async Task<IReadOnlyList<AttendanceGroup>> GetByClassAsync(
         StatisticsQuery ctx, CancellationToken ct) =>
-        await (from a in AttendanceInWindow(ctx)
-               join c in ClassesInScope(ctx) on a.ClassId equals c.Id
-               group a by new { c.Id, c.Name }
-               into g
-               orderby g.Key.Name
-               select new AttendanceGroup(
-                   g.Key.Id.ToString(),
-                   g.Key.Name,
-                   g.Count(),
-                   g.Count(x => x.IsPresent),
-                   g.Count(x => !x.IsPresent && x.IsExcused)))
-            .ToListAsync(ct);
+        await ByClassQuery(ctx).ToListAsync(ct);
+
+    public Task<PagedResultDto<AttendanceGroup>> GetByClassPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct) =>
+        PageAsync(ByClassQuery(ctx), pagination, ct);
+
+    public Task<PagedResultDto<AttendanceGroup>> GetBySubjectPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct) =>
+        PageAsync(BySubjectQuery(ctx), pagination, ct);
 
     public async Task<IReadOnlyList<AttendanceGroup>> GetByClassAsync(
         StatisticsQuery ctx, IReadOnlyCollection<Guid> classIds, CancellationToken ct) =>
@@ -95,21 +107,23 @@ public class AttendanceStatisticsRepository(AppDbContext context)
             .ToList();
     }
 
+    private IQueryable<AttendanceGroup> BySubjectQuery(StatisticsQuery ctx) =>
+        from a in AttendanceInWindow(ctx)
+        join d in LessonsInWindow(ctx) on a.DiaryEntryId equals d.Id
+        join s in Scope(_context.Subjects, ctx) on d.SubjectId equals s.Id
+        group a by new { s.Id, s.Name }
+        into g
+        orderby g.Key.Name, g.Key.Id
+        select new AttendanceGroup(
+            g.Key.Id.ToString(),
+            g.Key.Name,
+            g.Count(),
+            g.Count(x => x.IsPresent),
+            g.Count(x => !x.IsPresent && x.IsExcused));
+
     public async Task<IReadOnlyList<AttendanceGroup>> GetBySubjectAsync(
         StatisticsQuery ctx, CancellationToken ct) =>
-        await (from a in AttendanceInWindow(ctx)
-               join d in LessonsInWindow(ctx) on a.DiaryEntryId equals d.Id
-               join s in Scope(_context.Subjects, ctx) on d.SubjectId equals s.Id
-               group a by new { s.Id, s.Name }
-               into g
-               orderby g.Key.Name
-               select new AttendanceGroup(
-                   g.Key.Id.ToString(),
-                   g.Key.Name,
-                   g.Count(),
-                   g.Count(x => x.IsPresent),
-                   g.Count(x => !x.IsPresent && x.IsExcused)))
-            .ToListAsync(ct);
+        await BySubjectQuery(ctx).ToListAsync(ct);
 
     public async Task<IReadOnlyList<(DateOnly Day, int Records, int Present)>> GetDailyTrendAsync(
         StatisticsQuery ctx, CancellationToken ct)
@@ -148,6 +162,43 @@ public class AttendanceStatisticsRepository(AppDbContext context)
                 r.Excused,
                 Rate(r.Present, r.Records)))
             .ToList();
+    }
+
+    public async Task<PagedResultDto<StudentAttendanceSummaryDto>> GetByStudentPagedAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct)
+    {
+        var (page, pageSize) = ListPagination.Normalize(pagination);
+
+        // Same rows as GetByStudentAsync, but grouped, ordered and sliced in the database.
+        // The endpoint used to load every student in scope and then throw away all but 20 —
+        // the payload shrank, the read did not.
+        var matches = StudentAttendanceAggregates(ctx);
+
+        var totalCount = await matches.CountAsync(ct);
+
+        var items = await matches
+            // Name preserves the previous list order. Student and class break ties, because
+            // two students sharing a name would otherwise be free to swap places between two
+            // LIMIT/OFFSET queries, showing one twice and the other never.
+            .OrderBy(r => r.Name)
+            .ThenBy(r => r.StudentId)
+            .ThenBy(r => r.ClassId)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return new PagedResultDto<StudentAttendanceSummaryDto>(
+            items.Select(r => new StudentAttendanceSummaryDto(
+                r.StudentId,
+                r.Name,
+                r.ClassId,
+                r.ClassName,
+                r.Records,
+                r.Present,
+                r.Records - r.Present,
+                r.Excused,
+                Rate(r.Present, r.Records))).ToList(),
+            page, pageSize, totalCount);
     }
 
     public async Task<IReadOnlyList<ExcessiveAbsenceStudentDto>> GetExcessiveAbsencesAsync(

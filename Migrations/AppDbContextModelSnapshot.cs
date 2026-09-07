@@ -261,6 +261,9 @@ namespace EduCore.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Timestamp", "Id")
+                        .IsDescending(true, false);
+
                     b.ToTable("AuditLogs");
                 });
 
@@ -775,6 +778,9 @@ namespace EduCore.Migrations
                     b.Property<Guid>("GradingPeriodId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("SchoolId")
                         .HasColumnType("uuid");
 
@@ -919,6 +925,39 @@ namespace EduCore.Migrations
                         .IsUnique();
 
                     b.ToTable("OriginCities");
+                });
+
+            modelBuilder.Entity("EduCore.Models.PasswordResetToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "ExpiresAt");
+
+                    b.ToTable("PasswordResetTokens");
                 });
 
             modelBuilder.Entity("EduCore.Models.RegionalAdmin", b =>
@@ -1070,6 +1109,122 @@ namespace EduCore.Migrations
                         .IsUnique();
 
                     b.ToTable("SchoolShifts");
+                });
+
+            modelBuilder.Entity("EduCore.Models.SchoolStatisticsSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AcademicAtRisk")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("AcademicAverageFinalMark")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("AcademicFailed")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AcademicGradedMarks")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AcademicIncompleteMarks")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AcademicPassed")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("AcademicYearId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttendanceAbsent")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("AttendanceAverageBehaviorMark")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("AttendanceBehaviorMarkCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AttendanceExcusedAbsences")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AttendancePresent")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AttendanceRecords")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ChangesSinceComputed")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Classes")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ComputedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EnrollmentsActive")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EnrollmentsActiveYearAgo")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EnrollmentsExited")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EnrollmentsStarted")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("From")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("GradingPeriodId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("StudentsActive")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StudentsFemale")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StudentsGenderNotRecorded")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StudentsGraduated")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StudentsMale")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StudentsNewArrivals")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StudentsTotal")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Teachers")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TeachersWithWorkload")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("To")
+                        .HasColumnType("date");
+
+                    b.Property<int>("WorkloadClassesSum")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchoolId", "From", "To", "AcademicYearId", "GradingPeriodId")
+                        .IsUnique();
+
+                    b.ToTable("SchoolStatisticsSnapshots");
                 });
 
             modelBuilder.Entity("EduCore.Models.SchoolingHistory", b =>
@@ -1267,6 +1422,93 @@ namespace EduCore.Migrations
                         .IsUnique();
 
                     b.ToTable("Students");
+                });
+
+            modelBuilder.Entity("EduCore.Models.StudentAcademicRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AcademicYearId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AcademicYearName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ClassName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CompiledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("EnrolledAt")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("ExitReason")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Grade")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("LeftAt")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SchoolName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudentId", "EnrolledAt");
+
+                    b.HasIndex("StudentId", "SchoolId", "AcademicYearId")
+                        .IsUnique();
+
+                    b.ToTable("StudentAcademicRecords");
+                });
+
+            modelBuilder.Entity("EduCore.Models.StudentAcademicRecordSubject", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("AnnualMark")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("StudentAcademicRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SubjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SubjectName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudentAcademicRecordId", "SubjectName");
+
+                    b.ToTable("StudentAcademicRecordSubjects");
                 });
 
             modelBuilder.Entity("EduCore.Models.StudentDocument", b =>
@@ -1486,6 +1728,9 @@ namespace EduCore.Migrations
                         .IsRequired()
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
+
+                    b.Property<bool>("EmailDigestsOptOut")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
@@ -1860,6 +2105,17 @@ namespace EduCore.Migrations
                     b.Navigation("Country");
                 });
 
+            modelBuilder.Entity("EduCore.Models.PasswordResetToken", b =>
+                {
+                    b.HasOne("EduCore.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("EduCore.Models.RegionalAdmin", b =>
                 {
                     b.HasOne("EduCore.Models.City", "City")
@@ -2017,6 +2273,26 @@ namespace EduCore.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("EduCore.Models.StudentAcademicRecord", b =>
+                {
+                    b.HasOne("EduCore.Models.Student", null)
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EduCore.Models.StudentAcademicRecordSubject", b =>
+                {
+                    b.HasOne("EduCore.Models.StudentAcademicRecord", "Record")
+                        .WithMany("Subjects")
+                        .HasForeignKey("StudentAcademicRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Record");
+                });
+
             modelBuilder.Entity("EduCore.Models.StudentDocument", b =>
                 {
                     b.HasOne("EduCore.Models.Student", null)
@@ -2120,6 +2396,11 @@ namespace EduCore.Migrations
                     b.Navigation("Enrollments");
 
                     b.Navigation("Guardians");
+                });
+
+            modelBuilder.Entity("EduCore.Models.StudentAcademicRecord", b =>
+                {
+                    b.Navigation("Subjects");
                 });
 
             modelBuilder.Entity("EduCore.Models.Teacher", b =>

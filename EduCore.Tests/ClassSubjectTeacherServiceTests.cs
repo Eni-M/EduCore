@@ -62,6 +62,9 @@ public class ClassSubjectTeacherServiceTests
         public Task<School?> GetWithLocationAsync(Guid schoolId, CancellationToken ct) => Task.FromResult<School?>(school);
         public Task<IEnumerable<School>> GetAllOrderedAsync(bool activeOnly, CancellationToken ct) =>
             Task.FromResult<IEnumerable<School>>([]);
+        public Task<EduCore.Dtos.Pagination.PagedResultDto<School>> GetOrderedPagedAsync(
+            bool activeOnly, EduCore.Dtos.Pagination.PaginationQueryDto pagination, CancellationToken ct) =>
+            Task.FromResult(new EduCore.Dtos.Pagination.PagedResultDto<School>([], 1, 20, 0));
         public Task<IEnumerable<School>> GetByCityAsync(Guid cityId, bool activeOnly, CancellationToken ct) =>
             Task.FromResult<IEnumerable<School>>([]);
         public Task<IEnumerable<School>> GetByStateAsync(Guid stateId, bool activeOnly, CancellationToken ct) =>
@@ -135,6 +138,29 @@ public class ClassSubjectTeacherServiceTests
         public Task<bool> SaveChangesAsync(CancellationToken ct) => Task.FromResult(true);
     }
 
+    // Every subject is on the syllabus here: these tests are about grade bands and
+    // qualifications, not about the curriculum restriction, which has its own tests.
+    private sealed class FakeGradeCurriculumRepository(bool onSyllabus = true, bool hasCurriculum = true)
+        : IGradeCurriculumRepository
+    {
+        public Task<IReadOnlyList<Subject>> GetSubjectsForGradeAsync(int grade, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<Subject>>([]);
+        public Task<IReadOnlyList<GradeCurriculum>> GetAllAsync(CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<GradeCurriculum>>([]);
+        public Task<GradeCurriculum?> GetAsync(int grade, Guid subjectId, CancellationToken ct) =>
+            Task.FromResult<GradeCurriculum?>(null);
+        public Task<bool> IsInCurriculumAsync(int grade, Guid subjectId, CancellationToken ct) =>
+            Task.FromResult(onSyllabus);
+        public Task<bool> HasCurriculumAsync(int grade, CancellationToken ct) =>
+            Task.FromResult(hasCurriculum);
+        public Task<GradeCurriculum?> GetByIdAsync(Guid id, CancellationToken ct) =>
+            Task.FromResult<GradeCurriculum?>(null);
+        public Task AddAsync(GradeCurriculum entity) => Task.CompletedTask;
+        public void Update(GradeCurriculum entity) { }
+        public void Remove(GradeCurriculum entity) { }
+        public Task<bool> SaveChangesAsync(CancellationToken ct) => Task.FromResult(true);
+    }
+
     private static IMapper Mapper() =>
         new MapperConfiguration(c => c.AddProfile<MappingProfile>(),
             Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance).CreateMapper();
@@ -150,6 +176,7 @@ public class ClassSubjectTeacherServiceTests
             new FakeClassRepository(classEntity),
             new FakeSchoolRepository(school),
             new FakeSubjectRepository(),
+            new FakeGradeCurriculumRepository(),
             new FakeTeacherSubjectRepository(qualified: true),
             access: null!,
             new FakeCurrentUser(),
@@ -172,6 +199,7 @@ public class ClassSubjectTeacherServiceTests
             new FakeClassRepository(classEntity),
             new FakeSchoolRepository(school),
             new FakeSubjectRepository(),
+            new FakeGradeCurriculumRepository(),
             new FakeTeacherSubjectRepository(qualified: true),
             access: null!,
             new FakeCurrentUser(),
@@ -183,5 +211,87 @@ public class ClassSubjectTeacherServiceTests
 
         Assert.NotNull(assignments.Added);
         Assert.Equal(SubjectId, result.SubjectId);
+    }
+
+    [Fact]
+    public async Task Assigning_a_subject_that_is_not_in_the_grades_curriculum_is_rejected()
+    {
+        var classEntity = new Class { Id = ClassId, SchoolId = SchoolId, Name = "10A", Grade = 10 };
+        var school = new School { Id = SchoolId, Name = "High School", Type = SchoolType.HighSchool };
+        var assignments = new FakeAssignmentRepository();
+
+        var service = new ClassSubjectTeacherService(
+            assignments,
+            new FakeClassRepository(classEntity),
+            new FakeSchoolRepository(school),
+            new FakeSubjectRepository(),
+            new FakeGradeCurriculumRepository(onSyllabus: false),
+            new FakeTeacherSubjectRepository(qualified: true),
+            access: null!,
+            new FakeCurrentUser(),
+            Mapper());
+
+        var dto = new ClassSubjectTeacherCreateDto(ClassId, SubjectId, TeacherId);
+
+        var error = await Assert.ThrowsAsync<BusinessException>(
+            () => service.CreateAsync(dto, CancellationToken.None));
+
+        // The grade has a curriculum, so the message must say the subject is not on it --
+        // not that the curriculum is missing, which would send the reader somewhere useless.
+        Assert.Contains("not in the grade 10 curriculum", error.Message);
+        Assert.Null(assignments.Added);
+    }
+
+    [Fact]
+    public async Task Assigning_a_subject_when_the_grade_has_no_curriculum_says_so_specifically()
+    {
+        var classEntity = new Class { Id = ClassId, SchoolId = SchoolId, Name = "10A", Grade = 10 };
+        var school = new School { Id = SchoolId, Name = "High School", Type = SchoolType.HighSchool };
+
+        var service = new ClassSubjectTeacherService(
+            new FakeAssignmentRepository(),
+            new FakeClassRepository(classEntity),
+            new FakeSchoolRepository(school),
+            new FakeSubjectRepository(),
+            new FakeGradeCurriculumRepository(onSyllabus: false, hasCurriculum: false),
+            new FakeTeacherSubjectRepository(qualified: true),
+            access: null!,
+            new FakeCurrentUser(),
+            Mapper());
+
+        var dto = new ClassSubjectTeacherCreateDto(ClassId, SubjectId, TeacherId);
+
+        var error = await Assert.ThrowsAsync<BusinessException>(
+            () => service.CreateAsync(dto, CancellationToken.None));
+
+        Assert.Contains("no curriculum yet", error.Message);
+    }
+
+    [Fact]
+    public async Task The_curriculum_check_runs_before_the_qualification_check()
+    {
+        // Otherwise an off-syllabus request is reported as "this teacher is not qualified",
+        // which points at the wrong fix: qualifying the teacher would still not make the
+        // subject part of the grade.
+        var classEntity = new Class { Id = ClassId, SchoolId = SchoolId, Name = "10A", Grade = 10 };
+        var school = new School { Id = SchoolId, Name = "High School", Type = SchoolType.HighSchool };
+
+        var service = new ClassSubjectTeacherService(
+            new FakeAssignmentRepository(),
+            new FakeClassRepository(classEntity),
+            new FakeSchoolRepository(school),
+            new FakeSubjectRepository(),
+            new FakeGradeCurriculumRepository(onSyllabus: false),
+            new FakeTeacherSubjectRepository(qualified: false),
+            access: null!,
+            new FakeCurrentUser(),
+            Mapper());
+
+        var dto = new ClassSubjectTeacherCreateDto(ClassId, SubjectId, TeacherId);
+
+        var error = await Assert.ThrowsAsync<BusinessException>(
+            () => service.CreateAsync(dto, CancellationToken.None));
+
+        Assert.DoesNotContain("not qualified", error.Message);
     }
 }
