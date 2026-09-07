@@ -31,15 +31,25 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      # Restore separately from build so a dependency failure is distinguishable from a
-      # compilation failure in the log.
+      # Restore from the test project, not the repository root. EduCore.slnx contains only
+      # EduCore.csproj -- the test project is not in the solution -- so a root restore leaves it
+      # untouched and the test step then has nothing to run. Restoring the test project pulls the
+      # app in through its ProjectReference, so this covers both.
+      #
+      # Separate from build so a dependency failure is distinguishable from a compilation failure.
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore EduCore.Tests/EduCore.Tests.csproj
 
-      # Warnings as errors. The build is clean today, and the cheapest moment to keep it that way
-      # is before the first warning is merged rather than after fifty have accumulated.
+      # Warnings as errors, on the application. The build is clean today, and the cheapest moment
+      # to keep it that way is before the first warning is merged rather than after fifty have
+      # accumulated.
       - name: Build
         run: dotnet build --no-restore --configuration Release -warnaserror
+
+      # Explicit, for the same reason the restore is: the root build stops at the solution, which
+      # does not include this project.
+      - name: Build tests
+        run: dotnet build EduCore.Tests/EduCore.Tests.csproj --no-restore --configuration Release
 
       - name: Test
         run: dotnet run --project EduCore.Tests/EduCore.Tests.csproj --configuration Release --no-build
