@@ -1,4 +1,5 @@
 using AutoMapper;
+using EduCore.Dtos.Assignment;
 using EduCore.Dtos.Calendar;
 using EduCore.Dtos.Class;
 using EduCore.Dtos.Enrollment;
@@ -173,12 +174,29 @@ public class CalendarServiceTests
         public Task<bool> SaveChangesAsync(CancellationToken ct) => Task.FromResult(true);
     }
 
+    private sealed class FakeAssignmentRepo : IAssignmentRepository
+    {
+        public Task<Assignment?> GetByIdAsync(Guid id, CancellationToken ct) => Task.FromResult<Assignment?>(null);
+        public Task<IEnumerable<AssignmentListDto>> GetByClassAsync(Guid classId, CancellationToken ct) =>
+            Task.FromResult<IEnumerable<AssignmentListDto>>([]);
+        public Task<IEnumerable<AssignmentListDto>> GetByTeacherAsync(Guid teacherId, CancellationToken ct) =>
+            Task.FromResult<IEnumerable<AssignmentListDto>>([]);
+        public Task<AssignmentDetailsDto?> GetDetailsAsync(Guid assignmentId, CancellationToken ct) =>
+            Task.FromResult<AssignmentDetailsDto?>(null);
+        public Task<IEnumerable<AssignmentCalendarDto>> GetForCalendarAsync(Guid[] classIds, DateOnly? from, DateOnly? to, CancellationToken ct) =>
+            Task.FromResult<IEnumerable<AssignmentCalendarDto>>([]);
+        public Task AddAsync(Assignment entity) => Task.CompletedTask;
+        public void Update(Assignment entity) { }
+        public void Remove(Assignment entity) { }
+        public Task<bool> SaveChangesAsync(CancellationToken ct) => Task.FromResult(true);
+    }
+
     private static IMapper Mapper() =>
         new MapperConfiguration(c => c.AddProfile<MappingProfile>(), NullLoggerFactory.Instance).CreateMapper();
 
     private static CalendarService Service(ICurrentUser user, FakeCalendarRepo repo, IReadOnlyList<Guid>? taught = null) =>
         new(repo, new FakeClassRepo(taught ?? []), new FakeStudentRepo(), new FakeEnrollmentRepo(),
-            new FakeGuardianRepo(), new FakeAccessGuard(), user, Mapper());
+            new FakeGuardianRepo(), new FakeAccessGuard(), user, Mapper(), new FakeAssignmentRepo());
 
     private static CalendarEventCreateDto Create(CalendarAudience audience, Guid? classId = null, Guid? studentId = null) =>
         new("Midterm", null, CalendarEventType.Exam, audience, classId, studentId,
