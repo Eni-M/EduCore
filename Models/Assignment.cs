@@ -17,7 +17,7 @@ public class Assignment : ISchoolScoped
 
     public string? Description { get; set; }
 
-    public DateTime DueDate { get; set; }
+    public DateTimeOffset DueDate { get; set; }
 
     public string? FileName { get; set; }
 
@@ -27,8 +27,8 @@ public class Assignment : ISchoolScoped
 
     public string? StorageKey { get; set; }
 
-    public DateTime CreatedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 
-    public DateTime UpdatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
 }
 

@@ -20,7 +20,7 @@ public class AssignmentSubmission : ISchoolScoped
 
     public string? StorageKey { get; set; }
 
-    public DateTime SubmittedAt { get; set; }
+    public DateTimeOffset SubmittedAt { get; set; }
 
     public decimal? Score { get; set; }
 

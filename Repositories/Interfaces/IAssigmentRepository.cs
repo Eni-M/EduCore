@@ -8,7 +8,7 @@ public interface IAssignmentRepository : IRepository<Assignment>
     Task<IEnumerable<AssignmentListDto>> GetByClassAsync(
         Guid classId,
         CancellationToken ct);
-    
+
     Task<IEnumerable<AssignmentListDto>> GetByTeacherAsync(
         Guid teacherId,
         CancellationToken ct);
@@ -16,4 +16,10 @@ public interface IAssignmentRepository : IRepository<Assignment>
     Task<AssignmentDetailsDto?> GetDetailsAsync(
         Guid assignmentId,
         CancellationToken ct);
+
+    Task<IEnumerable<AssignmentCalendarDto>> GetForCalendarAsync(
+       Guid[] classIds,
+       DateOnly? from,
+       DateOnly? to,
+       CancellationToken ct);
 }

@@ -19,4 +19,18 @@ public interface IAssignmentService
     Task<AssignmentDetailsDto> GetDetailsAsync(
         Guid assignmentId,
         CancellationToken ct);
+
+    Task<AssignmentDetailsDto> UploadAssignmentFileAsync(
+        Guid assignmentId,
+        Microsoft.AspNetCore.Http.IFormFile file,
+        CancellationToken ct);
+
+    Task<AssignmentSubmissionDto> SubmitAssignmentAsync(
+        Guid assignmentId,
+        Microsoft.AspNetCore.Http.IFormFile file,
+        CancellationToken ct);
+
+    Task<AssignmentSubmissionDto> GetMySubmissionAsync(
+        Guid assignmentId,
+        CancellationToken ct);
 }

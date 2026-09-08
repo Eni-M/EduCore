@@ -9,6 +9,6 @@ public record AssignmentListDto(
     Guid TeacherId,
     string TeacherName,
     string Title,
-    DateTime DueDate,
+    DateTimeOffset DueDate,
     bool HasAttachment,
-    DateTime CreatedAt);
+    DateTimeOffset CreatedAt);

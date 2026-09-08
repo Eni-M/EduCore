@@ -17,14 +17,22 @@ public class CalendarService(
     IGuardianRepository guardians,
     IAccessGuard access,
     ICurrentUser currentUser,
-    IMapper mapper) : ICalendarService
+    IMapper mapper,
+    IAssignmentRepository assignments) : ICalendarService
 {
     public async Task<IEnumerable<CalendarEventListDto>> GetMineAsync(
         DateOnly? from, DateOnly? to, CancellationToken ct)
     {
-        // The Directorate runs the school's calendar, so they see all of it.
         if (currentUser.IsDirectorate)
-            return await events.GetForViewerAsync(true, [], [], currentUser.UserId, from, to, ct);
+        {
+            var allClassIds = (await classes.GetAllAsync(null, ct))
+                .Select(c => c.Id)
+                .ToArray();
+
+            var directorateEvents = await events.GetForViewerAsync(true, [], [], currentUser.UserId, from, to, ct);
+            var directorateAssignments = await GetAssignmentEventsAsync(allClassIds, from, to, ct);
+            return Merge(directorateEvents, directorateAssignments);
+        }
 
         var classIds = new HashSet<Guid>();
         var studentIds = new HashSet<Guid>();
@@ -56,9 +64,44 @@ public class CalendarService(
             return [];
         }
 
-        return await events.GetForViewerAsync(
+        var calendarEvents = await events.GetForViewerAsync(
             false, classIds.ToArray(), studentIds.ToArray(), currentUser.UserId, from, to, ct);
+
+        var assignmentEvents = await GetAssignmentEventsAsync(classIds.ToArray(), from, to, ct);
+
+        return Merge(calendarEvents, assignmentEvents);
     }
+
+    // Assignment due dates folded into the calendar feed on the fly -- no CalendarEvent row is ever
+    // created for one, so there is nothing to keep in sync when a due date changes.
+    private async Task<IEnumerable<CalendarEventListDto>> GetAssignmentEventsAsync(
+        Guid[] classIds, DateOnly? from, DateOnly? to, CancellationToken ct)
+    {
+        if (classIds.Length == 0)
+            return [];
+
+        var results = await assignments.GetForCalendarAsync(classIds, from, to, ct);
+
+        return results.Select(a => new CalendarEventListDto(
+            a.Id,
+            a.Title,
+            a.Description,
+            CalendarEventType.Assignment,
+            CalendarAudience.Class,
+            a.ClassId,
+            a.ClassName,
+            null,
+            null,
+            DateOnly.FromDateTime(a.DueDate.UtcDateTime),
+            null,
+            null,
+            a.TeacherId,
+            a.TeacherName));
+    }
+
+    private static IEnumerable<CalendarEventListDto> Merge(
+        IEnumerable<CalendarEventListDto> events, IEnumerable<CalendarEventListDto> assignments) =>
+        events.Concat(assignments).OrderBy(e => e.Date).ThenBy(e => e.StartTime);
 
     public async Task<CalendarEventListDto> CreateAsync(CalendarEventCreateDto dto, CancellationToken ct)
     {

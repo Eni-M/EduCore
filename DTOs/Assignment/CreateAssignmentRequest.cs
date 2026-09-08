@@ -5,4 +5,4 @@ public record CreateAssignmentRequest(
     Guid SubjectId,
     string Title,
     string? Description,
-    DateTime DueDate);
+    DateTimeOffset DueDate);

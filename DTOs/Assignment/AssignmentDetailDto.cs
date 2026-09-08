@@ -10,9 +10,9 @@ public record AssignmentDetailsDto(
     string TeacherName,
     string Title,
     string? Description,
-    DateTime DueDate,
+    DateTimeOffset DueDate,
     string? FileName,
     string? ContentType,
     long? SizeBytes,
-    DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);

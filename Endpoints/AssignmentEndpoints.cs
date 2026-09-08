@@ -48,5 +48,40 @@ public static class AssignmentEndpoints
                         assignment);
                 })
             .RequireAuthorization(Policies.Teacher);
+
+        group.MapPost("/{assignmentId:guid}/file",
+         async (
+             Guid assignmentId,
+             Microsoft.AspNetCore.Http.IFormFile file,
+             IAssignmentService service,
+             CancellationToken ct) =>
+         {
+             var updated = await service.UploadAssignmentFileAsync(assignmentId, file, ct);
+             return Results.Ok(updated);
+         })
+     .RequireAuthorization(Policies.Teacher)
+     .DisableAntiforgery();
+
+        group.MapPost("/{assignmentId:guid}/submissions/upload",
+                async (
+                    Guid assignmentId,
+                    Microsoft.AspNetCore.Http.IFormFile file,
+                    IAssignmentService service,
+                    CancellationToken ct) =>
+                {
+                    var submission = await service.SubmitAssignmentAsync(assignmentId, file, ct);
+                    return Results.Created($"/api/assignments/{assignmentId}/submissions/{submission.Id}", submission);
+                })
+            .RequireAuthorization(Policies.StudentReadable)
+            .DisableAntiforgery();
+
+        // Student: get my submission for the assignment
+        group.MapGet("/{assignmentId:guid}/submissions/mine",
+                async (
+                    Guid assignmentId,
+                    IAssignmentService service,
+                    CancellationToken ct) =>
+                    Results.Ok(await service.GetMySubmissionAsync(assignmentId, ct)))
+            .RequireAuthorization(Policies.StudentReadable);
     }
 }

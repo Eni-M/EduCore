@@ -8,7 +8,7 @@ public record AssignmentSubmissionDto(
     Guid StudentId,
     string StudentName,
     string Status,
-    DateTime? SubmittedAt,
+    DateTimeOffset? SubmittedAt,
     string? FileName,
     string? ContentType,
     long? SizeBytes,
