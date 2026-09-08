@@ -72,14 +72,14 @@ namespace EduCore.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasMaxLength(8000)
                         .HasColumnType("character varying(8000)");
 
-                    b.Property<DateTime>("DueDate")
+                    b.Property<DateTimeOffset>("DueDate")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("FileName")
@@ -107,7 +107,7 @@ namespace EduCore.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<DateTime>("UpdatedAt")
+                    b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<uint>("Version")
@@ -162,7 +162,7 @@ namespace EduCore.Migrations
                     b.Property<Guid>("StudentId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("SubmittedAt")
+                    b.Property<DateTimeOffset>("SubmittedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<uint>("Version")
