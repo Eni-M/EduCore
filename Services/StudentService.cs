@@ -242,7 +242,7 @@ public class StudentService(
     }
 
     private static (int Page, int PageSize) Normalize(PaginationQueryDto pagination) =>
-        (Math.Max(1, pagination.Page), Math.Clamp(pagination.PageSize, 1, 100));
+        (Math.Max(1, pagination.Page), Math.Clamp(pagination.PageSize, 1, ListPagination.MaxPageSize));
 
     private IEnumerable<StudentListDto> WithVisibleAccounts(IEnumerable<StudentListDto> rows) =>
         currentUser.CanManageAccounts() ? rows : rows.Select(row => row with { Account = null });

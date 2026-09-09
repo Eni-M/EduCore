@@ -88,9 +88,15 @@ public class TwoFactorService(
     }
 
     // RandomNumberGenerator, not Random: this is a credential, and a predictable one is no
-    // second step at all. GetInt32 is uniform over the range, so no digit is favoured.
-    private static string GenerateCode() =>
-        RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+    // second step at all. GetInt32 is uniform over the range, so no digit is favoured, and the
+    // format keeps the leading zeros that make every code the same length.
+    private string GenerateCode()
+    {
+        var digits = _options.CodeLength;
+        var exclusiveMax = (int)Math.Pow(10, digits);
+
+        return RandomNumberGenerator.GetInt32(0, exclusiveMax).ToString(new string('0', digits));
+    }
 
     private static string Hash(string code) =>
         Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(code)));

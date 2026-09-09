@@ -1,3 +1,4 @@
+using EduCore.Configuration;
 using EduCore.Dtos.Pagination;
 
 namespace EduCore.Helpers;
@@ -6,8 +7,13 @@ public static class ListPagination
 {
     // Single source of truth for page clamping: server-side paging (Skip/Take in the
     // database) must echo the same page/pageSize as the in-memory pager below.
+    // The ceiling is a setting rather than a literal, but it still has to be reachable from
+    // static helpers that no container hands anything to. Program.cs sets it once at start-up
+    // from Pagination:MaxPageSize.
+    public static int MaxPageSize { get; set; } = new PaginationOptions().MaxPageSize;
+
     public static (int Page, int PageSize) Normalize(PaginationQueryDto pagination) =>
-        (Math.Max(1, pagination.Page), Math.Clamp(pagination.PageSize, 1, 100));
+        (Math.Max(1, pagination.Page), Math.Clamp(pagination.PageSize, 1, MaxPageSize));
 
     // Pages an already-materialised list for the HTTP response. This trims the payload
     // the client receives; it does not reduce the database read (the caller has already

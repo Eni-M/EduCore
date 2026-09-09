@@ -1,7 +1,9 @@
-﻿using EduCore.Models;
+using EduCore.Models;
 using EduCore.Repositories.Interfaces;
+using EduCore.Configuration;
 using EduCore.Security;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace EduCore.Tests;
@@ -48,7 +50,7 @@ public class AccountStatusCacheTests
         var memory = new MemoryCache(new MemoryCacheOptions());
         var users = new CountingUserRepository(user);
 
-        return (new AccountStatusCache(memory, users), users, memory);
+        return (new AccountStatusCache(memory, users, Options.Create(new CachingOptions())), users, memory);
     }
 
     [Fact]

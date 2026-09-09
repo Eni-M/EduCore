@@ -1,4 +1,5 @@
-﻿using EduCore.Dtos.Dashboard;
+﻿using EduCore.Configuration;
+using EduCore.Dtos.Dashboard;
 using EduCore.Dtos.Mark;
 using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Schedule;
@@ -6,6 +7,7 @@ using EduCore.Dtos.Statistics;
 using EduCore.Enums;
 using EduCore.Exceptions;
 using EduCore.Helpers;
+using Microsoft.Extensions.Options;
 using EduCore.Security;
 using EduCore.Services.Interfaces;
 using EduCore.Services.Statistics.Interfaces;
@@ -28,15 +30,12 @@ public class DashboardService(
     IScheduleService schedule,
     IGuardianService guardians,
     IStatisticsOverviewService overview,
-    IGradingCalculator grading) : IDashboardService
+    IGradingCalculator grading,
+    IOptions<DashboardOptions> dashboard) : IDashboardService
 {
-    // Enough to see the shape of recent activity without turning the dashboard into a list page.
-    private const int RecentLimit = 5;
-
-    // A guardian with more children than this gets the first few; the rest are one click away in
-    // the portal. The per-child lookups are sequential, so this bounds the work a single request
-    // can cause.
-    private const int MaxChildrenDetailed = 4;
+    // Both bound work a single request can cause, not just how much it displays.
+    private readonly int _recentLimit = dashboard.Value.RecentActivityLimit;
+    private readonly int _maxChildrenDetailed = dashboard.Value.MaxChildrenDetailed;
 
     public Task<DashboardDto> GetAsync(CancellationToken ct) => currentUser.Role switch
     {
@@ -144,7 +143,7 @@ public class DashboardService(
                 $"{l.SubjectName} · {l.ClassName}",
                 $"Period {l.Period}, {l.Start:HH\\:mm}–{l.End:HH\\:mm}",
                 "/lessons"))
-            .Take(RecentLimit)
+            .Take(_recentLimit)
             .ToList();
 
         return new DashboardDto(
@@ -183,7 +182,7 @@ public class DashboardService(
 
         // Sequential and bounded rather than parallel: these share nothing, but a guardian with
         // many children should not be able to fan out an unbounded number of queries per request.
-        foreach (var child in children.Take(MaxChildrenDetailed))
+        foreach (var child in children.Take(_maxChildrenDetailed))
         {
             var profile = await students.GetProfileAsync(child.StudentId, ct);
             var name = child.FirstName;
@@ -237,7 +236,7 @@ public class DashboardService(
             stats,
             attention,
             today,
-            recent.Take(RecentLimit).ToList());
+            recent.Take(_recentLimit).ToList());
     }
 
     // ---- Directorate ---------------------------------------------------------------
@@ -304,7 +303,7 @@ public class DashboardService(
     private async Task<DashboardDto> RegionAsync(UserRole role, string context, CancellationToken ct)
     {
         var summary = await overview.GetPlatformOverviewAsync(
-            new StatisticsFilter(), new PaginationQueryDto(1, RecentLimit), ct);
+            new StatisticsFilter(), new PaginationQueryDto(1, _recentLimit), ct);
 
         var stats = new List<DashboardStatDto>
         {
@@ -364,12 +363,12 @@ public class DashboardService(
                 includeTeacher ? e.TeacherName : null))
             .ToList();
 
-    private static List<DashboardEntryDto> RecentMarks(
+    private List<DashboardEntryDto> RecentMarks(
         IEnumerable<MarkListDto> marks, string link, bool withStudentName) =>
         marks
             .Where(m => m.FinalMark is not null)
             .Reverse()
-            .Take(RecentLimit)
+            .Take(_recentLimit)
             .Select(m => new DashboardEntryDto(
                 withStudentName ? $"{m.StudentName} · {m.SubjectName}" : m.SubjectName,
                 $"{m.FinalMark} · {m.GradingPeriodName}",

@@ -1,5 +1,6 @@
 using System.Threading.Channels;
 using EduCore.Services.Interfaces;
+using Microsoft.Extensions.Options;
 
 namespace EduCore.Services.Email;
 
@@ -7,10 +8,12 @@ namespace EduCore.Services.Email;
 // round trip out of the request. Bounded and drop-oldest, so a stuck sender cannot grow into a
 // crash; in memory, so anything queued is lost on restart. Mail that must survive one needs a
 // database-backed outbox, which this deliberately is not.
-public class AccountMailQueue(ILogger<AccountMailQueue> logger) : IAccountMailQueue
+public class AccountMailQueue(
+    IOptions<EmailOptions> options,
+    ILogger<AccountMailQueue> logger) : IAccountMailQueue
 {
     private readonly Channel<AccountMailRequest> _channel =
-        Channel.CreateBounded<AccountMailRequest>(new BoundedChannelOptions(500)
+        Channel.CreateBounded<AccountMailRequest>(new BoundedChannelOptions(options.Value.QueueCapacity)
         {
             FullMode = BoundedChannelFullMode.DropOldest,
             SingleReader = true

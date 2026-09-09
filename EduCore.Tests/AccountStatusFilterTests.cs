@@ -3,9 +3,11 @@ using EduCore.Enums;
 using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
+using EduCore.Configuration;
 using EduCore.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace EduCore.Tests;
@@ -73,7 +75,10 @@ public class AccountStatusFilterTests
     // The real cache over the fake repository, not a stub of it: the cache is now part of the
     // revocation path, so a test that replaced it would no longer cover what actually runs.
     private static IAccountStatusCache Accounts(User? user) =>
-        new AccountStatusCache(new MemoryCache(new MemoryCacheOptions()), new FakeUserRepository(user));
+        new AccountStatusCache(
+            new MemoryCache(new MemoryCacheOptions()),
+            new FakeUserRepository(user),
+            Options.Create(new CachingOptions()));
 
     private static ActiveAccountEndpointFilter Revocation(User? user) =>
         new(Accounts(user), new FakeCurrentUser());

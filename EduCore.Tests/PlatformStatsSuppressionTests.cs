@@ -1,3 +1,4 @@
+using EduCore.Configuration;
 using EduCore.Dtos.Public;
 using EduCore.Repositories.Interfaces;
 using EduCore.Services;
@@ -21,6 +22,7 @@ public class PlatformStatsSuppressionTests
     private static PlatformStatsService Service(PlatformStatsDto counts, int minimumCellSize = 5) =>
         new(new FixedStatsRepository(counts),
             new CellSuppressor(Options.Create(new PrivacyOptions { MinimumCellSize = minimumCellSize })),
+            Options.Create(new CachingOptions()),
             new MemoryCache(new MemoryCacheOptions()));
 
     [Fact]

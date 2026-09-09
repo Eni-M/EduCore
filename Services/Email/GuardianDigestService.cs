@@ -29,13 +29,12 @@ public class GuardianDigestService(
     IEmailSender email,
     IGradingCalculator grading,
     IOptions<PasswordResetOptions> passwordReset,
+    IOptions<EmailOptions> emailOptions,
     ILogger<GuardianDigestService> logger) : IGuardianDigestService
 {
     private readonly string _appUrl = AccountMailTemplates.AppUrlFrom(passwordReset.Value.ResetUrlTemplate);
 
-    // Matches ScheduleDigestService: bounded so a real transport is never hit with unlimited
-    // parallel sends.
-    private const int MaxConcurrentEmails = 5;
+    private readonly int _maxConcurrentEmails = emailOptions.Value.MaxConcurrentSends;
 
     private sealed record ChildChanges(
         string FirstName,
@@ -144,7 +143,7 @@ public class GuardianDigestService(
             .Where(m => m is not null)
             .ToList();
 
-        using var gate = new SemaphoreSlim(MaxConcurrentEmails);
+        using var gate = new SemaphoreSlim(_maxConcurrentEmails);
 
         await Task.WhenAll(messages.Select(async m =>
         {

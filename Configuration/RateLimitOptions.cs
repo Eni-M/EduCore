@@ -1,0 +1,29 @@
+namespace EduCore.Configuration;
+
+// One token bucket. PermitsPerPeriod tokens are handed out every PeriodMinutes, and a caller
+// with none left is rejected rather than queued -- a queued request just moves the delay.
+public class RateLimitBucket
+{
+    public int PermitsPerPeriod { get; set; }
+    public int PeriodMinutes { get; set; } = 1;
+}
+
+// Read at start-up rather than through IOptions: the limiter is configured while the container
+// is still being built, before anything can be resolved from it.
+public class RateLimitOptions
+{
+    public const string SectionName = "RateLimiting";
+
+    // Every authenticated caller, or the address when there is no identity yet.
+    public RateLimitBucket Global { get; set; } = new() { PermitsPerPeriod = 100, PeriodMinutes = 1 };
+
+    // Stricter, because what is being stopped here is guessing a password.
+    public RateLimitBucket Login { get; set; } = new() { PermitsPerPeriod = 5, PeriodMinutes = 1 };
+
+    // Stricter still: this one sends mail to an address the caller names, so the abuse to stop
+    // is flooding somebody else's inbox rather than guessing a secret.
+    public RateLimitBucket PasswordReset { get; set; } = new() { PermitsPerPeriod = 3, PeriodMinutes = 15 };
+
+    // What a rejected caller is told to wait.
+    public int RetryAfterSeconds { get; set; } = 60;
+}

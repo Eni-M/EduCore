@@ -3,6 +3,7 @@ using EduCore.Dtos.Guardian;
 using EduCore.Dtos.Pagination;
 using EduCore.Enums;
 using EduCore.Exceptions;
+using EduCore.Helpers;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
@@ -86,7 +87,7 @@ public class GuardianService(
     {
         var schoolId = currentUser.RequireSchoolId();
         var page = Math.Max(1, pagination.Page);
-        var pageSize = Math.Clamp(pagination.PageSize, 1, 100);
+        var pageSize = Math.Clamp(pagination.PageSize, 1, ListPagination.MaxPageSize);
 
         var (items, totalCount) = await guardians.GetPagedBySchoolAsync(
             schoolId, new PaginationQueryDto(page, pageSize), search, ct);

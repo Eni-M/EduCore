@@ -8,11 +8,12 @@ namespace EduCore.Services;
 
 public static class PlatformOwnerSeeder
 {
-    private const int MinimumPasswordLength = 12;
-    private const string DefaultStateName = "Kosova";
+    // Defaults only. Both are overridden from the SuperAdmin section; see appsettings.json.
+    private const int FallbackMinimumPasswordLength = 12;
+    private const string FallbackStateName = "Kosova";
 
-    private static bool IsStrongEnough(string password) =>
-        password.Length >= MinimumPasswordLength
+    private static bool IsStrongEnough(string password, int minimumLength) =>
+        password.Length >= minimumLength
         && password.Any(char.IsLower)
         && password.Any(char.IsUpper)
         && password.Any(char.IsDigit);
@@ -26,7 +27,9 @@ public static class PlatformOwnerSeeder
             .GetRequiredService<ILoggerFactory>()
             .CreateLogger(typeof(PlatformOwnerSeeder));
 
-        var stateName = configuration["SuperAdmin:StateName"] ?? DefaultStateName;
+        var stateName = configuration["SuperAdmin:StateName"] ?? FallbackStateName;
+        var minimumPasswordLength = configuration.GetValue(
+            "SuperAdmin:MinimumPasswordLength", FallbackMinimumPasswordLength);
 
         var adminUserIds = await db.Users
             .Where(u => u.Role == UserRole.StateAdmin)
@@ -61,9 +64,9 @@ public static class PlatformOwnerSeeder
             return;
         }
 
-        if (!IsStrongEnough(password))
+        if (!IsStrongEnough(password, minimumPasswordLength))
             throw new InvalidOperationException(
-                $"SuperAdmin:Password must be at least {MinimumPasswordLength} characters and " +
+                $"SuperAdmin:Password must be at least {minimumPasswordLength} characters and " +
                 "contain a lowercase letter, an uppercase letter and a digit. " +
                 "This account owns every school on the platform.");
 

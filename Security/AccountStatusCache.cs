@@ -1,6 +1,8 @@
+using EduCore.Configuration;
 using EduCore.Data;
 using EduCore.Repositories.Interfaces;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 namespace EduCore.Security;
 
@@ -18,11 +20,14 @@ public interface IAccountStatusCache
 // Removes the per-request SELECT against Users that every /api call used to make. Revocation
 // stays immediate: AccountStatusInvalidationInterceptor evicts on the write that deactivates a
 // user, and the TTL is only a backstop for another process writing the same database.
-public class AccountStatusCache(IMemoryCache cache, IUserRepository users) : IAccountStatusCache
+public class AccountStatusCache(
+    IMemoryCache cache,
+    IUserRepository users,
+    IOptions<CachingOptions> caching) : IAccountStatusCache
 {
     // Bounded by this window rather than by user count. Short enough that a second instance
     // cannot keep a deactivated account alive for long.
-    private static readonly TimeSpan Ttl = TimeSpan.FromSeconds(60);
+    private readonly TimeSpan _ttl = TimeSpan.FromSeconds(caching.Value.AccountStatusSeconds);
 
     // Public so the invalidation interceptor and its tests name the same entry.
     public static string Key(Guid userId) => $"account-status:{userId}";
@@ -41,7 +46,7 @@ public class AccountStatusCache(IMemoryCache cache, IUserRepository users) : IAc
         // Unknown users are cached too, or a stale token would read the database every request.
         cache.Set(Key(userId), status, new MemoryCacheEntryOptions
         {
-            AbsoluteExpirationRelativeToNow = Ttl
+            AbsoluteExpirationRelativeToNow = _ttl
         });
 
         return status;

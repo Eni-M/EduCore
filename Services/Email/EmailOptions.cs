@@ -6,6 +6,15 @@ public class EmailOptions
 {
     public const string SectionName = "Email";
 
+    // Bounded so a real transport is never hit with unlimited parallel sends when a digest run
+    // fans out to a whole school.
+    public int MaxConcurrentSends { get; set; } = 5;
+
+    // The hand-off between the write that causes account mail and the background sender. Bounded
+    // and drop-oldest, so a stuck sender cannot grow into a crash; losing a welcome email is a
+    // better outcome than losing the process.
+    public int QueueCapacity { get; set; } = 500;
+
     // "Log" writes what would be sent to the application log and delivers nothing -- the right
     // default for development and for a machine with no mail credentials. "Smtp" delivers over
     // SMTP using the settings below. Chosen in Program.cs; see StorageOptions for the same shape.

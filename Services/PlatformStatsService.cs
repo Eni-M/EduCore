@@ -1,24 +1,27 @@
+using EduCore.Configuration;
 using EduCore.Dtos.Public;
 using EduCore.Repositories.Interfaces;
 using EduCore.Services.Interfaces;
 using EduCore.Services.Statistics.Interfaces;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 namespace EduCore.Services;
 
 // The landing page is the one screen an anonymous visitor can reach, so its figures are cached
 // rather than counted per request -- six aggregate scans is not something a public URL should be
-// able to trigger at will. Ten minutes is far fresher than these figures actually change.
+// able to trigger at will. See Caching:PlatformStatsMinutes.
 //
 // Counting lives in the repository; deciding what may be published lives here, which is where
 // the statistics services draw the same line.
 public class PlatformStatsService(
     IPlatformStatsRepository stats,
     ICellSuppressor suppressor,
+    IOptions<CachingOptions> caching,
     IMemoryCache cache) : IPlatformStatsService
 {
     private const string Key = "platform-stats";
-    private static readonly TimeSpan Ttl = TimeSpan.FromMinutes(10);
+    private readonly TimeSpan _ttl = TimeSpan.FromMinutes(caching.Value.PlatformStatsMinutes);
 
     public async Task<PlatformStatsDto> GetAsync(CancellationToken ct)
     {
@@ -38,7 +41,7 @@ public class PlatformStatsService(
             Publishable(counted.Lessons),
             Publishable(counted.Attendances));
 
-        cache.Set(Key, fresh, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = Ttl });
+        cache.Set(Key, fresh, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = _ttl });
 
         return fresh;
     }

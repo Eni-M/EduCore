@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using Amazon.S3;
 using AutoMapper;
+using EduCore.Configuration;
 using EduCore.Data;
 using EduCore.Endpoints;
 using EduCore.Observability;
@@ -85,6 +86,11 @@ var defaultConnectionString = builder.Configuration.GetConnectionString("Default
     ?? builder.Configuration["DATABASE_URL"]
     ?? builder.Configuration["ConnectionStrings:Default"];
 
+// Bound here rather than resolved: the DbContext and the rate limiter are both configured
+// while the container is still being built, so nothing can be pulled out of it yet.
+var database = builder.Configuration.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>()
+               ?? new DatabaseOptions();
+
 builder.Services.AddDbContext<AppDbContext>((sp, options) =>
     options.UseNpgsql(defaultConnectionString, npgsql =>
         {
@@ -98,15 +104,15 @@ builder.Services.AddDbContext<AppDbContext>((sp, options) =>
             // operation. If a BeginTransaction is ever added, it has to be wrapped in
             // strategy.ExecuteAsync or EF will refuse it at run time.
             npgsql.EnableRetryOnFailure(
-                maxRetryCount: 3,
-                maxRetryDelay: TimeSpan.FromSeconds(5),
+                maxRetryCount: database.MaxRetryCount,
+                maxRetryDelay: TimeSpan.FromSeconds(database.MaxRetryDelaySeconds),
                 errorCodesToAdd: null);
 
             // A query that runs longer than this is not going to finish usefully -- it is going
             // to hold a connection while a user stares at a spinner. Fail it and free the
             // connection instead. Above the slowest legitimate screen (the statistics overview
             // on a cold snapshot), well below any human's patience.
-            npgsql.CommandTimeout(30);
+            npgsql.CommandTimeout(database.CommandTimeoutSeconds);
         })
         .AddInterceptors(
             sp.GetRequiredService<AuditSaveChangesInterceptor>(),
@@ -171,6 +177,26 @@ builder.Services.AddOptions<GradingOptions>()
     .Bind(builder.Configuration.GetSection(GradingOptions.SectionName))
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<GradingOptions>, GradingOptionsValidator>();
+
+builder.Services.AddOptions<CachingOptions>()
+    .Bind(builder.Configuration.GetSection(CachingOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<CachingOptions>, CachingOptionsValidator>();
+
+builder.Services.AddOptions<PaginationOptions>()
+    .Bind(builder.Configuration.GetSection(PaginationOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<PaginationOptions>, PaginationOptionsValidator>();
+
+builder.Services.AddOptions<DashboardOptions>()
+    .Bind(builder.Configuration.GetSection(DashboardOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<DashboardOptions>, DashboardOptionsValidator>();
+
+builder.Services.AddOptions<StatisticsQueryOptions>()
+    .Bind(builder.Configuration.GetSection(StatisticsQueryOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<StatisticsQueryOptions>, StatisticsQueryOptionsValidator>();
 
 builder.Services.AddOptions<TwoFactorOptions>()
     .Bind(builder.Configuration.GetSection(TwoFactorOptions.SectionName))
@@ -379,7 +405,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
             ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromMinutes(1)
+            ClockSkew = TimeSpan.FromMinutes(builder.Configuration.GetValue("Jwt:ClockSkewMinutes", 1))
         };
     });
 
@@ -404,6 +430,9 @@ builder.Services.AddCors(options =>
         .AllowCredentials()));
 
 // Rate limiting: per-user (by user id claim) otherwise per-IP token-bucket limiter.
+var rateLimits = builder.Configuration.GetSection(RateLimitOptions.SectionName).Get<RateLimitOptions>()
+                 ?? new RateLimitOptions();
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -418,9 +447,9 @@ builder.Services.AddRateLimiter(options =>
 
         return RateLimitPartition.GetTokenBucketLimiter(partitionKey, _ => new TokenBucketRateLimiterOptions
         {
-            TokenLimit = 100,
-            TokensPerPeriod = 100,
-            ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+            TokenLimit = rateLimits.Global.PermitsPerPeriod,
+            TokensPerPeriod = rateLimits.Global.PermitsPerPeriod,
+            ReplenishmentPeriod = TimeSpan.FromMinutes(rateLimits.Global.PeriodMinutes),
             AutoReplenishment = true,
             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             QueueLimit = 0
@@ -437,9 +466,9 @@ builder.Services.AddRateLimiter(options =>
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new TokenBucketRateLimiterOptions
         {
-            TokenLimit = 5,
-            TokensPerPeriod = 5,
-            ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+            TokenLimit = rateLimits.Login.PermitsPerPeriod,
+            TokensPerPeriod = rateLimits.Login.PermitsPerPeriod,
+            ReplenishmentPeriod = TimeSpan.FromMinutes(rateLimits.Login.PeriodMinutes),
             AutoReplenishment = true,
             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             QueueLimit = 0
@@ -453,9 +482,9 @@ builder.Services.AddRateLimiter(options =>
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new TokenBucketRateLimiterOptions
             {
-                TokenLimit = 3,
-                TokensPerPeriod = 3,
-                ReplenishmentPeriod = TimeSpan.FromMinutes(15),
+                TokenLimit = rateLimits.PasswordReset.PermitsPerPeriod,
+                TokensPerPeriod = rateLimits.PasswordReset.PermitsPerPeriod,
+                ReplenishmentPeriod = TimeSpan.FromMinutes(rateLimits.PasswordReset.PeriodMinutes),
                 AutoReplenishment = true,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0
@@ -464,10 +493,16 @@ builder.Services.AddRateLimiter(options =>
     // Add a Retry-After header when rejected
     options.OnRejected = async (context, ct) =>
     {
-        context.HttpContext.Response.Headers["Retry-After"] = "60";
+        context.HttpContext.Response.Headers["Retry-After"] =
+            rateLimits.RetryAfterSeconds.ToString();
         await Task.CompletedTask;
     };
 });
+
+// Static helpers cannot be handed anything by the container, so the one ceiling they share is
+// set here from configuration before the app serves a request.
+ListPagination.MaxPageSize =
+    builder.Configuration.GetValue("Pagination:MaxPageSize", new PaginationOptions().MaxPageSize);
 
 var app = builder.Build();
 

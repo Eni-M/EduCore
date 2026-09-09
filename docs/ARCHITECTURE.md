@@ -175,6 +175,36 @@ Password reset is `/api/auth/forgot-password` + `/reset-password`, rate-limited,
 at rest and single-use. `forgot-password` always returns 204, so it cannot be used to test which
 addresses hold accounts.
 
+## Configuration
+
+Every tunable value lives in `appsettings.json`, and nothing operational is a literal in the
+code. Each section binds to an options class beside the code that reads it, and most carry a
+validator that runs at start-up, so a bad value stops the application rather than surfacing as
+odd behaviour later.
+
+| Section | What it governs |
+| --- | --- |
+| `Jwt`, `Session` | Token lifetime and clock skew; cookie names and flags |
+| `TwoFactor` | Code lifetime, length, attempt cap, and which roles cannot opt out |
+| `PasswordReset` | Reset-link lifetime and where the link points |
+| `Caching` | Public-statistics and account-status cache windows |
+| `Pagination` | Default and maximum page size, and the tighter audit-log cap |
+| `RateLimiting` | The global, sign-in and password-reset token buckets, and `Retry-After` |
+| `Database` | Connection retry count and delay, command timeout |
+| `Privacy`, `Statistics`, `StatisticsSnapshot` | Small-cell threshold, maximum query window, snapshot staleness |
+| `Grading`, `AcademicCalendar`, `Assignment` | Mark weights and pass marks, term boundaries, qualification cap |
+| `Email`, `ScheduledEmail` | Transport, send concurrency, queue capacity, digest run hour |
+| `Storage` | Local or S3, size cap, content-type allowlist |
+| `Observability` | Metrics and tracing |
+| `SuperAdmin` | First-run administrator, its state name and password floor |
+
+Two values are deliberately *not* configurable, because they are facts rather than choices:
+the AES block size in `AesFieldEncryptor`, and the seeder's fallback constants, which are read
+before options validation runs.
+
+Anything here can be overridden per environment the usual way, including as `Section__Key`
+environment variables — which is how compose supplies the secrets.
+
 ## Operations
 
 **Observability.** OpenTelemetry metrics on `/metrics` (Prometheus format) and tracing, shipped to

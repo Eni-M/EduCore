@@ -11,7 +11,7 @@ public static class QueryablePagination
         this IQueryable<T> query, PaginationQueryDto pagination, CancellationToken ct)
     {
         var page = Math.Max(1, pagination.Page);
-        var pageSize = Math.Clamp(pagination.PageSize, 1, 100);
+        var pageSize = Math.Clamp(pagination.PageSize, 1, ListPagination.MaxPageSize);
 
         var totalCount = await query.CountAsync(ct);
         var items = await query

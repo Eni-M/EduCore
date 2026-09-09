@@ -11,6 +11,10 @@ public class TwoFactorOptions
     // code sitting in a mailbox stops being a key to the account.
     public int CodeLifetimeMinutes { get; set; } = 10;
 
+    // How many digits the code has. Every digit multiplies the guessing space by ten, so this
+    // and MaxAttempts are the two numbers that decide whether the second step means anything.
+    public int CodeLength { get; set; } = 6;
+
     // Wrong guesses before the challenge is dead. Six digits is a million possibilities; this
     // cap is what stands between that and an attacker who can simply try them.
     public int MaxAttempts { get; set; } = 5;
@@ -32,6 +36,11 @@ public class TwoFactorOptionsValidator : IValidateOptions<TwoFactorOptions>
                 $"TwoFactor:CodeLifetimeMinutes ({options.CodeLifetimeMinutes}) must be between 2 and 60. "
                 + "Below 2 the code expires before a slow inbox delivers it; above an hour it is a "
                 + "standing second factor sitting in a mailbox.");
+
+        if (options.CodeLength is < 4 or > 10)
+            return ValidateOptionsResult.Fail(
+                $"TwoFactor:CodeLength ({options.CodeLength}) must be between 4 and 10. Below 4 the "
+                + "code is guessable inside the attempt cap; above 10 nobody retypes it correctly.");
 
         if (options.MaxAttempts is < 3 or > 10)
             return ValidateOptionsResult.Fail(

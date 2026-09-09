@@ -17,12 +17,12 @@ namespace EduCore.Services.Email;
 public class ScheduleDigestService(
     AppDbContext db,
     IEmailSender email,
-    IOptions<PasswordResetOptions> passwordReset) : IScheduleDigestService
+    IOptions<PasswordResetOptions> passwordReset,
+    IOptions<EmailOptions> email_options) : IScheduleDigestService
 {
     private readonly string _appUrl = AccountMailTemplates.AppUrlFrom(passwordReset.Value.ResetUrlTemplate);
 
-    // Bounded so a real SMTP/provider transport is never hit with unlimited parallel sends.
-    private const int MaxConcurrentEmails = 5;
+    private readonly int _maxConcurrentEmails = email_options.Value.MaxConcurrentSends;
 
     private sealed record LessonRow(
         Guid SchoolId, DayOfWeek Day, int PeriodNumber, TimeOnly Start, TimeOnly End,
@@ -238,7 +238,7 @@ public class ScheduleDigestService(
     {
         if (mails.Count == 0) return;
 
-        using var gate = new SemaphoreSlim(MaxConcurrentEmails);
+        using var gate = new SemaphoreSlim(_maxConcurrentEmails);
 
         var sends = mails.Select(async m =>
         {

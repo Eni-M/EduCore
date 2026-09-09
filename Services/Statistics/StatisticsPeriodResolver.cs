@@ -1,15 +1,18 @@
+using EduCore.Configuration;
 using EduCore.Dtos.Statistics;
 using EduCore.Exceptions;
 using EduCore.Repositories.Interfaces;
 using EduCore.Services.Statistics.Interfaces;
+using Microsoft.Extensions.Options;
 
 namespace EduCore.Services.Statistics;
 
 public class StatisticsPeriodResolver(
     IAcademicYearRepository academicYears,
-    IGradingPeriodRepository gradingPeriods) : IStatisticsPeriodResolver
+    IGradingPeriodRepository gradingPeriods,
+    IOptions<StatisticsQueryOptions> options) : IStatisticsPeriodResolver
 {
-    private const int MaximumWindowYears = 10;
+    private readonly int _maximumWindowYears = options.Value.MaximumWindowYears;
 
     public async Task<(DateOnly From, DateOnly To)> ResolveAsync(
         StatisticsFilter filter, Guid? schoolId, CancellationToken ct)
@@ -50,9 +53,9 @@ public class StatisticsPeriodResolver(
             if (from > to)
                 throw new BusinessException("The start of the range cannot be after its end.");
 
-            if (from < to.AddYears(-MaximumWindowYears))
+            if (from < to.AddYears(-_maximumWindowYears))
                 throw new BusinessException(
-                    $"A statistics window cannot be longer than {MaximumWindowYears} years.");
+                    $"A statistics window cannot be longer than {_maximumWindowYears} years.");
 
             return (from, to);
         }
