@@ -21,7 +21,6 @@ using EduCore.Security.Encryption;
 using EduCore.Services;
 using EduCore.Services.Account;
 using EduCore.Services.Assignments;
-using EduCore.Services.Assignments;
 using EduCore.Services.Email;
 using EduCore.Services.Interfaces;
 using EduCore.Services.Statistics;
