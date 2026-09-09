@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using EduCore.Dtos.RegionalAdmin;
 using EduCore.Enums;
 using EduCore.Exceptions;
@@ -26,9 +26,13 @@ public class RegionalAdminService(
     public async Task<PagedResultDto<RegionalAdminListDto>> GetPagedAsync(
         PaginationQueryDto pagination, string? search, CancellationToken ct)
     {
-        var all = await GetAllAsync(ct);
-        return all.Search(search, r => new[] { r.FirstName, r.LastName, r.Email, r.CityName, r.StateName })
-            .ToPagedResult(pagination);
+        var (items, total) = await regionalAdmins.GetPagedAsync(
+            currentUser.RequireStateId(), pagination, search, ct);
+
+        var (page, pageSize) = ListPagination.Normalize(pagination);
+
+        return new PagedResultDto<RegionalAdminListDto>(
+            mapper.Map<IReadOnlyList<RegionalAdminListDto>>(items), page, pageSize, total);
     }
 
     public async Task<RegionalAdminListDto> GetByIdAsync(Guid regionalAdminId, CancellationToken ct)

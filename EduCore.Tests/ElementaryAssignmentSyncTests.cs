@@ -1,4 +1,4 @@
-using EduCore.Enums;
+﻿using EduCore.Enums;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Services.Assignment;
@@ -17,6 +17,10 @@ public class ElementaryAssignmentSyncTests
 
     private sealed class FakeSchoolRepository(SchoolType type) : ISchoolRepository
     {
+        public Task<(IReadOnlyList<School> Items, int TotalCount)> GetPagedAsync(
+            bool activeOnly, Guid? cityId, Guid? stateId,
+            EduCore.Dtos.Pagination.PaginationQueryDto pagination, string? search, CancellationToken ct) =>
+            Task.FromResult<(IReadOnlyList<School>, int)>(([], 0));
         public Task<School?> GetByIdAsync(Guid id, CancellationToken ct) =>
             Task.FromResult<School?>(new School { Id = SchoolId, Name = "S", Type = type });
         public Task<School?> GetWithLocationAsync(Guid schoolId, CancellationToken ct) => Task.FromResult<School?>(null);

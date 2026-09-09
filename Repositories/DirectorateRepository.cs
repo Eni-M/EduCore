@@ -1,4 +1,6 @@
-using EduCore.Data;
+﻿using EduCore.Data;
+using EduCore.Dtos.Pagination;
+using EduCore.Helpers;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +24,31 @@ public class DirectorateRepository(AppDbContext context) : Repository<Directorat
         return await query
             .OrderBy(a => a.User.LastName).ThenBy(a => a.User.FirstName)
             .ToListAsync(ct);
+    }
+
+    public async Task<(IReadOnlyList<Directorate> Items, int TotalCount)> GetPagedAsync(
+        Guid? cityId, PaginationQueryDto pagination, string? search, CancellationToken ct)
+    {
+        var query = _context.Directorates
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Include(a => a.User)
+            .Include(a => a.School)
+            .AsQueryable();
+
+        if (cityId is not null)
+            query = query.Where(a => a.School.CityId == cityId);
+
+        if (SearchTerm.Like(search) is { } term)
+            query = query.Where(a =>
+                EF.Functions.ILike(a.User.FirstName, term)
+                || EF.Functions.ILike(a.User.LastName, term)
+                || EF.Functions.ILike(a.User.Email, term)
+                || EF.Functions.ILike(a.School.Name, term));
+
+        return await query
+            .OrderBy(a => a.User.LastName).ThenBy(a => a.User.FirstName).ThenBy(a => a.Id)
+            .ToPageAsync(pagination, ct);
     }
 
     public async Task<IEnumerable<Directorate>> GetByCityAsync(Guid cityId, CancellationToken ct) =>

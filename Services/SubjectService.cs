@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using EduCore.Dtos.ClassSubjectTeacher;
 using EduCore.Dtos.Subject;
 using EduCore.Exceptions;
@@ -37,8 +37,16 @@ public class SubjectService(
     public async Task<PagedResultDto<SubjectListDto>> GetPagedAsync(
         PaginationQueryDto pagination, string? search, CancellationToken ct)
     {
-        var all = await GetAllAsync(ct);
-        return all.Search(search, s => new[] { s.Name }).ToPagedResult(pagination);
+        // A teacher or student sees only their own subjects, which comes from their
+        // assignments rather than the catalogue, so those two keep the in-memory path.
+        if (!currentUser.IsDirectorate)
+            return (await GetAllAsync(ct)).Search(search, s => new[] { s.Name }).ToPagedResult(pagination);
+
+        var (items, total) = await subjects.GetPagedAsync(pagination, search, ct);
+        var (page, pageSize) = ListPagination.Normalize(pagination);
+
+        return new PagedResultDto<SubjectListDto>(
+            mapper.Map<IReadOnlyList<SubjectListDto>>(items), page, pageSize, total);
     }
 
     private static IEnumerable<SubjectListDto> Distinct(

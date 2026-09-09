@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using EduCore.Dtos.Location;
 using EduCore.Dtos.School;
 using EduCore.Enums;
@@ -35,6 +35,10 @@ public class SchoolServiceLocationTests
 
     private sealed class FakeSchoolRepository : ISchoolRepository
     {
+        public Task<(IReadOnlyList<School> Items, int TotalCount)> GetPagedAsync(
+            bool activeOnly, Guid? cityId, Guid? stateId,
+            EduCore.Dtos.Pagination.PaginationQueryDto pagination, string? search, CancellationToken ct) =>
+            Task.FromResult<(IReadOnlyList<School>, int)>(([], 0));
         public School? Added;
         public Task<School?> GetByIdAsync(Guid id, CancellationToken ct) => Task.FromResult<School?>(Added);
         public Task<School?> GetWithLocationAsync(Guid schoolId, CancellationToken ct) => Task.FromResult<School?>(Added);

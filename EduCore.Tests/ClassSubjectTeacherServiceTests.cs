@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using EduCore.Dtos.ClassSubjectTeacher;
 using EduCore.Enums;
 using EduCore.Exceptions;
@@ -58,6 +58,10 @@ public class ClassSubjectTeacherServiceTests
 
     private sealed class FakeSchoolRepository(School school) : ISchoolRepository
     {
+        public Task<(IReadOnlyList<School> Items, int TotalCount)> GetPagedAsync(
+            bool activeOnly, Guid? cityId, Guid? stateId,
+            EduCore.Dtos.Pagination.PaginationQueryDto pagination, string? search, CancellationToken ct) =>
+            Task.FromResult<(IReadOnlyList<School>, int)>(([], 0));
         public Task<School?> GetByIdAsync(Guid id, CancellationToken ct) => Task.FromResult<School?>(school);
         public Task<School?> GetWithLocationAsync(Guid schoolId, CancellationToken ct) => Task.FromResult<School?>(school);
         public Task<IEnumerable<School>> GetAllOrderedAsync(bool activeOnly, CancellationToken ct) =>
@@ -79,6 +83,9 @@ public class ClassSubjectTeacherServiceTests
 
     private sealed class FakeSubjectRepository : ISubjectRepository
     {
+        public Task<(IReadOnlyList<Subject> Items, int TotalCount)> GetPagedAsync(
+            EduCore.Dtos.Pagination.PaginationQueryDto pagination, string? search, CancellationToken ct) =>
+            Task.FromResult<(IReadOnlyList<Subject>, int)>(([], 0));
         public Task<Subject?> GetByIdAsync(Guid id, CancellationToken ct) =>
             Task.FromResult<Subject?>(new Subject { Id = SubjectId, Name = "Mathematics", SchoolId = SchoolId });
         public Task<IEnumerable<Subject>> GetAllOrderedAsync(CancellationToken ct) =>

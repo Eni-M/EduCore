@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using EduCore.Dtos.Directorate;
 using EduCore.Enums;
 using EduCore.Exceptions;
@@ -26,9 +26,13 @@ public class DirectorateService(
     public async Task<PagedResultDto<DirectorateListDto>> GetPagedAsync(
         PaginationQueryDto pagination, string? search, CancellationToken ct)
     {
-        var all = await GetAllAsync(ct);
-        return all.Search(search, d => new[] { d.FirstName, d.LastName, d.Email, d.SchoolName })
-            .ToPagedResult(pagination);
+        var (items, total) = await directorates.GetPagedAsync(
+            currentUser.RequireCityId(), pagination, search, ct);
+
+        var (page, pageSize) = ListPagination.Normalize(pagination);
+
+        return new PagedResultDto<DirectorateListDto>(
+            mapper.Map<IReadOnlyList<DirectorateListDto>>(items), page, pageSize, total);
     }
 
     public async Task<DirectorateListDto> GetByIdAsync(Guid directorateId, CancellationToken ct)

@@ -1,4 +1,4 @@
-using EduCore.Dtos.Pagination;
+﻿using EduCore.Dtos.Pagination;
 using EduCore.Helpers;
 using EduCore.Data;
 using EduCore.Models;
@@ -21,6 +21,35 @@ public class SchoolRepository(AppDbContext context) : Repository<School>(context
             query = query.Where(s => s.DeactivatedAt == null);
 
         return await query.OrderBy(s => s.Name).ToListAsync(ct);
+    }
+
+    public async Task<(IReadOnlyList<School> Items, int TotalCount)> GetPagedAsync(
+        bool activeOnly, Guid? cityId, Guid? stateId,
+        PaginationQueryDto pagination, string? search, CancellationToken ct)
+    {
+        var query = _context.Schools
+            .AsNoTracking()
+            .Include(s => s.City).ThenInclude(c => c!.State)
+            .Include(s => s.Zone)
+            .AsQueryable();
+
+        if (activeOnly)
+            query = query.Where(s => s.DeactivatedAt == null);
+
+        if (cityId is not null)
+            query = query.Where(s => s.CityId == cityId);
+
+        if (stateId is not null)
+            query = query.Where(s => s.City != null && s.City.StateId == stateId);
+
+        if (SearchTerm.Like(search) is { } term)
+            query = query.Where(s =>
+                EF.Functions.ILike(s.Name, term)
+                || (s.City != null && EF.Functions.ILike(s.City.Name, term))
+                || (s.Zone != null && EF.Functions.ILike(s.Zone.Name, term))
+                || (s.City != null && EF.Functions.ILike(s.City.State.Name, term)));
+
+        return await query.OrderBy(s => s.Name).ThenBy(s => s.Id).ToPageAsync(pagination, ct);
     }
 
     public async Task<PagedResultDto<School>> GetOrderedPagedAsync(

@@ -1,4 +1,4 @@
-using EduCore.Dtos.Curriculum;
+﻿using EduCore.Dtos.Curriculum;
 using EduCore.Enums;
 using EduCore.Exceptions;
 using EduCore.Models;
@@ -36,6 +36,10 @@ public class CurriculumServiceTests
 
     private sealed class FakeSchoolRepository(SchoolType type) : ISchoolRepository
     {
+        public Task<(IReadOnlyList<School> Items, int TotalCount)> GetPagedAsync(
+            bool activeOnly, Guid? cityId, Guid? stateId,
+            EduCore.Dtos.Pagination.PaginationQueryDto pagination, string? search, CancellationToken ct) =>
+            Task.FromResult<(IReadOnlyList<School>, int)>(([], 0));
         public Task<School?> GetByIdAsync(Guid id, CancellationToken ct) =>
             Task.FromResult<School?>(new School { Id = SchoolId, Name = "S", Type = type });
         public Task<School?> GetWithLocationAsync(Guid schoolId, CancellationToken ct) => Task.FromResult<School?>(null);
@@ -57,6 +61,9 @@ public class CurriculumServiceTests
 
     private sealed class FakeSubjectRepository : ISubjectRepository
     {
+        public Task<(IReadOnlyList<Subject> Items, int TotalCount)> GetPagedAsync(
+            EduCore.Dtos.Pagination.PaginationQueryDto pagination, string? search, CancellationToken ct) =>
+            Task.FromResult<(IReadOnlyList<Subject>, int)>(([], 0));
         public Task<Subject?> GetByIdAsync(Guid id, CancellationToken ct) =>
             Task.FromResult<Subject?>(new Subject { Id = SubjectId, Name = "Mathematics", SchoolId = SchoolId });
         public Task<IEnumerable<Subject>> GetAllOrderedAsync(CancellationToken ct) =>

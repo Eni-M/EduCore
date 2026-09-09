@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using EduCore.Dtos.School;
 using EduCore.Exceptions;
 using EduCore.Models;
@@ -32,9 +32,16 @@ public class SchoolService(
     public async Task<PagedResultDto<SchoolListDto>> GetPagedAsync(
         bool activeOnly, PaginationQueryDto pagination, string? search, CancellationToken ct)
     {
-        var all = await GetAllAsync(activeOnly, ct);
-        return all.Search(search, s => new[] { s.Name, s.CityName, s.ZoneName, s.StateName })
-            .ToPagedResult(pagination);
+        var (items, total) = await schools.GetPagedAsync(
+            activeOnly,
+            currentUser.IsRegionalAdmin ? currentUser.RequireCityId() : null,
+            currentUser.IsStateAdmin ? currentUser.RequireStateId() : null,
+            pagination, search, ct);
+
+        var (page, pageSize) = ListPagination.Normalize(pagination);
+
+        return new PagedResultDto<SchoolListDto>(
+            mapper.Map<IReadOnlyList<SchoolListDto>>(items), page, pageSize, total);
     }
 
     public async Task<SchoolListDto> GetByIdAsync(Guid schoolId, CancellationToken ct)

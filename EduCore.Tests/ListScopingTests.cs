@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using EduCore.Dtos.Class;
 using EduCore.Dtos.ClassSubjectTeacher;
 using EduCore.Dtos.Enrollment;
@@ -150,6 +150,9 @@ public class ListScopingTests
 
     private sealed class FakeSubjectRepository : ISubjectRepository
     {
+        public Task<(IReadOnlyList<Subject> Items, int TotalCount)> GetPagedAsync(
+            EduCore.Dtos.Pagination.PaginationQueryDto pagination, string? search, CancellationToken ct) =>
+            Task.FromResult<(IReadOnlyList<Subject>, int)>(([], 0));
         public Task<IEnumerable<Subject>> GetAllOrderedAsync(CancellationToken ct) =>
             Task.FromResult<IEnumerable<Subject>>(
             [
