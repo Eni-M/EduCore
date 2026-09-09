@@ -1,10 +1,12 @@
-using EduCore.Dtos.Errors;
+﻿using EduCore.Dtos.Errors;
 using EduCore.Exceptions;
+using EduCore.Localization;
 using FluentValidation;
 
 namespace EduCore.Endpoints;
 
-public class ValidationEndpointFilter(IServiceProvider services) : IEndpointFilter
+public class ValidationEndpointFilter(IServiceProvider services, IMessageLocalizer localizer)
+    : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
@@ -23,7 +25,7 @@ public class ValidationEndpointFilter(IServiceProvider services) : IEndpointFilt
             errors.AddRange(result.Errors.Select(e => new FieldError
             {
                 Field = e.PropertyName,
-                Message = e.ErrorMessage
+                Message = localizer.Translate(e.ErrorMessage)
             }));
         }
 

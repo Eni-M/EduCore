@@ -10,6 +10,7 @@ using EduCore.Observability;
 using EduCore.Endpoints.Statistics;
 using EduCore.Exceptions;
 using EduCore.Helpers;
+using EduCore.Localization;
 using EduCore.Models;
 using EduCore.Repositories;
 using EduCore.Repositories.Interfaces;
@@ -30,6 +31,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -312,6 +314,24 @@ builder.Services.AddScoped<INoticeService, NoticeService>();
 builder.Services.AddScoped<ICalendarService, CalendarService>();
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
+// Which language the API answers in. The catalogue keys on the English message, so a language
+// it does not carry simply falls through to English rather than failing.
+builder.Services.AddSingleton<IMessageLocalizer, MessageLocalizer>();
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.SetDefaultCulture(Language.English);
+    options.AddSupportedUICultures(Language.Supported);
+    options.AddSupportedCultures(Language.Supported);
+
+    // A signed-in user's choice travels as Accept-Language from the SPA. ?lang= is kept for
+    // links and for testing a language without changing browser settings.
+    options.RequestCultureProviders =
+    [
+        new QueryStringRequestCultureProvider { QueryStringKey = "lang", UIQueryStringKey = "lang" },
+        new AcceptLanguageHeaderRequestCultureProvider()
+    ];
+});
 builder.Services.AddProblemDetails();
 
 var jwtKey = builder.Configuration["Jwt:Key"];
@@ -539,6 +559,7 @@ foreach (var proxy in trustedProxies)
 
 app.UseForwardedHeaders(forwardedOptions);
 
+app.UseRequestLocalization();
 app.UseExceptionHandler();
 // Off by default: TLS is terminated at the edge (nginx / the platform). Set
 // ForceHttpsRedirect=true only when the API itself is the HTTPS endpoint.

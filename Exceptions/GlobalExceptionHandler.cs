@@ -1,12 +1,15 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using EduCore.Dtos.Errors;
+using EduCore.Localization;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace EduCore.Exceptions;
 
-public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
+public class GlobalExceptionHandler(
+    ILogger<GlobalExceptionHandler> logger,
+    IMessageLocalizer localizer) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
@@ -57,10 +60,12 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
             logger.LogWarning("{Error}: {Message}. TraceId: {TraceId}", error, exception.Message, traceId);
         }
 
+        // Translated here rather than at the 240 throw sites: every message the API sends a
+        // person passes through this one place, so the services stay readable in English.
         var errorResponse = new ErrorResponseDto(
             StatusCode: statusCode,
             Timestamp: DateTime.UtcNow,
-            Message: message,
+            Message: localizer.Translate(message),
             Error: error,
             TraceId: traceId,
             Path: httpContext.Request.Path,
