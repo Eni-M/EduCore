@@ -6,11 +6,16 @@ namespace EduCore.Dtos.Public;
 //
 // Counts rather than rates, on purpose. A rate needs a sample to mean anything -- one present
 // pupil would publish "100% attendance" across the country -- whereas a count is honest at
-// every size, including zero.
+// every size.
+//
+// Every figure is nullable because it passes through the same ICellSuppressor the statistics
+// screens use: a count below Privacy:MinimumCellSize comes back null and the page leaves it
+// out rather than publishing it. Zero is not suppressed -- "nothing recorded yet" is a fact,
+// not a small sample.
 public record PlatformStatsDto(
-    int Schools,
-    int Cities,
-    int Students,
-    int Teachers,
-    int Lessons,
-    int Attendances);
+    int? Schools,
+    int? Cities,
+    int? Students,
+    int? Teachers,
+    int? Lessons,
+    int? Attendances);
