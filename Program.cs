@@ -146,6 +146,7 @@ builder.Services.AddScoped<IMarkRepository, MarkRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 builder.Services.AddScoped<ISchoolingHistoryRepository, SchoolingHistoryRepository>();
 builder.Services.AddScoped<IStudentDocumentRepository, StudentDocumentRepository>();
+builder.Services.AddScoped<IPlatformStatsRepository, PlatformStatsRepository>();
 builder.Services.AddScoped<IStudentMedicalRecordRepository, StudentMedicalRecordRepository>();
 builder.Services.AddScoped<INoticeRepository, NoticeRepository>();
 builder.Services.AddScoped<ICalendarEventRepository, CalendarEventRepository>();
@@ -309,6 +310,7 @@ builder.Services.AddScoped<IMarkService, MarkService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<ISchoolingHistoryService, SchoolingHistoryService>();
 builder.Services.AddScoped<IStudentDocumentService, StudentDocumentService>();
+builder.Services.AddScoped<IPlatformStatsService, PlatformStatsService>();
 builder.Services.AddScoped<IStudentMedicalRecordService, StudentMedicalRecordService>();
 builder.Services.AddScoped<INoticeService, NoticeService>();
 builder.Services.AddScoped<ICalendarService, CalendarService>();
@@ -586,6 +588,7 @@ app.MapGet("/healthz", () => Results.Ok(new { status = "ok" })).DisableRateLimit
 app.MapEduCoreMetrics(observability);
 
 app.MapAuthEndpoints();
+app.MapPublicEndpoints();
 
 var api = app.MapGroup("/api")
     .RequireAuthorization()
