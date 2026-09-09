@@ -2,6 +2,7 @@
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
+using Amazon.S3;
 using AutoMapper;
 using EduCore.Data;
 using EduCore.Endpoints;
@@ -183,13 +184,28 @@ builder.Services.AddOptions<AcademicCalendarOptions>()
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<AcademicCalendarOptions>, AcademicCalendarOptionsValidator>();
 
-// Where student documents are kept, how big they may be, and which content types are allowed.
-// Only a local-disk backend exists today; IFileStorage is the seam a cloud one slots into later.
+// Where uploaded files are kept, how big they may be, and which content types are allowed.
+// Storage:Provider picks the backend; everything above IFileStorage is unaware of which one runs.
 builder.Services.AddOptions<StorageOptions>()
     .Bind(builder.Configuration.GetSection(StorageOptions.SectionName))
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<StorageOptions>, StorageOptionsValidator>();
-builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();
+
+var storageOptions = builder.Configuration.GetSection(StorageOptions.SectionName).Get<StorageOptions>()
+                     ?? new StorageOptions();
+
+if (storageOptions.UsesS3)
+{
+    // Credentials come from the ambient AWS chain (environment, or the instance role in
+    // production), never from configuration -- there is nothing here to leak into source control.
+    builder.Services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(
+        Amazon.RegionEndpoint.GetBySystemName(storageOptions.S3Region)));
+    builder.Services.AddSingleton<IFileStorage, S3FileStorage>();
+}
+else
+{
+    builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();
+}
 
 // How long an emailed reset link lives, and where it points.
 // How stale a statistics snapshot may get before the next read recomputes it.
