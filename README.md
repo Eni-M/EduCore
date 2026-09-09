@@ -62,3 +62,4 @@ Tests: `dotnet run --project EduCore.Tests/EduCore.Tests.csproj`
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how the system is put together
 - [docs/DEV-SETUP.md](docs/DEV-SETUP.md) — getting a working local environment
 - [docs/EXPLICIT_MIGRATIONS.md](docs/EXPLICIT_MIGRATIONS.md) — the migration workflow
+- [docs/OPTIMISATION-PLAN.md](docs/OPTIMISATION-PLAN.md) — what to speed up next, and what to leave alone
