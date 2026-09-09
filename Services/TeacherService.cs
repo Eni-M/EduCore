@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using EduCore.Dtos.Teacher;
 using EduCore.Dtos.TeacherSubject;
 using EduCore.Enums;
@@ -28,25 +28,19 @@ public class TeacherService(
     public async Task<IEnumerable<TeacherListDto>> GetAllAsync(CancellationToken ct) =>
         WithVisibleAccounts(mapper.Map<IEnumerable<TeacherListDto>>(await teachers.GetAllWithUserAsync(ct)));
 
-    public async Task<PagedResultDto<TeacherListDto>> GetPagedAsync(
-        PaginationQueryDto pagination, string? search, CancellationToken ct)
-    {
-        var all = await GetAllAsync(ct);
-        return all.Search(search,
-                t => new[] { t.FirstName, t.LastName, t.Email, string.Join(" ", t.Subjects) })
-            .ToPagedResult(pagination);
-    }
+    public Task<PagedResultDto<TeacherListDto>> GetPagedAsync(
+        PaginationQueryDto pagination, string? search, CancellationToken ct) =>
+        GetPagedAsync(pagination, null, search, ct);
 
     public async Task<PagedResultDto<TeacherListDto>> GetPagedAsync(
         PaginationQueryDto pagination, Guid? subjectId, string? search, CancellationToken ct)
     {
-        var all = subjectId is null
-            ? await GetAllAsync(ct)
-            : await GetBySubjectAsync(subjectId.Value, ct);
+        var (items, total) = await teachers.GetPagedAsync(subjectId, pagination, search, ct);
+        var (page, pageSize) = ListPagination.Normalize(pagination);
 
-        return all.Search(search,
-                t => new[] { t.FirstName, t.LastName, t.Email, string.Join(" ", t.Subjects) })
-            .ToPagedResult(pagination);
+        return new PagedResultDto<TeacherListDto>(
+            WithVisibleAccounts(mapper.Map<IEnumerable<TeacherListDto>>(items)).ToList(),
+            page, pageSize, total);
     }
 
     public async Task<TeacherDetailDto> GetByIdAsync(Guid teacherId, CancellationToken ct)

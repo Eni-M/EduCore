@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using EduCore.Dtos.Pagination;
 using EduCore.Enums;
 using EduCore.Mapping;
@@ -84,7 +84,8 @@ public class SearchPushdownTests
         var service = new SubjectService(
             repo, null!, null!, new FakeCurrentUser(UserRole.Directorate), Mapper());
 
-        var result = await service.GetPagedAsync(new PaginationQueryDto(1, 20), "math", default);
+        var result = await service.GetPagedAsync(
+            new PaginationQueryDto(1, 20), "math", TestContext.Current.CancellationToken);
 
         Assert.Equal("math", repo.SawSearch);
         Assert.False(repo.LoadedEverything);
@@ -137,7 +138,8 @@ public class SearchPushdownTests
         var service = new RegionalAdminService(
             repo, null!, null!, null!, new FakeCurrentUser(UserRole.StateAdmin), Mapper());
 
-        await service.GetPagedAsync(new PaginationQueryDto(1, 20), "ana", default);
+        await service.GetPagedAsync(
+            new PaginationQueryDto(1, 20), "ana", TestContext.Current.CancellationToken);
 
         Assert.Equal("ana", repo.SawSearch);
         Assert.Equal(StateId, repo.SawStateId);
