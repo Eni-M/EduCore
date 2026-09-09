@@ -86,8 +86,8 @@ public static class AuthEndpoints
         group.MapPost("/change-password/request-code", async (
                 IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
             {
-                await users.RequestPasswordChangeCodeAsync(currentUser.UserId, ct);
-                return Results.NoContent();
+                var challengeId = await users.RequestPasswordChangeCodeAsync(currentUser.UserId, ct);
+                return Results.Ok(new TwoFactorRequiredDto(challengeId));
             })
             .RequireAuthorization()
             .AddEndpointFilter<ActiveAccountEndpointFilter>()

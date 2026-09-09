@@ -89,7 +89,7 @@ public class UserService(
         return await BuildAuthResponseAsync(user, ct);
     }
 
-    public async Task RequestPasswordChangeCodeAsync(Guid userId, CancellationToken ct)
+    public async Task<Guid> RequestPasswordChangeCodeAsync(Guid userId, CancellationToken ct)
     {
         var user = await userRepository.GetByIdAsync(userId, ct)
                    ?? throw new NotFoundException("User", userId);
@@ -97,7 +97,7 @@ public class UserService(
         if (user.DeactivatedAt is not null)
             throw new UnauthorizedException("This account has been deactivated.");
 
-        await twoFactor.IssueAsync(user, TwoFactorPurpose.PasswordChange, ct);
+        return await twoFactor.IssueAsync(user, TwoFactorPurpose.PasswordChange, ct);
     }
 
     public async Task<TwoFactorStatusDto> GetTwoFactorStatusAsync(Guid userId, CancellationToken ct)

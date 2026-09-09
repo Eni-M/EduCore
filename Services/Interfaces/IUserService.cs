@@ -11,8 +11,9 @@ public interface IUserService
 
     Task<AuthResultDto> CompleteSignInAsync(VerifyTwoFactorDto dto, CancellationToken ct);
 
-    // Emails the code that ChangePasswordAsync will demand.
-    Task RequestPasswordChangeCodeAsync(Guid userId, CancellationToken ct);
+    // Emails the code that ChangePasswordAsync will demand, and returns the challenge id the
+    // caller has to send back with it. The id is a handle, not a secret.
+    Task<Guid> RequestPasswordChangeCodeAsync(Guid userId, CancellationToken ct);
 
     Task<TwoFactorStatusDto> GetTwoFactorStatusAsync(Guid userId, CancellationToken ct);
     Task<TwoFactorStatusDto> SetTwoFactorAsync(Guid userId, bool enabled, CancellationToken ct);
