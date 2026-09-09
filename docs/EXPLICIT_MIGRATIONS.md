@@ -1,8 +1,5 @@
 # Explicit database migrations (the "trio")
 
-Finished 2026-09-04. Started by Claude (Program.cs, Dockerfile), completed here
-(compose wiring, docs). Plan reference: `docs/PERFORMANCE_PLAN.md` §1.3.
-
 ## What changed and why
 
 The API used to run `MigrateAsync()` on every boot, in every environment. That meant:

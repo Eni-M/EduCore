@@ -56,3 +56,9 @@ dotnet run                  # API — needs Jwt__Key, Encryption__Key and Connec
 Run the front end from `../EduCoreFront` with `npm run dev`.
 
 Tests: `dotnet run --project EduCore.Tests/EduCore.Tests.csproj`
+
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how the system is put together
+- [docs/DEV-SETUP.md](docs/DEV-SETUP.md) — getting a working local environment
+- [docs/EXPLICIT_MIGRATIONS.md](docs/EXPLICIT_MIGRATIONS.md) — the migration workflow
