@@ -1,6 +1,8 @@
 ﻿using EduCore.Data;
 using EduCore.Helpers;
+using EduCore.Services.Account;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace EduCore.Services.Email;
 
@@ -32,8 +34,11 @@ public class GuardianDigestService(
     AppDbContext db,
     IEmailSender email,
     IGradingCalculator grading,
+    IOptions<PasswordResetOptions> passwordReset,
     ILogger<GuardianDigestService> logger) : IGuardianDigestService
 {
+    private readonly string _appUrl = AccountMailTemplates.AppUrlFrom(passwordReset.Value.ResetUrlTemplate);
+
     // Matches ScheduleDigestService: bounded so a real transport is never hit with unlimited
     // parallel sends.
     private const int MaxConcurrentEmails = 5;
@@ -153,7 +158,7 @@ public class GuardianDigestService(
 
             try
             {
-                await email.SendAsync(m!.Email, m.Subject, m.Body, ct);
+                await email.SendAsync(m!.Email, m.Subject, EmailLayout.FromText(m.Subject, m.Body, _appUrl), ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

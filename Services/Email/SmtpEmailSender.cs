@@ -19,16 +19,18 @@ public class SmtpEmailSender(IOptions<EmailOptions> options, ILogger<SmtpEmailSe
 {
     private readonly EmailOptions _options = options.Value;
 
-    public async Task SendAsync(string toEmail, string subject, string body, CancellationToken ct)
+    public async Task SendAsync(string toEmail, string subject, EmailBody body, CancellationToken ct)
     {
         if (!MailboxAddress.TryParse(toEmail, out var recipient))
             throw new InvalidOperationException(
                 $"'{toEmail}' is not a valid email address, so no message could be addressed to it.");
 
+        // multipart/alternative: the client picks the richest part it can render, and the ones
+        // that refuse HTML -- or a spam filter reading the message -- still get real text.
         var message = new MimeMessage
         {
             Subject = subject,
-            Body = new TextPart(TextFormat.Plain) { Text = body }
+            Body = new BodyBuilder { TextBody = body.Text, HtmlBody = body.Html }.ToMessageBody()
         };
 
         message.From.Add(new MailboxAddress(_options.FromName, _options.FromAddress));

@@ -307,11 +307,13 @@ public class PasswordResetServiceTests
 
     private sealed class RecordingEmailSender : IEmailSender
     {
-        public List<(string To, string Subject, string Body)> Sent { get; } = [];
+        public List<(string To, string Subject, string Body, string Html)> Sent { get; } = [];
 
-        public Task SendAsync(string toEmail, string subject, string body, CancellationToken ct)
+        public Task SendAsync(string toEmail, string subject, EmailBody body, CancellationToken ct)
         {
-            Sent.Add((toEmail, subject, body));
+            // Body is the text part, so the existing link assertions still read what a
+            // text-only client would see; Html is kept so a test can check both carry the link.
+            Sent.Add((toEmail, subject, body.Text, body.Html));
             return Task.CompletedTask;
         }
     }

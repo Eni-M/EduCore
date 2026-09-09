@@ -4,5 +4,5 @@ namespace EduCore.Services.Email;
 // logging stub) is chosen in DI, so the rest of the app never depends on how mail is delivered.
 public interface IEmailSender
 {
-    Task SendAsync(string toEmail, string subject, string body, CancellationToken ct);
+    Task SendAsync(string toEmail, string subject, EmailBody body, CancellationToken ct);
 }

@@ -57,16 +57,18 @@ public class PasswordResetService(
         await email.SendAsync(
             user.Email,
             "Reset your EduCore password",
-            $"""
-             Hello {user.FirstName},
-
-             Someone asked to reset the password for your EduCore account. Open the link below
-             to choose a new one. It works once, and expires in {_options.TokenLifetimeMinutes} minutes.
-
-             {link}
-
-             If this wasn't you, ignore this email — your password has not changed.
-             """,
+            EmailLayout.Render(
+                "Reset your password",
+                [
+                    new EmailBlock.Paragraph($"Hello {user.FirstName},"),
+                    new EmailBlock.Paragraph(
+                        "Someone asked to reset the password for your EduCore account. Use the button "
+                        + $"below to choose a new one. It works once, and expires in {_options.TokenLifetimeMinutes} minutes."),
+                    new EmailBlock.Button("Choose a new password", link),
+                    new EmailBlock.Note(
+                        "If this wasn't you, ignore this email -- your password has not changed."),
+                ],
+                AccountMailTemplates.AppUrlFrom(_options.ResetUrlTemplate)),
             ct);
     }
 

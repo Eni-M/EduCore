@@ -13,8 +13,16 @@ public class AccountMailTests
     private static AccountMailRequest Request(AccountMailKind kind) =>
         new(kind, "ana.berisha@example.org", "Ana");
 
-    private static (string Subject, string Body) Compose(AccountMailKind kind) =>
-        AccountMailTemplates.Compose(Request(kind), AppUrl);
+    // Both parts, concatenated: every rule below has to hold for the HTML as well as the text,
+    // and a secret that leaked into only one of them would otherwise pass.
+    private static (string Subject, string Body) Compose(AccountMailKind kind)
+    {
+        var (subject, body) = AccountMailTemplates.Compose(Request(kind), AppUrl);
+        return (subject, body.Text + "\n" + body.Html);
+    }
+
+    private static EmailBody Rendered(AccountMailKind kind) =>
+        AccountMailTemplates.Compose(Request(kind), AppUrl).Body;
 
     // ---- what must never appear -------------------------------------------------------
 

@@ -1,4 +1,4 @@
-﻿namespace EduCore.Services.Email;
+namespace EduCore.Services.Email;
 
 // An enum rather than pre-rendered text, so the queue carries facts and the wording is decided
 // at composition time.
@@ -17,6 +17,9 @@ public record AccountMailRequest(AccountMailKind Kind, string Email, string Firs
 // Composes account emails as pure functions, so the wording is testable without a mail server.
 // No message carries a password, a token, or a link holding either -- they point at the reset
 // flow, which is single-use and time-limited.
+//
+// Each message is written once as a list of blocks; EmailLayout renders that to HTML and to
+// plain text, so the two cannot drift apart.
 public static class AccountMailTemplates
 {
     // Derived from the reset link's origin rather than configured twice: two settings for one
@@ -26,7 +29,7 @@ public static class AccountMailTemplates
             ? uri.GetLeftPart(UriPartial.Authority)
             : resetUrlTemplate;
 
-    public static (string Subject, string Body) Compose(AccountMailRequest request, string appUrl) =>
+    public static (string Subject, EmailBody Body) Compose(AccountMailRequest request, string appUrl) =>
         request.Kind switch
         {
             AccountMailKind.Welcome => Welcome(request, appUrl),
@@ -34,37 +37,34 @@ public static class AccountMailTemplates
             _ => throw new ArgumentOutOfRangeException(nameof(request))
         };
 
-    private static (string, string) Welcome(AccountMailRequest request, string appUrl) =>
+    private static (string, EmailBody) Welcome(AccountMailRequest request, string appUrl) =>
         ("Your EduCore account is ready",
-            $"""
-             Hello {request.FirstName},
+            EmailLayout.Render(
+                $"Welcome, {request.FirstName}",
+                [
+                    new EmailBlock.Paragraph(
+                        "Your school has created an EduCore account for you. You sign in with this email address:"),
+                    new EmailBlock.Code(request.Email, Spaced: false),
+                    new EmailBlock.Paragraph(
+                        "Your school will give you a temporary password. You will be asked to choose your own the first time you sign in."),
+                    new EmailBlock.Button("Sign in", appUrl),
+                    new EmailBlock.Note(
+                        "If nobody has given you a password, use the \"Forgot your password?\" link on the sign-in page and we will email you one that works once."),
+                ],
+                appUrl));
 
-             Your school has created an EduCore account for you. You sign in with this email
-             address:
-
-             {request.Email}
-
-             Your school will give you a temporary password. You will be asked to choose your own
-             the first time you sign in.
-
-             {appUrl}
-
-             If nobody has given you a password, use the "Forgot your password?" link on the
-             sign-in page and we will email you one that works once.
-             """);
-
-    private static (string, string) PasswordChanged(AccountMailRequest request, string appUrl) =>
+    private static (string, EmailBody) PasswordChanged(AccountMailRequest request, string appUrl) =>
         ("Your EduCore password was changed",
-            $"""
-             Hello {request.FirstName},
-
-             The password for your EduCore account ({request.Email}) has just been changed.
-
-             If you made this change, there is nothing to do.
-
-             If you did not, someone else may have access to your account. Contact your
-             school office straight away, and change your password here:
-
-             {appUrl}
-             """);
+            EmailLayout.Render(
+                "Your password was changed",
+                [
+                    new EmailBlock.Paragraph($"Hello {request.FirstName},"),
+                    new EmailBlock.Paragraph(
+                        $"The password for your EduCore account ({request.Email}) has just been changed."),
+                    new EmailBlock.Paragraph("If you made this change, there is nothing to do."),
+                    new EmailBlock.Paragraph(
+                        "If you did not, someone else may have access to your account. Contact your school office straight away, and change your password."),
+                    new EmailBlock.Button("Change your password", appUrl),
+                ],
+                appUrl));
 }

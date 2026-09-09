@@ -1,6 +1,8 @@
 using EduCore.Data;
 using EduCore.Enums;
+using EduCore.Services.Account;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace EduCore.Services.Email;
 
@@ -11,8 +13,13 @@ namespace EduCore.Services.Email;
 // signed-in user, so the per-request school filter would otherwise match nothing. It is safe
 // because every email is grouped by its owning teacher/class/school -- a recipient only ever sees
 // their own school's data. Deactivated users are excluded explicitly instead.
-public class ScheduleDigestService(AppDbContext db, IEmailSender email) : IScheduleDigestService
+public class ScheduleDigestService(
+    AppDbContext db,
+    IEmailSender email,
+    IOptions<PasswordResetOptions> passwordReset) : IScheduleDigestService
 {
+    private readonly string _appUrl = AccountMailTemplates.AppUrlFrom(passwordReset.Value.ResetUrlTemplate);
+
     // Bounded so a real SMTP/provider transport is never hit with unlimited parallel sends.
     private const int MaxConcurrentEmails = 5;
 
@@ -235,7 +242,7 @@ public class ScheduleDigestService(AppDbContext db, IEmailSender email) : ISched
         var sends = mails.Select(async m =>
         {
             await gate.WaitAsync(ct);
-            try { await email.SendAsync(m.Email, m.Subject, m.Body, ct); }
+            try { await email.SendAsync(m.Email, m.Subject, EmailLayout.FromText(m.Subject, m.Body, _appUrl), ct); }
             finally { gate.Release(); }
         });
 

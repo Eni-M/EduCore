@@ -7,9 +7,13 @@ namespace EduCore.Services.Email;
 // stub transport, replace with SMTP/provider when the client picks one.
 public class LoggingEmailSender(ILogger<LoggingEmailSender> logger) : IEmailSender
 {
-    public Task SendAsync(string toEmail, string subject, string body, CancellationToken ct)
+    public Task SendAsync(string toEmail, string subject, EmailBody body, CancellationToken ct)
     {
-        logger.LogInformation("Email to {To}: {Subject}\n{Body}", toEmail, subject, body);
+        // The text part, not the HTML: a log line full of table markup hides the thing you
+        // opened the log to read.
+        logger.LogInformation("Email to {To}: {Subject}{NewLine}{Body}",
+            toEmail, subject, Environment.NewLine, body.Text);
+
         return Task.CompletedTask;
     }
 }
