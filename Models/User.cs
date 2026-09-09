@@ -20,6 +20,10 @@ public class User
     // settings screen nobody will build. Default false, so digests are opt-out, not opt-in --
     // they are the reason most guardians have an account at all.
     public bool EmailDigestsOptOut { get; set; }
+
+    // Opt-in second step at sign-in. The roles that manage accounts get it whether or not this
+    // is set -- see TwoFactorOptions.RequiredForRoles -- so this flag only ever adds it.
+    public bool TwoFactorEnabled { get; set; }
     public UserRole Role { get; set; }
     public DateTime? DeactivatedAt { get; set; }
 

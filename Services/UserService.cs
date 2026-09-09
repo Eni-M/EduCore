@@ -7,8 +7,10 @@ using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
+using EduCore.Services.Account;
 using EduCore.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using PasswordGenerator;
 
@@ -38,10 +40,12 @@ public class UserService(
     IGuardianRepository guardianRepository,
     ISchoolRepository schoolRepository,
     IPasswordHasher<User> passwordHasher,
+    ITwoFactorService twoFactor,
+    IOptions<TwoFactorOptions> twoFactorOptions,
     ICurrentUser currentUser,
     IConfiguration config) : IUserService
 {
-    public async Task<AuthResultDto> LoginAsync(LoginUserDto dto, CancellationToken ct)
+    public async Task<LoginResultDto> LoginAsync(LoginUserDto dto, CancellationToken ct)
     {
         var user = await userRepository.GetByEmailAsync(dto.Email, ct);
 
@@ -62,7 +66,65 @@ public class UserService(
             await userRepository.SaveChangesAsync(ct);
         }
 
+        // The password was right, but for these accounts it is not sufficient on its own. No
+        // session cookie is issued here -- the caller gets a handle and has to prove they can
+        // read the mailbox before anything is signed in.
+        if (twoFactor.SignInRequiresSecondStep(user))
+            return LoginResultDto.NeedsSecondStep(
+                await twoFactor.IssueAsync(user, TwoFactorPurpose.SignIn, ct));
+
+        return LoginResultDto.SignedIn(await BuildAuthResponseAsync(user, ct));
+    }
+
+    public async Task<AuthResultDto> CompleteSignInAsync(VerifyTwoFactorDto dto, CancellationToken ct)
+    {
+        var user = await twoFactor.CompleteAsync(
+            dto.ChallengeId, dto.Code, TwoFactorPurpose.SignIn, ct);
+
+        // Re-checked here, not just at the first step: an account can be deactivated in the
+        // minutes between the password and the code.
+        if (user.DeactivatedAt is not null)
+            throw new UnauthorizedException("This account has been deactivated.");
+
         return await BuildAuthResponseAsync(user, ct);
+    }
+
+    public async Task RequestPasswordChangeCodeAsync(Guid userId, CancellationToken ct)
+    {
+        var user = await userRepository.GetByIdAsync(userId, ct)
+                   ?? throw new NotFoundException("User", userId);
+
+        if (user.DeactivatedAt is not null)
+            throw new UnauthorizedException("This account has been deactivated.");
+
+        await twoFactor.IssueAsync(user, TwoFactorPurpose.PasswordChange, ct);
+    }
+
+    public async Task<TwoFactorStatusDto> GetTwoFactorStatusAsync(Guid userId, CancellationToken ct)
+    {
+        var user = await userRepository.GetByIdAsync(userId, ct)
+                   ?? throw new NotFoundException("User", userId);
+
+        var required = twoFactorOptions.Value.IsRequiredFor(user.Role);
+        return new TwoFactorStatusDto(required || user.TwoFactorEnabled, required);
+    }
+
+    public async Task<TwoFactorStatusDto> SetTwoFactorAsync(Guid userId, bool enabled, CancellationToken ct)
+    {
+        var user = await userRepository.GetByIdAsync(userId, ct)
+                   ?? throw new NotFoundException("User", userId);
+
+        // The roles that manage accounts do not get to decline. Refused outright rather than
+        // silently ignored, so the screen can say why instead of appearing to have worked.
+        if (!enabled && twoFactorOptions.Value.IsRequiredFor(user.Role))
+            throw new BusinessException(
+                "Two-step sign-in cannot be switched off for this role.");
+
+        user.TwoFactorEnabled = enabled;
+        userRepository.Update(user);
+        await userRepository.SaveChangesAsync(ct);
+
+        return await GetTwoFactorStatusAsync(userId, ct);
     }
 
     public async Task<AuthResultDto> ChangePasswordAsync(Guid userId, ChangePasswordDto dto, CancellationToken ct)
@@ -77,6 +139,15 @@ public class UserService(
 
         if (user.DeactivatedAt is not null)
             throw new UnauthorizedException("This account has been deactivated.");
+
+        // Emailed code, for every role. Checked after the current password so a caller who does
+        // not know it cannot burn somebody else's challenge, and bound to this user so a code
+        // issued for one account cannot be spent on another.
+        var confirmed = await twoFactor.CompleteAsync(
+            dto.ChallengeId, dto.Code, TwoFactorPurpose.PasswordChange, ct);
+
+        if (confirmed.Id != userId)
+            throw new UnauthorizedException("That code is not valid. Ask for a new one.");
 
         user.SetPassword(dto.NewPassword, passwordHasher);
         user.MustChangePassword = false;

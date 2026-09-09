@@ -11,6 +11,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<TwoFactorChallenge> TwoFactorChallenges => Set<TwoFactorChallenge>();
     public DbSet<Student> Students => Set<Student>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
     public DbSet<Assignment> Assignments => Set<Assignment>();
@@ -109,6 +110,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         modelBuilder.Entity<PasswordResetToken>().Property(t => t.TokenHash).HasMaxLength(64);
         // Backs both "invalidate this user's outstanding tokens" and the expiry sweep.
         modelBuilder.Entity<PasswordResetToken>().HasIndex(t => new { t.UserId, t.ExpiresAt });
+
+        modelBuilder.Entity<TwoFactorChallenge>()
+            .HasOne(c => c.User).WithMany()
+            .HasForeignKey(c => c.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<TwoFactorChallenge>().Property(c => c.CodeHash).HasMaxLength(64);
+        // Backs retiring a user's outstanding challenges, which happens on every code issued.
+        modelBuilder.Entity<TwoFactorChallenge>().HasIndex(c => new { c.UserId, c.Purpose, c.CompletedAt });
 
         modelBuilder.Entity<Student>()
             .HasOne(s => s.User).WithOne()

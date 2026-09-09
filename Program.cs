@@ -147,6 +147,7 @@ builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 builder.Services.AddScoped<ISchoolingHistoryRepository, SchoolingHistoryRepository>();
 builder.Services.AddScoped<IStudentDocumentRepository, StudentDocumentRepository>();
 builder.Services.AddScoped<IPlatformStatsRepository, PlatformStatsRepository>();
+builder.Services.AddScoped<ITwoFactorChallengeRepository, TwoFactorChallengeRepository>();
 builder.Services.AddScoped<IStudentMedicalRecordRepository, StudentMedicalRecordRepository>();
 builder.Services.AddScoped<INoticeRepository, NoticeRepository>();
 builder.Services.AddScoped<ICalendarEventRepository, CalendarEventRepository>();
@@ -171,6 +172,11 @@ builder.Services.AddOptions<GradingOptions>()
     .Bind(builder.Configuration.GetSection(GradingOptions.SectionName))
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<GradingOptions>, GradingOptionsValidator>();
+
+builder.Services.AddOptions<TwoFactorOptions>()
+    .Bind(builder.Configuration.GetSection(TwoFactorOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<TwoFactorOptions>, TwoFactorOptionsValidator>();
 
 builder.Services.AddOptions<PrivacyOptions>()
     .Bind(builder.Configuration.GetSection(PrivacyOptions.SectionName))
@@ -314,6 +320,7 @@ builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<ISchoolingHistoryService, SchoolingHistoryService>();
 builder.Services.AddScoped<IStudentDocumentService, StudentDocumentService>();
 builder.Services.AddScoped<IPlatformStatsService, PlatformStatsService>();
+builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
 builder.Services.AddScoped<IStudentMedicalRecordService, StudentMedicalRecordService>();
 builder.Services.AddScoped<INoticeService, NoticeService>();
 builder.Services.AddScoped<ICalendarService, CalendarService>();

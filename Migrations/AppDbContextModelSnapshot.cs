@@ -1801,6 +1801,42 @@ namespace EduCore.Migrations
                     b.ToTable("TeacherSubjects");
                 });
 
+            modelBuilder.Entity("EduCore.Models.TwoFactorChallenge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FailedAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Purpose", "CompletedAt");
+
+                    b.ToTable("TwoFactorChallenges");
+                });
+
             modelBuilder.Entity("EduCore.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1838,6 +1874,9 @@ namespace EduCore.Migrations
 
                     b.Property<int>("Role")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("TwoFactorEnabled")
+                        .HasColumnType("boolean");
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
@@ -2484,6 +2523,17 @@ namespace EduCore.Migrations
                         .IsRequired();
 
                     b.Navigation("Subject");
+                });
+
+            modelBuilder.Entity("EduCore.Models.TwoFactorChallenge", b =>
+                {
+                    b.HasOne("EduCore.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("EduCore.Models.Zone", b =>

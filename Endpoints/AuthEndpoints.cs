@@ -20,6 +20,27 @@ public static class AuthEndpoints
             CancellationToken ct) =>
         {
             var result = await users.LoginAsync(dto, ct);
+
+            // A second step is owed: no cookie yet, just the handle to answer with. The code
+            // is in the account's mailbox and never in this response.
+            if (result.Session is null)
+                return Results.Ok(new TwoFactorRequiredDto(result.TwoFactorChallengeId!.Value));
+
+            cookies.Issue(response, result.Session.Token, result.Session.User.ExpiresAt);
+            return Results.Ok(result.Session.User);
+        }).RequireRateLimiting("LoginPolicy");
+
+        // Anonymous: the caller has proved the password but holds no session yet, which is the
+        // whole point of the step. Rate-limited like login, because this is where a six-digit
+        // code would be guessed at if anywhere.
+        group.MapPost("/login/verify", async (
+            VerifyTwoFactorDto dto,
+            IUserService users,
+            ISessionCookies cookies,
+            HttpResponse response,
+            CancellationToken ct) =>
+        {
+            var result = await users.CompleteSignInAsync(dto, ct);
             cookies.Issue(response, result.Token, result.User.ExpiresAt);
             return Results.Ok(result.User);
         }).RequireRateLimiting("LoginPolicy");
@@ -60,6 +81,18 @@ public static class AuthEndpoints
             .RequireAuthorization()
             .AddEndpointFilter<ActiveAccountEndpointFilter>();
 
+        // Sends the code that change-password will demand. Separate from the change itself so
+        // the screen can ask for the code before the user has typed a new password.
+        group.MapPost("/change-password/request-code", async (
+                IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
+            {
+                await users.RequestPasswordChangeCodeAsync(currentUser.UserId, ct);
+                return Results.NoContent();
+            })
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>()
+            .RequireRateLimiting("PasswordResetPolicy");
+
         group.MapPost("/change-password", async (
                 ChangePasswordDto dto,
                 IUserService users,
@@ -75,6 +108,21 @@ public static class AuthEndpoints
             .RequireAuthorization()
             .AddEndpointFilter<ActiveAccountEndpointFilter>();
 
+
+        group.MapGet("/me/two-factor", async (
+                IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
+                Results.Ok(await users.GetTwoFactorStatusAsync(currentUser.UserId, ct)))
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
+
+        // Opt in or out. The service refuses to switch it off for the roles that manage
+        // accounts, so this is only ever additive for them.
+        group.MapPut("/me/two-factor", async (
+                TwoFactorPreferenceDto dto, IUserService users, ICurrentUser currentUser,
+                CancellationToken ct) =>
+                Results.Ok(await users.SetTwoFactorAsync(currentUser.UserId, dto.Enabled, ct)))
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
 
         // Turning scheduled mail off is a self-service action, deliberately available to every
         // signed-in role rather than only guardians -- teachers and students receive the daily
