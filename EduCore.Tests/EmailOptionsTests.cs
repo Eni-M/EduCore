@@ -1,14 +1,12 @@
-using EduCore.Services.Email;
+﻿using EduCore.Services.Email;
 using Xunit;
 
 namespace EduCore.Tests;
 
-/// <summary>
-/// Mail configuration fails in the worst possible way: silently, in a background job, hours
-/// after start-up, to a recipient who simply never receives their password-reset link. The
-/// validator exists to turn every one of those into a start-up failure, so it is worth testing
-/// as carefully as the feature itself.
-/// </summary>
+// Mail configuration fails in the worst possible way: silently, in a background job, hours
+// after start-up, to a recipient who simply never receives their password-reset link. The
+// validator exists to turn every one of those into a start-up failure, so it is worth testing
+// as carefully as the feature itself.
 public class EmailOptionsTests
 {
     private static EmailOptions ValidSmtp() => new()

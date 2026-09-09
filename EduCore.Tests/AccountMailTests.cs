@@ -1,13 +1,11 @@
-using EduCore.Services.Email;
+﻿using EduCore.Services.Email;
 using Xunit;
 
 namespace EduCore.Tests;
 
-/// <summary>
-/// Account emails leave the building and cannot be recalled, so the properties worth pinning are
-/// the ones that would be embarrassing or dangerous to get wrong: no secrets in the body, the
-/// right address quoted back, and a link that points somewhere the recipient can actually reach.
-/// </summary>
+// Account emails leave the building and cannot be recalled, so the properties worth pinning are
+// the ones that would be embarrassing or dangerous to get wrong: no secrets in the body, the
+// right address quoted back, and a link that points somewhere the recipient can actually reach.
 public class AccountMailTests
 {
     private const string AppUrl = "https://edu-core-front.vercel.app";

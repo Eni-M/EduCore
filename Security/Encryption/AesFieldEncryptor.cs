@@ -1,24 +1,22 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 
 namespace EduCore.Security.Encryption;
 
-/// <summary>
-/// Deterministic AES-256-CBC field encryption with a synthetic (HMAC-derived) IV.
-///
-/// Determinism is a hard requirement here: the encrypted columns (<c>Student.PersonalNumber</c>,
-/// <c>Guardian.NationalId</c>) carry a unique index and are located by equality lookups, so the
-/// same plaintext must always map to the same ciphertext. A random IV would break both.
-///
-/// The IV is derived as HMAC-SHA256(macKey, plaintext) truncated to the AES block size, following
-/// the synthetic-IV principle: equal plaintexts get equal IVs (determinism preserved), while
-/// distinct plaintexts get distinct IVs, so CBC never leaks equality of shared prefixes across
-/// records. The master key is split into independent encryption and MAC subkeys via HKDF, so the
-/// same raw key is never used for two purposes.
-///
-/// The envelope is <c>enc:v1:BASE64(iv || ciphertext)</c>. The version prefix lets us evolve the
-/// scheme and lets <see cref="Decrypt"/> pass through legacy plaintext that predates encryption.
-/// </summary>
+// Deterministic AES-256-CBC field encryption with a synthetic (HMAC-derived) IV.
+//
+// Determinism is a hard requirement here: the encrypted columns (Student.PersonalNumber,
+// Guardian.NationalId) carry a unique index and are located by equality lookups, so the
+// same plaintext must always map to the same ciphertext. A random IV would break both.
+//
+// The IV is derived as HMAC-SHA256(macKey, plaintext) truncated to the AES block size, following
+// the synthetic-IV principle: equal plaintexts get equal IVs (determinism preserved), while
+// distinct plaintexts get distinct IVs, so CBC never leaks equality of shared prefixes across
+// records. The master key is split into independent encryption and MAC subkeys via HKDF, so the
+// same raw key is never used for two purposes.
+//
+// The envelope is enc:v1:BASE64(iv || ciphertext). The version prefix lets us evolve the
+// scheme and lets Decrypt pass through legacy plaintext that predates encryption.
 public sealed class AesFieldEncryptor : IFieldEncryptor
 {
     private const string Prefix = "enc:v1:";
@@ -27,7 +25,7 @@ public sealed class AesFieldEncryptor : IFieldEncryptor
     private readonly byte[] _encKey;
     private readonly byte[] _macKey;
 
-    /// <param name="masterKey">A 32-byte master key (e.g. the base64-decoded <c>Encryption:Key</c>).</param>
+    // A 32-byte master key (e.g. the base64-decoded Encryption:Key).
     public AesFieldEncryptor(byte[] masterKey)
     {
         ArgumentNullException.ThrowIfNull(masterKey);

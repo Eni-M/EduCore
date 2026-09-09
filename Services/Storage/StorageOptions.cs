@@ -1,3 +1,4 @@
+using EduCore.Exceptions;
 using Microsoft.Extensions.Options;
 
 namespace EduCore.Services.Storage;
@@ -52,5 +53,24 @@ public class StorageOptionsValidator : IValidateOptions<StorageOptions>
                 $"Storage:MaxFileSizeBytes ({options.MaxFileSizeBytes}) must be at least 1.");
 
         return ValidateOptionsResult.Success;
+    }
+}
+
+public static class UploadRules
+{
+    // Every upload path applies these, so a file one endpoint accepts is not rejected by
+    // another for a rule the first never checked.
+    public static void EnsureAccepted(this StorageOptions options, long sizeBytes, string? contentType)
+    {
+        if (sizeBytes <= 0)
+            throw new BusinessException("The uploaded file is empty.");
+
+        if (sizeBytes > options.MaxFileSizeBytes)
+            throw new BusinessException(
+                $"The file is larger than the {options.MaxFileSizeBytes / (1024 * 1024)} MB limit.");
+
+        if (options.AllowedContentTypes.Length > 0
+            && !options.AllowedContentTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase))
+            throw new BusinessException($"Files of type '{contentType}' are not allowed.");
     }
 }

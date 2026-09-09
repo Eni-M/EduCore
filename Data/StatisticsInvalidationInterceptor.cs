@@ -1,21 +1,19 @@
-using EduCore.Models;
+﻿using EduCore.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace EduCore.Data;
 
-/// <summary>
-/// Counts writes that would change a school's statistics, so <c>StatisticsSnapshotService</c>
-/// can tell a stale snapshot from a current one without re-running the aggregates to find out.
-///
-/// The count is deliberately per school and across every contributing table, not just
-/// enrollments: a term's worth of attendance or marks moves the figures every bit as much as a
-/// new student does, and a snapshot that only noticed enrollments would sit wrong all term.
-///
-/// The counter is bumped after the write commits, in a separate statement. Doing it inside the
-/// same SaveChanges would mean loading and tracking snapshot rows on every unrelated write; the
-/// extra round trip is paid only by writes, which are far rarer here than reads.
-/// </summary>
+// Counts writes that would change a school's statistics, so StatisticsSnapshotService
+// can tell a stale snapshot from a current one without re-running the aggregates to find out.
+//
+// The count is deliberately per school and across every contributing table, not just
+// enrollments: a term's worth of attendance or marks moves the figures every bit as much as a
+// new student does, and a snapshot that only noticed enrollments would sit wrong all term.
+//
+// The counter is bumped after the write commits, in a separate statement. Doing it inside the
+// same SaveChanges would mean loading and tracking snapshot rows on every unrelated write; the
+// extra round trip is paid only by writes, which are far rarer here than reads.
 public class StatisticsInvalidationInterceptor : SaveChangesInterceptor
 {
     // The tables every snapshotted figure is derived from. A write to anything else — a notice,

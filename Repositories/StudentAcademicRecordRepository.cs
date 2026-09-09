@@ -1,20 +1,18 @@
-using EduCore.Data;
+﻿using EduCore.Data;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace EduCore.Repositories;
 
-/// <summary>
-/// Reads and writes transcript rows.
-///
-/// Every query here uses IgnoreQueryFilters, and that is the entire point of the class rather
-/// than an optimisation: a transcript is assembled from years the student spent at schools the
-/// caller has no claim on, so the school filter would return an empty history for exactly the
-/// student it was asked about. Access is decided before any of this runs, by
-/// IAccessGuard.EnsureCanViewStudentAsync -- the caller must be able to see the student today,
-/// and having established that, they see the whole record.
-/// </summary>
+// Reads and writes transcript rows.
+//
+// Every query here uses IgnoreQueryFilters, and that is the entire point of the class rather
+// than an optimisation: a transcript is assembled from years the student spent at schools the
+// caller has no claim on, so the school filter would return an empty history for exactly the
+// student it was asked about. Access is decided before any of this runs, by
+// IAccessGuard.EnsureCanViewStudentAsync -- the caller must be able to see the student today,
+// and having established that, they see the whole record.
 public class StudentAcademicRecordRepository(AppDbContext context) : IStudentAcademicRecordRepository
 {
     public async Task<string?> GetStudentNameAsync(Guid studentId, CancellationToken ct) =>

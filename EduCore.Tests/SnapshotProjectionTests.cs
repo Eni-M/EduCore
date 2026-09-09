@@ -1,4 +1,4 @@
-using EduCore.Dtos.Pagination;
+﻿using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
 using EduCore.Dtos.Statistics.Aggregate;
 using EduCore.Dtos.Statistics.Individual;
@@ -12,12 +12,10 @@ using Xunit;
 
 namespace EduCore.Tests;
 
-/// <summary>
-/// The snapshot table is only safe if a figure read from it is indistinguishable from the same
-/// figure computed live. These tests hold the two paths against each other for identical inputs.
-/// If they ever disagree, an overview screen silently reports different numbers depending on how
-/// recently somebody enrolled a student, which is worse than the slow query it replaced.
-/// </summary>
+// The snapshot table is only safe if a figure read from it is indistinguishable from the same
+// figure computed live. These tests hold the two paths against each other for identical inputs.
+// If they ever disagree, an overview screen silently reports different numbers depending on how
+// recently somebody enrolled a student, which is worse than the slow query it replaced.
 public class SnapshotProjectionTests
 {
     private static readonly StatisticsQuery Ctx = new(

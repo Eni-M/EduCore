@@ -2,27 +2,15 @@ using EduCore.Enums;
 
 namespace EduCore.Models;
 
-/// <summary>
-/// One year of a student's schooling, at one school, kept so it survives the student leaving
-/// that school.
-///
-/// Deliberately NOT <c>ISchoolScoped</c>. Every scoped entity is filtered to
-/// <c>currentUser.SchoolIds</c>, which is exactly wrong for a transcript: the rows worth reading
-/// are the ones belonging to the school the student has already left. A receiving school cannot
-/// see a student's previous year through Enrollments or Marks for that reason, even though the
-/// data is sitting in both. This table is the answer to that, so access is decided in the
-/// service layer instead — see StudentAcademicHistoryService.
-///
-/// School and year names are copied in, not just referenced. A transcript has to still read
-/// correctly years later, after a school is renamed, merged into another, or removed; a record
-/// that renders through today's foreign keys quietly rewrites history when the present changes.
-/// This is one of the few places where duplicating data is the correct choice.
-///
-/// What is stored is the mark, never the verdict. Pass, fail and averages are derived on the way
-/// out from the current grading configuration, exactly as SchoolStatisticsSnapshot stores raw
-/// aggregates rather than presented figures -- freezing "passed" into the row would make every
-/// historical record disagree with the rules the moment a threshold is adjusted.
-/// </summary>
+// One year of a student's schooling at one school, kept so it survives them leaving.
+//
+// Deliberately NOT ISchoolScoped: scoping filters to the caller's schools, which is exactly wrong
+// for a transcript, where the rows worth reading belong to a school the student has left. Access
+// is decided in StudentAcademicHistoryService instead.
+//
+// School, year and subject names are copied in rather than referenced, so a transcript still
+// reads correctly after a rename or a deletion. Marks are stored, verdicts are not -- pass, fail
+// and averages derive from the current grading rules on the way out.
 public class StudentAcademicRecord
 {
     public Guid Id { get; set; }
@@ -51,11 +39,7 @@ public class StudentAcademicRecord
     public ICollection<StudentAcademicRecordSubject> Subjects { get; set; } = [];
 }
 
-/// <summary>
-/// One subject within a <see cref="StudentAcademicRecord"/>, carrying the annual mark the
-/// student finished that subject with. Subject names are copied in for the same reason school
-/// names are.
-/// </summary>
+// One subject within a record, carrying the annual mark the student finished it with.
 public class StudentAcademicRecordSubject
 {
     public Guid Id { get; set; }
@@ -67,7 +51,6 @@ public class StudentAcademicRecordSubject
     public Guid? SubjectId { get; set; }
     public string SubjectName { get; set; } = null!;
 
-    // The average of the period final marks, rounded the same way IGradingCalculator.AnnualMark
-    // rounds it. Null when the student was never graded in this subject that year.
+    // Averaged and rounded as IGradingCalculator.AnnualMark does. Null when never graded.
     public int? AnnualMark { get; set; }
 }

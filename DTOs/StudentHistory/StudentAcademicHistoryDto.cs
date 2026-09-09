@@ -1,12 +1,10 @@
-using EduCore.Enums;
+﻿using EduCore.Enums;
 
 namespace EduCore.Dtos.StudentHistory;
 
-/// <summary>
-/// A student's schooling across every year and every school, newest first. Assembled from
-/// StudentAcademicRecord rows, which are not school-scoped, so a receiving school sees the years
-/// the student spent elsewhere -- the whole reason the table exists.
-/// </summary>
+// A student's schooling across every year and every school, newest first. Assembled from
+// StudentAcademicRecord rows, which are not school-scoped, so a receiving school sees the years
+// the student spent elsewhere -- the whole reason the table exists.
 public record StudentAcademicHistoryDto(
     Guid StudentId,
     string StudentName,

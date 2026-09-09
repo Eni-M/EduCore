@@ -1,4 +1,4 @@
-using EduCore.Dtos.Dashboard;
+﻿using EduCore.Dtos.Dashboard;
 using EduCore.Dtos.Mark;
 using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Schedule;
@@ -12,17 +12,15 @@ using EduCore.Services.Statistics.Interfaces;
 
 namespace EduCore.Services;
 
-/// <summary>
-/// Builds the signed-in user's dashboard.
-///
-/// Composed entirely from existing services rather than new queries. That is a deliberate
-/// constraint: every figure here is one a screen elsewhere already shows, so a dashboard and the
-/// page it links to can never disagree — and the aggregates keep going through the statistics
-/// layer, which is where privacy suppression and grading rules live.
-///
-/// It is also one HTTP round trip. The directorate dashboard previously made six parallel calls
-/// from the browser, two of them requesting a single row purely to read a total off the envelope.
-/// </summary>
+// Builds the signed-in user's dashboard.
+//
+// Composed entirely from existing services rather than new queries. That is a deliberate
+// constraint: every figure here is one a screen elsewhere already shows, so a dashboard and the
+// page it links to can never disagree — and the aggregates keep going through the statistics
+// layer, which is where privacy suppression and grading rules live.
+//
+// It is also one HTTP round trip. The directorate dashboard previously made six parallel calls
+// from the browser, two of them requesting a single row purely to read a total off the envelope.
 public class DashboardService(
     ICurrentUser currentUser,
     IStudentService students,

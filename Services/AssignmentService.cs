@@ -7,8 +7,6 @@ using EduCore.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using EduCore.Services.Storage;
-using System.IO;
-using System.Linq;
 
 namespace EduCore.Services.Assignments;
 
@@ -21,9 +19,8 @@ public class AssignmentService(
     IFileStorage storage,
     IOptions<StorageOptions> storageOptions) : IAssignmentService
 {
-    private readonly IAssignmentSubmissionRepository _submissions = submissions;
-    private readonly IFileStorage _storage = storage;
     private readonly StorageOptions _storageOptions = storageOptions.Value;
+
     public async Task<AssignmentDetailsDto> CreateAsync(
         CreateAssignmentRequest request,
         CancellationToken ct)
@@ -77,18 +74,7 @@ public class AssignmentService(
         IFormFile file,
         CancellationToken ct)
     {
-        if (file is null)
-            throw new BusinessException("No file provided.");
-
-        if (file.Length < 1)
-            throw new BusinessException("Empty file provided.");
-
-        if (file.Length > _storageOptions.MaxFileSizeBytes)
-            throw new BusinessException("File is too large.");
-
-        if (_storageOptions.AllowedContentTypes.Length > 0 &&
-            !_storageOptions.AllowedContentTypes.Contains(file.ContentType))
-            throw new BusinessException("Content type not allowed.");
+        _storageOptions.EnsureAccepted(file.Length, file.ContentType);
 
         var assignmentEntity = await assignments.GetByIdAsync(assignmentId, ct);
 
@@ -108,10 +94,10 @@ public class AssignmentService(
         var extension = Path.GetExtension(file.FileName) ?? string.Empty;
 
         await using var stream = file.OpenReadStream();
-        var key = await _storage.SaveAsync(stream, $"assignments/{assignmentId}", extension, ct);
+        var key = await storage.SaveAsync(stream, $"assignments/{assignmentId}", extension, ct);
 
         if (!string.IsNullOrEmpty(assignmentEntity.StorageKey))
-            await _storage.DeleteAsync(assignmentEntity.StorageKey, ct);
+            await storage.DeleteAsync(assignmentEntity.StorageKey, ct);
 
         assignmentEntity.FileName = file.FileName;
         assignmentEntity.ContentType = file.ContentType;
@@ -132,18 +118,7 @@ public class AssignmentService(
     {
         var studentId = currentUser.RequireStudentId();
 
-        if (file is null)
-            throw new BusinessException("No file provided.");
-
-        if (file.Length < 1)
-            throw new BusinessException("Empty file provided.");
-
-        if (file.Length > _storageOptions.MaxFileSizeBytes)
-            throw new BusinessException("File is too large.");
-
-        if (_storageOptions.AllowedContentTypes.Length > 0 &&
-            !_storageOptions.AllowedContentTypes.Contains(file.ContentType))
-            throw new BusinessException("Content type not allowed.");
+        _storageOptions.EnsureAccepted(file.Length, file.ContentType);
 
         var assignment = await assignments.GetByIdAsync(assignmentId, ct);
 
@@ -152,15 +127,15 @@ public class AssignmentService(
 
         await access.EnsureCanViewClassAsync(assignment.ClassId, ct);
 
-        var existing = await _submissions.GetByAssignmentAndStudentAsync(assignmentId, studentId, ct);
+        var existing = await submissions.GetByAssignmentAndStudentAsync(assignmentId, studentId, ct);
 
         var extension = Path.GetExtension(file.FileName) ?? string.Empty;
 
         await using var stream = file.OpenReadStream();
-        var key = await _storage.SaveAsync(stream, $"submissions/{assignmentId}/{studentId}", extension, ct);
+        var key = await storage.SaveAsync(stream, $"submissions/{assignmentId}/{studentId}", extension, ct);
 
         if (existing is not null && !string.IsNullOrEmpty(existing.StorageKey))
-            await _storage.DeleteAsync(existing.StorageKey, ct);
+            await storage.DeleteAsync(existing.StorageKey, ct);
 
         if (existing is null)
         {
@@ -177,7 +152,7 @@ public class AssignmentService(
                 SubmittedAt = DateTimeOffset.UtcNow
             };
 
-            await _submissions.AddAsync(submission);
+            await submissions.AddAsync(submission);
         }
         else
         {
@@ -187,12 +162,12 @@ public class AssignmentService(
             existing.StorageKey = key;
             existing.SubmittedAt = DateTimeOffset.UtcNow;
 
-            _submissions.Update(existing);
+            submissions.Update(existing);
         }
 
-        await _submissions.SaveChangesAsync(ct);
+        await submissions.SaveChangesAsync(ct);
 
-        var dto = await _submissions.GetForStudentAsync(assignmentId, studentId, ct);
+        var dto = await submissions.GetForStudentAsync(assignmentId, studentId, ct);
 
         return dto ?? new AssignmentSubmissionDto(null, assignmentId, studentId, "", "Missing", null, null, null, null, null, null);
     }
@@ -203,7 +178,7 @@ public class AssignmentService(
     {
         var studentId = currentUser.RequireStudentId();
 
-        var dto = await _submissions.GetForStudentAsync(assignmentId, studentId, ct);
+        var dto = await submissions.GetForStudentAsync(assignmentId, studentId, ct);
 
         if (dto is null)
             return new AssignmentSubmissionDto(null, assignmentId, studentId, string.Empty, "Missing", null, null, null, null, null, null);

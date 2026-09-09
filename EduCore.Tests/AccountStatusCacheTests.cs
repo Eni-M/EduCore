@@ -1,4 +1,4 @@
-using EduCore.Models;
+﻿using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
 using Microsoft.Extensions.Caching.Memory;
@@ -6,12 +6,10 @@ using Xunit;
 
 namespace EduCore.Tests;
 
-/// <summary>
-/// The account-status cache sits on the revocation path, so its failure mode is not a slow page
-/// -- it is a deactivated account that keeps working. These cover the two properties that make
-/// caching it safe at all: reads are served without touching the database, and an eviction is
-/// visible immediately rather than after the entry expires.
-/// </summary>
+// The account-status cache sits on the revocation path, so its failure mode is not a slow page
+// -- it is a deactivated account that keeps working. These cover the two properties that make
+// caching it safe at all: reads are served without touching the database, and an eviction is
+// visible immediately rather than after the entry expires.
 public class AccountStatusCacheTests
 {
     private static readonly Guid UserId = Guid.NewGuid();

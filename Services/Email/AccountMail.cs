@@ -1,44 +1,26 @@
-namespace EduCore.Services.Email;
+﻿namespace EduCore.Services.Email;
 
-/// <summary>
-/// Why an account email is being sent. Kept as an enum rather than a pre-rendered message so the
-/// queue carries facts, not prose -- the wording is decided when the mail is actually composed,
-/// and changing it does not require draining anything.
-/// </summary>
+// An enum rather than pre-rendered text, so the queue carries facts and the wording is decided
+// at composition time.
 public enum AccountMailKind
 {
-    /// <summary>An account was created for this person by their school.</summary>
     Welcome,
 
-    /// <summary>The password changed. Sent for every change, whoever made it.</summary>
+    // Sent for every change, whoever made it.
     PasswordChanged
 }
 
-/// <summary>
-/// One queued account email. Carries only what the message needs, copied at the moment of the
-/// write -- never the User entity, which belongs to a DbContext that is disposed long before the
-/// background sender gets to it.
-/// </summary>
+// Copied at the moment of the write, never the User entity -- its DbContext is long disposed by
+// the time the background sender runs.
 public record AccountMailRequest(AccountMailKind Kind, string Email, string FirstName);
 
-/// <summary>
-/// Composes account emails. Pure functions of their input, so the wording -- the part most likely
-/// to be wrong, and the part a non-engineer will want to change -- is testable without a mail
-/// server, a database, or a running application.
-///
-/// No message here contains a password, a token, or a link carrying either. A welcome mail that
-/// shipped credentials would put them in an inbox forever; the reset flow already exists and is
-/// single-use and time-limited, so these point people at it instead.
-/// </summary>
+// Composes account emails as pure functions, so the wording is testable without a mail server.
+// No message carries a password, a token, or a link holding either -- they point at the reset
+// flow, which is single-use and time-limited.
 public static class AccountMailTemplates
 {
-    /// <summary>
-    /// The application's public address, taken from the origin of the password-reset link.
-    ///
-    /// Derived rather than configured separately, because a second setting for the same fact is a
-    /// second setting to forget: the two drift, and the symptom is emails pointing at an address
-    /// nobody can reach. One value, already validated as an absolute URL at start-up.
-    /// </summary>
+    // Derived from the reset link's origin rather than configured twice: two settings for one
+    // fact drift, and the symptom is mail pointing somewhere nobody can reach.
     public static string AppUrlFrom(string resetUrlTemplate) =>
         Uri.TryCreate(resetUrlTemplate, UriKind.Absolute, out var uri)
             ? uri.GetLeftPart(UriPartial.Authority)

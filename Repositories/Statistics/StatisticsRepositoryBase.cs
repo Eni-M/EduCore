@@ -1,4 +1,4 @@
-using EduCore.Dtos.Pagination;
+﻿using EduCore.Dtos.Pagination;
 using EduCore.Helpers;
 using EduCore.Dtos.Statistics;
 using EduCore.Data;
@@ -40,15 +40,13 @@ public abstract class StatisticsRepositoryBase(AppDbContext context)
         return query;
     }
 
-    /// <summary>
-    /// Counts and slices an already-ordered aggregate query in the database.
-    /// </summary>
-    /// <remarks>
-    /// The query must carry its own ORDER BY, and that order must be total — every caller
-    /// here breaks ties on an id. LIMIT/OFFSET over a partial order is free to return rows
-    /// in a different arrangement for each page, which shows some rows twice and hides
-    /// others entirely.
-    /// </remarks>
+    // Counts and slices an already-ordered aggregate query in the database.
+    //
+    //
+    // The query must carry its own ORDER BY, and that order must be total — every caller
+    // here breaks ties on an id. LIMIT/OFFSET over a partial order is free to return rows
+    // in a different arrangement for each page, which shows some rows twice and hides
+    // others entirely.
     protected static async Task<PagedResultDto<T>> PageAsync<T>(
         IQueryable<T> ordered, PaginationQueryDto pagination, CancellationToken ct)
     {

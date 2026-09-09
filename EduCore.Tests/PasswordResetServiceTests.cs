@@ -1,4 +1,4 @@
-using EduCore.Dtos.User;
+﻿using EduCore.Dtos.User;
 using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
@@ -11,11 +11,9 @@ using Xunit;
 
 namespace EduCore.Tests;
 
-/// <summary>
-/// Self-service password reset is an unauthenticated endpoint that can change a password, so
-/// its security properties are the whole feature: it must not reveal who holds an account, the
-/// stored token must be useless to anyone who reads the database, and a link must work once.
-/// </summary>
+// Self-service password reset is an unauthenticated endpoint that can change a password, so
+// its security properties are the whole feature: it must not reveal who holds an account, the
+// stored token must be useless to anyone who reads the database, and a link must work once.
 public class PasswordResetServiceTests
 {
     private const string KnownEmail = "teacher@example.com";

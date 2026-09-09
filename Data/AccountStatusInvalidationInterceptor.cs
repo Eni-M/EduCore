@@ -1,4 +1,4 @@
-using EduCore.Models;
+﻿using EduCore.Models;
 using EduCore.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -6,19 +6,17 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace EduCore.Data;
 
-/// <summary>
-/// Drops a user's cached account status whenever that user row is written.
-///
-/// Deliberately an interceptor rather than a call in each service. Deactivation and password
-/// rotation happen in five different places today (<c>UserService.SetActiveAsync</c>,
-/// <c>ChangePasswordAsync</c>, <c>ResetPasswordAsync</c>, <c>PasswordResetService.ResetAsync</c>
-/// and <c>PlatformOwnerSeeder</c>), and the cost of missing one is a revoked account that keeps
-/// working. Hanging eviction off the write itself means a sixth path added later is covered
-/// without anyone remembering to do it.
-///
-/// Over-eviction is free -- it costs one database read -- so this evicts on any User write,
-/// not only on writes that touched the two fields.
-/// </summary>
+// Drops a user's cached account status whenever that user row is written.
+//
+// Deliberately an interceptor rather than a call in each service. Deactivation and password
+// rotation happen in five different places today (UserService.SetActiveAsync,
+// ChangePasswordAsync, ResetPasswordAsync, PasswordResetService.ResetAsync
+// and PlatformOwnerSeeder), and the cost of missing one is a revoked account that keeps
+// working. Hanging eviction off the write itself means a sixth path added later is covered
+// without anyone remembering to do it.
+//
+// Over-eviction is free -- it costs one database read -- so this evicts on any User write,
+// not only on writes that touched the two fields.
 public class AccountStatusInvalidationInterceptor(IMemoryCache cache) : SaveChangesInterceptor
 {
     // Collected while the change tracker still reports what changed; the entries are Unchanged

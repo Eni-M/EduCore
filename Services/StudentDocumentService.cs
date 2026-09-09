@@ -54,16 +54,7 @@ public class StudentDocumentService(
         if (string.IsNullOrWhiteSpace(title))
             throw new BusinessException("A document needs a title.");
 
-        if (sizeBytes <= 0)
-            throw new BusinessException("The uploaded file is empty.");
-
-        if (sizeBytes > _storage.MaxFileSizeBytes)
-            throw new BusinessException(
-                $"The file is larger than the {_storage.MaxFileSizeBytes / (1024 * 1024)} MB limit.");
-
-        if (_storage.AllowedContentTypes.Length > 0
-            && !_storage.AllowedContentTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase))
-            throw new BusinessException($"Files of type '{contentType}' are not allowed.");
+        _storage.EnsureAccepted(sizeBytes, contentType);
 
         var key = await storage.SaveAsync(
             content, $"{student.SchoolId}/{studentId}", Path.GetExtension(fileName), ct);

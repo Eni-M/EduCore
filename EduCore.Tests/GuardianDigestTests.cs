@@ -1,18 +1,16 @@
-using EduCore.Helpers;
+﻿using EduCore.Helpers;
 using EduCore.Services.Statistics;
 using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace EduCore.Tests;
 
-/// <summary>
-/// The rules behind the guardian weekly summary that do not need a database to be wrong: what a
-/// half-entered mark is called, and how a mark reaches a parent as a number.
-///
-/// The query itself -- who receives one, over what window -- is not covered here. It is a single
-/// EF query over five joined tables, and a fake that answered it would be asserting my own
-/// arithmetic rather than the database's. That is the integration-test gap already on record.
-/// </summary>
+// The rules behind the guardian weekly summary that do not need a database to be wrong: what a
+// half-entered mark is called, and how a mark reaches a parent as a number.
+//
+// The query itself -- who receives one, over what window -- is not covered here. It is a single
+// EF query over five joined tables, and a fake that answered it would be asserting my own
+// arithmetic rather than the database's. That is the integration-test gap already on record.
 public class GuardianDigestTests
 {
     private static GradingCalculator Grading(int passMark = 2) =>

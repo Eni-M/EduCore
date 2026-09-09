@@ -2,32 +2,19 @@ using EduCore.Data;
 
 namespace EduCore.Models;
 
-/// <summary>
-/// Pre-computed statistics for one school over one reporting window.
-///
-/// The overview screens used to derive every figure by fanning out across Students,
-/// Enrollments, Attendances, Marks, Classes and Teachers on each request — around seven
-/// statements for the student block alone, repeated per school. The platform overview did
-/// that for all 80 schools in a loop. This table holds the answers instead, so those screens
-/// read rows rather than recomputing aggregates.
-///
-/// What is stored is the raw aggregate (counts and sums), never the presented figure. Rates,
-/// averages and small-cell suppression are still derived in the service layer on the way out,
-/// so a change to the privacy threshold takes effect immediately instead of being frozen into
-/// every stored row.
-///
-/// Only unfiltered, single-school queries are snapshotted. Narrowing by class, grade, subject
-/// or teacher multiplies the key space far beyond what is worth storing, and those queries
-/// fall through to live computation.
-/// </summary>
+// Pre-computed statistics for one school over one reporting window, so the overview screens
+// read rows instead of fanning out across six tables per request.
+//
+// Raw aggregates only, never presented figures: rates, averages and small-cell suppression are
+// derived on the way out, so a change to the privacy threshold takes effect immediately. Only
+// unfiltered single-school queries are snapshotted; anything narrower computes live.
 public class SchoolStatisticsSnapshot : ISchoolScoped
 {
     public Guid Id { get; set; }
     public Guid SchoolId { get; set; }
 
     // --- Key: which question these numbers answer -------------------------------------
-    // From/To already encode the academic year or grading period the window came from, but
-    // both ids also filter marks directly, so they are part of the identity of the row.
+    // Both ids also filter marks directly, so they are part of the row's identity.
     public DateOnly From { get; set; }
     public DateOnly To { get; set; }
     public Guid? AcademicYearId { get; set; }
@@ -36,9 +23,7 @@ public class SchoolStatisticsSnapshot : ISchoolScoped
     // --- Freshness ---------------------------------------------------------------------
     public DateTime ComputedAt { get; set; }
 
-    // Writes to the tables these figures are drawn from, counted since ComputedAt by
-    // StatisticsInvalidationInterceptor. Compared against a school-size-dependent threshold
-    // to decide when the numbers are worth computing again.
+    // Counted since ComputedAt by StatisticsInvalidationInterceptor; see SnapshotStaleness.
     public int ChangesSinceComputed { get; set; }
 
     // --- Students -----------------------------------------------------------------------
@@ -78,8 +63,7 @@ public class SchoolStatisticsSnapshot : ISchoolScoped
     public int Teachers { get; set; }
     public int Classes { get; set; }
 
-    // Sum and count of classes taught per teacher, so "average classes per teacher" can be
-    // rebuilt without storing the average itself (which would round twice).
+    // Sum and count rather than the average itself, which would round twice.
     public int TeachersWithWorkload { get; set; }
     public int WorkloadClassesSum { get; set; }
 }

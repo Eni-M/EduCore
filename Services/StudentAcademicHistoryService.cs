@@ -1,4 +1,4 @@
-using EduCore.Dtos.StudentHistory;
+﻿using EduCore.Dtos.StudentHistory;
 using EduCore.Exceptions;
 using EduCore.Helpers;
 using EduCore.Models;
@@ -8,15 +8,13 @@ using EduCore.Services.Interfaces;
 
 namespace EduCore.Services;
 
-/// <summary>
-/// Compiles and serves a student's academic history across schools.
-///
-/// The access model in two steps, and the order matters: the caller must be able to see this
-/// student *today* (IAccessGuard, the same check the rest of the student surface uses), and only
-/// then do they see every year on record, including years at schools they have no claim on. That
-/// keeps the table's lack of school scoping from becoming a way to read arbitrary students --
-/// without it, "not school-scoped" would mean any directorate could pull any child in the country.
-/// </summary>
+// Compiles and serves a student's academic history across schools.
+//
+// The access model in two steps, and the order matters: the caller must be able to see this
+// student *today* (IAccessGuard, the same check the rest of the student surface uses), and only
+// then do they see every year on record, including years at schools they have no claim on. That
+// keeps the table's lack of school scoping from becoming a way to read arbitrary students --
+// without it, "not school-scoped" would mean any directorate could pull any child in the country.
 public class StudentAcademicHistoryService(
     IStudentAcademicRecordRepository records,
     IAccessGuard access,

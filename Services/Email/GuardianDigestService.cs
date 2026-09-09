@@ -1,4 +1,4 @@
-using EduCore.Data;
+﻿using EduCore.Data;
 using EduCore.Helpers;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,32 +6,28 @@ namespace EduCore.Services.Email;
 
 public interface IGuardianDigestService
 {
-    /// <summary>
-    /// One email per guardian, covering the seven days ending on <paramref name="today"/>.
-    /// Returns how many were sent, so the caller can log a run that quietly did nothing.
-    /// </summary>
+    // One email per guardian, covering the seven days ending on today.
+    // Returns how many were sent, so the caller can log a run that quietly did nothing.
     Task<int> SendWeeklyAsync(DateOnly today, CancellationToken ct);
 }
 
-/// <summary>
-/// The weekly summary a guardian actually wants: what changed for each of their children in the
-/// last seven days.
-///
-/// Deliberately a digest rather than an email per event. A parent of three children would
-/// otherwise receive dozens of messages a week, and the reliable outcome of that is a filter rule
-/// that hides all of them -- including the one about a failing grade. One message a week is one
-/// somebody reads.
-///
-/// Silence is the design: a guardian whose children had a quiet week gets nothing. A weekly mail
-/// that arrives saying "no changes" trains people to ignore it, which defeats the purpose of the
-/// weeks when there is something to say.
-///
-/// IgnoreQueryFilters throughout, as in ScheduleDigestService and for the same reason: this runs
-/// from a background scope with no signed-in user, so the per-request school filter would match
-/// nothing. It is safe because every row is reached by walking out from a specific guardian's own
-/// links -- a guardian only ever sees children they are linked to, whichever school those are in.
-/// That last part matters here: a guardian may have children at two different schools.
-/// </summary>
+// The weekly summary a guardian actually wants: what changed for each of their children in the
+// last seven days.
+//
+// Deliberately a digest rather than an email per event. A parent of three children would
+// otherwise receive dozens of messages a week, and the reliable outcome of that is a filter rule
+// that hides all of them -- including the one about a failing grade. One message a week is one
+// somebody reads.
+//
+// Silence is the design: a guardian whose children had a quiet week gets nothing. A weekly mail
+// that arrives saying "no changes" trains people to ignore it, which defeats the purpose of the
+// weeks when there is something to say.
+//
+// IgnoreQueryFilters throughout, as in ScheduleDigestService and for the same reason: this runs
+// from a background scope with no signed-in user, so the per-request school filter would match
+// nothing. It is safe because every row is reached by walking out from a specific guardian's own
+// links -- a guardian only ever sees children they are linked to, whichever school those are in.
+// That last part matters here: a guardian may have children at two different schools.
 public class GuardianDigestService(
     AppDbContext db,
     IEmailSender email,

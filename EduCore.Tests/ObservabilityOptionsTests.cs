@@ -1,13 +1,11 @@
-using EduCore.Observability;
+﻿using EduCore.Observability;
 using Xunit;
 
 namespace EduCore.Tests;
 
-/// <summary>
-/// Observability is the thing nobody notices is misconfigured until the moment they need it --
-/// during an incident, when the graphs are empty and the traces went nowhere. The validator turns
-/// each of those into a start-up failure instead.
-/// </summary>
+// Observability is the thing nobody notices is misconfigured until the moment they need it --
+// during an incident, when the graphs are empty and the traces went nowhere. The validator turns
+// each of those into a start-up failure instead.
 public class ObservabilityOptionsTests
 {
     private static (bool Succeeded, string Failures) Validate(ObservabilityOptions options)

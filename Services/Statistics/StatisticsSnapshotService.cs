@@ -1,4 +1,4 @@
-using EduCore.Dtos.Statistics;
+﻿using EduCore.Dtos.Statistics;
 using EduCore.Models;
 using EduCore.Repositories.Statistics.Interfaces;
 using EduCore.Services.Statistics.Interfaces;
@@ -6,14 +6,12 @@ using Microsoft.Extensions.Options;
 
 namespace EduCore.Services.Statistics;
 
-/// <summary>
-/// Reads school statistics from <see cref="SchoolStatisticsSnapshot"/>, recomputing a row when
-/// enough has changed underneath it to be worth the work.
-///
-/// Recomputation happens on the read that finds the row stale. That keeps the numbers correct
-/// by construction — there is no window in which a caller can be handed figures the system
-/// knows are out of date — at the cost of one slow request per threshold crossing.
-/// </summary>
+// Reads school statistics from SchoolStatisticsSnapshot, recomputing a row when
+// enough has changed underneath it to be worth the work.
+//
+// Recomputation happens on the read that finds the row stale. That keeps the numbers correct
+// by construction — there is no window in which a caller can be handed figures the system
+// knows are out of date — at the cost of one slow request per threshold crossing.
 public class StatisticsSnapshotService(
     IStatisticsSnapshotRepository snapshots,
     IStudentStatisticsRepository students,

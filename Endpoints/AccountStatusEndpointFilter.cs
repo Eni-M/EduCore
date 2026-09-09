@@ -3,18 +3,11 @@ using EduCore.Security;
 
 namespace EduCore.Endpoints;
 
-// Revocation gate. A JWT is valid for an hour, so deactivating an account does nothing on
-// its own -- the token keeps verifying until it expires. This re-checks the account on every
-// request so the deactivation takes effect immediately.
+// Revocation gate: a token stays valid for an hour, so deactivation has to be re-checked per
+// request. Reads IAccountStatusCache, not the database.
 //
-// The check reads IAccountStatusCache rather than the database directly. It used to be one
-// SELECT per request against Users, which made it the highest-frequency query in the whole
-// application; the cache is evicted by the write that deactivates an account, so revocation is
-// still immediate rather than merely eventual. See AccountStatusCache.
-//
-// Deliberately does NOT enforce MustChangePassword: this is what /api/auth/me and the
-// password-change endpoint use, and a user who is mid-rotation must still be able to read
-// their own profile and set a new password, or they can never get out of that state.
+// Deliberately does NOT enforce MustChangePassword -- /api/auth/me and the password-change
+// endpoint use this filter, and a user mid-rotation must still be able to get out of that state.
 public class ActiveAccountEndpointFilter(IAccountStatusCache accounts, ICurrentUser currentUser)
     : IEndpointFilter
 {

@@ -1,22 +1,20 @@
-using EduCore.Models;
+﻿using EduCore.Models;
 using EduCore.Services.Email;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace EduCore.Data;
 
-/// <summary>
-/// Queues account emails from the write that causes them.
-///
-/// An interceptor rather than a call in each service, for the same reason
-/// <see cref="AccountStatusInvalidationInterceptor"/> is one: accounts are created in seven
-/// different services today, and a welcome email wired at each of them is a welcome email the
-/// eighth one forgets. Hanging it off the save covers code nobody has written yet.
-///
-/// Only queued after the write commits. A message about a password that was never saved is worse
-/// than no message -- it tells someone their password changed when it did not, and invites them
-/// to report a breach that did not happen.
-/// </summary>
+// Queues account emails from the write that causes them.
+//
+// An interceptor rather than a call in each service, for the same reason
+// AccountStatusInvalidationInterceptor is one: accounts are created in seven
+// different services today, and a welcome email wired at each of them is a welcome email the
+// eighth one forgets. Hanging it off the save covers code nobody has written yet.
+//
+// Only queued after the write commits. A message about a password that was never saved is worse
+// than no message -- it tells someone their password changed when it did not, and invites them
+// to report a breach that did not happen.
 public class AccountMailInterceptor(IAccountMailQueue queue) : SaveChangesInterceptor
 {
     // Collected while the change tracker still reports what changed; entries are Unchanged by the

@@ -1,15 +1,13 @@
-using EduCore.Dtos.Dashboard;
+﻿using EduCore.Dtos.Dashboard;
 using EduCore.Dtos.Statistics;
 using EduCore.Services;
 using Xunit;
 
 namespace EduCore.Tests;
 
-/// <summary>
-/// The judgement calls a dashboard makes: what a figure is rendered as, and whether a user is
-/// told to act on it. One of these decides whether a privacy-suppressed statistic reaches a
-/// screen, which makes it the most security-relevant formatting code in the application.
-/// </summary>
+// The judgement calls a dashboard makes: what a figure is rendered as, and whether a user is
+// told to act on it. One of these decides whether a privacy-suppressed statistic reaches a
+// screen, which makes it the most security-relevant formatting code in the application.
 public class DashboardFormatTests
 {
     private static Measure Rate(double value) => Measure.Of(value, 200);

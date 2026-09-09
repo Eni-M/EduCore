@@ -2,43 +2,21 @@ using EduCore.Enums;
 
 namespace EduCore.Dtos.Dashboard;
 
-/// <summary>
-/// One shape, filled differently per role, rather than six separate response types.
-///
-/// The alternative — a dashboard endpoint per role — would put the same rendering logic in six
-/// front-end components and make "add a figure for teachers" a change in two places. Here the
-/// server decides what a role should see and the client renders whatever it is handed, so a new
-/// figure or a new role is a server change alone.
-///
-/// Every section is optional in practice: a role that has nothing to put in one returns it empty,
-/// and the client omits the section rather than rendering an empty panel.
-/// </summary>
+// One shape filled differently per role, so the client renders what it is handed instead of
+// branching six ways. Sections a role has nothing for come back empty.
 public record DashboardDto(
-    // A string, matching AuthResponseDto. No JsonStringEnumConverter is registered, so an enum
-    // here would reach the client as a number while the role it already holds is a name.
+    // A string, matching AuthResponseDto: no JsonStringEnumConverter is registered, so an enum
+    // would reach the client as a number.
     string Role,
-
-    // What this dashboard is about: the school, the region, or the student's class. Shown under
-    // the greeting so a user with access to several contexts can see which one they are in.
     string? Context,
-
-    // Headline figures. Deliberately few — a dashboard that shows twenty numbers shows none.
     IReadOnlyList<DashboardStatDto> Stats,
 
-    // The part that makes a dashboard worth opening: things that need doing, not things that
-    // happened. Empty is the good state and is rendered as such.
+    // Things that need doing, not things that happened. Empty is the good state.
     IReadOnlyList<DashboardAlertDto> NeedsAttention,
-
-    // Today's lessons, for the roles that teach or attend them.
     IReadOnlyList<DashboardLessonDto> Today,
-
-    // Recent activity relevant to this person specifically.
     IReadOnlyList<DashboardEntryDto> Recent);
 
-/// <summary>
-/// Severity, kept separate from any colour decision. The server says how serious something is;
-/// the client decides what that looks like.
-/// </summary>
+// Severity only; the client decides what it looks like.
 public enum DashboardTone
 {
     Neutral,
@@ -47,12 +25,8 @@ public enum DashboardTone
     Critical
 }
 
-/// <summary>
-/// Value is a string, not a number, on purpose: these are already-formatted figures — "94%",
-/// "4.2", "—" for a figure that is genuinely unknown. Formatting a rate in the client would mean
-/// re-deriving rounding rules that the grading and privacy layers already own, and the two would
-/// eventually disagree.
-/// </summary>
+// Value is already-formatted text ("94%", "4.2", "—"). Formatting in the client would re-derive
+// rounding the grading and privacy layers already own.
 public record DashboardStatDto(string Label, string Value, string? Caption, DashboardTone Tone);
 
 public record DashboardAlertDto(DashboardTone Tone, string Title, string Detail, string? Link);
@@ -63,7 +37,7 @@ public record DashboardLessonDto(
     TimeOnly End,
     string SubjectName,
     string ClassName,
-    // Null on a teacher's own dashboard, where naming the teacher is redundant.
+    // Null on a teacher's own dashboard.
     string? TeacherName);
 
 public record DashboardEntryDto(string Title, string Detail, string? Link);

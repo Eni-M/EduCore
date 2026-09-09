@@ -1,4 +1,4 @@
-using EduCore.Dtos.StudentHistory;
+﻿using EduCore.Dtos.StudentHistory;
 using EduCore.Enums;
 using EduCore.Helpers;
 using EduCore.Repositories.Interfaces;
@@ -11,12 +11,10 @@ using Xunit;
 
 namespace EduCore.Tests;
 
-/// <summary>
-/// A transcript is the one screen that has to keep working after a student leaves, a school is
-/// renamed, and a grading threshold is changed. These cover the properties that follow from that:
-/// history is assembled across schools the caller has no claim on, rebuilding is idempotent, and
-/// pass/fail is derived from the current rules rather than frozen into the stored row.
-/// </summary>
+// A transcript is the one screen that has to keep working after a student leaves, a school is
+// renamed, and a grading threshold is changed. These cover the properties that follow from that:
+// history is assembled across schools the caller has no claim on, rebuilding is idempotent, and
+// pass/fail is derived from the current rules rather than frozen into the stored row.
 public class StudentAcademicHistoryServiceTests
 {
     private static readonly Guid StudentId = Guid.NewGuid();

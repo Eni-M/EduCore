@@ -1,4 +1,4 @@
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using EduCore.Dtos.User;
@@ -24,7 +24,7 @@ public record ProfileScope(
 {
     public static readonly ProfileScope Empty = new([], null, null, null, null, null);
 
-    /// <summary>The single school this profile is pinned to, or null when it spans zero or several.</summary>
+    // The single school this profile is pinned to, or null when it spans zero or several.
     public Guid? SchoolId => SchoolIds.Count == 1 ? SchoolIds[0] : null;
 }
 

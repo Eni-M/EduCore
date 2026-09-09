@@ -1,4 +1,4 @@
-using EduCore.Enums;
+﻿using EduCore.Enums;
 
 namespace EduCore.Security;
 
@@ -7,11 +7,11 @@ public interface ICurrentUser
     Guid UserId { get; }
     UserRole? Role { get; }
 
-    /// <summary>The single school this user is pinned to, or null when they span zero or several.</summary>
+    // The single school this user is pinned to, or null when they span zero or several.
     Guid? SchoolId { get; }
 
-    /// <summary>Every school this user may act within — one entry for most roles, several for a
-    /// guardian with children in more than one school.</summary>
+    // Every school this user may act within — one entry for most roles, several for a
+    // guardian with children in more than one school.
     IReadOnlyCollection<Guid> SchoolIds { get; }
 
     Guid? TeacherId { get; }
