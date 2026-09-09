@@ -3,6 +3,7 @@ using EduCore.Enums;
 using EduCore.Services.Account;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using EduCore.Services.Interfaces;
 
 namespace EduCore.Services.Email;
 

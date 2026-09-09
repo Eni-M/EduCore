@@ -1,7 +1,7 @@
 ﻿using EduCore.Enums;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
-using EduCore.Services.Assignment;
+using EduCore.Services.Assignments;
 using Xunit;
 
 namespace EduCore.Tests;

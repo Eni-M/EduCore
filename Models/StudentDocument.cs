@@ -1,5 +1,6 @@
 using EduCore.Data;
 using EduCore.Enums;
+using EduCore.Services.Interfaces;
 
 namespace EduCore.Models;
 

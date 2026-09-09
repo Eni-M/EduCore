@@ -6,7 +6,7 @@ using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
-using EduCore.Services.Assignment;
+using EduCore.Services.Assignments;
 using EduCore.Services.Interfaces;
 using Microsoft.Extensions.Options;
 using EduCore.Dtos.Pagination;

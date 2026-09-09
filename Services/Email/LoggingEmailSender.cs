@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using EduCore.Services.Interfaces;
 
 namespace EduCore.Services.Email;
 

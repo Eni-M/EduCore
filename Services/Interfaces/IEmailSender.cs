@@ -1,4 +1,6 @@
-namespace EduCore.Services.Email;
+using EduCore.Services.Email;
+
+namespace EduCore.Services.Interfaces;
 
 // The one seam every outgoing email goes through. The transport (SMTP, a provider API, or the
 // logging stub) is chosen in DI, so the rest of the app never depends on how mail is delivered.

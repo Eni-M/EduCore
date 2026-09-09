@@ -1,8 +1,9 @@
 using EduCore.Enums;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
+using EduCore.Services.Interfaces;
 
-namespace EduCore.Services.Assignment;
+namespace EduCore.Services.Assignments;
 
 public class ElementaryAssignmentSync(
     ISchoolRepository schools,

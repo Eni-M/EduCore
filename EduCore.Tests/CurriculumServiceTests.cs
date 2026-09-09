@@ -5,8 +5,9 @@ using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
 using EduCore.Services;
-using EduCore.Services.Assignment;
+using EduCore.Services.Assignments;
 using Xunit;
+using EduCore.Services.Interfaces;
 
 namespace EduCore.Tests;
 

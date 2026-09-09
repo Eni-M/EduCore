@@ -1,4 +1,6 @@
-namespace EduCore.Services.Email;
+using EduCore.Services.Email;
+
+namespace EduCore.Services.Interfaces;
 
 // Builds and sends the scheduled digests. Runs from a background scope, so it queries across all
 // schools (the per-request school filter is bypassed) rather than for one signed-in user.

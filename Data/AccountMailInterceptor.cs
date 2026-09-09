@@ -2,6 +2,7 @@
 using EduCore.Services.Email;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using EduCore.Services.Interfaces;
 
 namespace EduCore.Data;
 

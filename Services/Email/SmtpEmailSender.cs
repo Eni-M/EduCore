@@ -3,6 +3,7 @@ using MailKit.Security;
 using Microsoft.Extensions.Options;
 using MimeKit;
 using MimeKit.Text;
+using EduCore.Services.Interfaces;
 
 namespace EduCore.Services.Email;
 

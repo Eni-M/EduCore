@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 
-namespace EduCore.Services.Assignment;
+namespace EduCore.Services.Assignments;
 
 public class AssignmentOptions
 {

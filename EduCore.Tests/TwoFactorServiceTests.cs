@@ -6,6 +6,7 @@ using EduCore.Services.Account;
 using EduCore.Services.Email;
 using Microsoft.Extensions.Options;
 using Xunit;
+using EduCore.Services.Interfaces;
 
 namespace EduCore.Tests;
 

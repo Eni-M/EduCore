@@ -1,15 +1,7 @@
 using System.Threading.Channels;
+using EduCore.Services.Interfaces;
 
 namespace EduCore.Services.Email;
-
-public interface IAccountMailQueue
-{
-    // Never throws and never blocks: the caller is inside a save, and a bad mail server must
-    // not fail an account creation.
-    void Enqueue(AccountMailRequest request);
-
-    IAsyncEnumerable<AccountMailRequest> ReadAllAsync(CancellationToken ct);
-}
 
 // Hands account mail from the write that causes it to the background sender, keeping the SMTP
 // round trip out of the request. Bounded and drop-oldest, so a stuck sender cannot grow into a

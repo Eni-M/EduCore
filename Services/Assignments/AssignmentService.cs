@@ -46,7 +46,7 @@ public class AssignmentService(
             throw new BusinessException(
                 "The due date must be in the future.");
 
-        var assignment = new global::EduCore.Models.Assignment
+        var assignment = new Assignment
         {
             Id = Guid.NewGuid(),
             SchoolId = currentUser.RequireSchoolId(),

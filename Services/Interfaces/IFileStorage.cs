@@ -1,4 +1,4 @@
-namespace EduCore.Services.Storage;
+namespace EduCore.Services.Interfaces;
 
 // The one seam between a feature that keeps files and where those files actually live. Callers
 // hold only the opaque key returned by SaveAsync; swapping the local implementation for a cloud

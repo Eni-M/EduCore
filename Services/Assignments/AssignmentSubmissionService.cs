@@ -2,6 +2,7 @@
 using EduCore.Exceptions;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
+using EduCore.Services.Interfaces;
 
 namespace EduCore.Services.Assignments;
 

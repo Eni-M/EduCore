@@ -1,6 +1,6 @@
 ﻿using EduCore.Dtos.Assignment;
 
-namespace EduCore.Services.Assignments;
+namespace EduCore.Services.Interfaces;
 
 public interface IAssignmentService
 {

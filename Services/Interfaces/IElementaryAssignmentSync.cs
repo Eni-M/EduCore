@@ -1,4 +1,4 @@
-namespace EduCore.Services.Assignment;
+namespace EduCore.Services.Interfaces;
 
 public interface IElementaryAssignmentSync
 {

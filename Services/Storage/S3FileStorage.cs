@@ -1,6 +1,7 @@
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Options;
+using EduCore.Services.Interfaces;
 
 namespace EduCore.Services.Storage;
 

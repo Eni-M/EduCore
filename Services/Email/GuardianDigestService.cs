@@ -3,15 +3,9 @@ using EduCore.Helpers;
 using EduCore.Services.Account;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using EduCore.Services.Interfaces;
 
 namespace EduCore.Services.Email;
-
-public interface IGuardianDigestService
-{
-    // One email per guardian, covering the seven days ending on today.
-    // Returns how many were sent, so the caller can log a run that quietly did nothing.
-    Task<int> SendWeeklyAsync(DateOnly today, CancellationToken ct);
-}
 
 // The weekly summary a guardian actually wants: what changed for each of their children in the
 // last seven days.
