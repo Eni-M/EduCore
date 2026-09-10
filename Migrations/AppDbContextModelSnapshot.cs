@@ -443,6 +443,54 @@ namespace EduCore.Migrations
                     b.ToTable("ClassSubjectTeachers");
                 });
 
+            modelBuilder.Entity("EduCore.Models.Conversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GuardianId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TeacherId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "SchoolId");
+
+                    b.HasIndex("GuardianId");
+
+                    b.HasIndex("SchoolId", "UpdatedAt");
+
+                    b.HasIndex("StudentId", "SchoolId");
+
+                    b.HasIndex("TeacherId", "SchoolId");
+
+                    b.HasIndex("SchoolId", "StudentId", "GuardianId", "TeacherId")
+                        .IsUnique();
+
+                    b.ToTable("Conversations");
+                });
+
             modelBuilder.Entity("EduCore.Models.Country", b =>
                 {
                     b.Property<Guid>("Id")
@@ -819,6 +867,44 @@ namespace EduCore.Migrations
                     b.HasIndex("ClassSubjectTeacherId", "ClassId", "SubjectId", "TeacherId", "SchoolId");
 
                     b.ToTable("Marks");
+                });
+
+            modelBuilder.Entity("EduCore.Models.Message", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SenderUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SenderUserId");
+
+                    b.HasIndex("ConversationId", "SentAt");
+
+                    b.ToTable("Messages");
                 });
 
             modelBuilder.Entity("EduCore.Models.Notice", b =>
@@ -1926,6 +2012,29 @@ namespace EduCore.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("EduCore.Models.Conversation", b =>
+                {
+                    b.HasOne("EduCore.Models.Guardian", null)
+                        .WithMany()
+                        .HasForeignKey("GuardianId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduCore.Models.Student", null)
+                        .WithMany()
+                        .HasForeignKey("StudentId", "SchoolId")
+                        .HasPrincipalKey("Id", "SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EduCore.Models.Teacher", null)
+                        .WithMany()
+                        .HasForeignKey("TeacherId", "SchoolId")
+                        .HasPrincipalKey("Id", "SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("EduCore.Models.DiaryEntry", b =>
                 {
                     b.HasOne("EduCore.Models.Class", null)
@@ -2074,6 +2183,23 @@ namespace EduCore.Migrations
                         .HasPrincipalKey("Id", "ClassId", "SubjectId", "TeacherId", "SchoolId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("EduCore.Models.Message", b =>
+                {
+                    b.HasOne("EduCore.Models.Conversation", "Conversation")
+                        .WithMany("Messages")
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EduCore.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("SenderUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Conversation");
                 });
 
             modelBuilder.Entity("EduCore.Models.Notice", b =>
@@ -2369,6 +2495,11 @@ namespace EduCore.Migrations
                         .IsRequired();
 
                     b.Navigation("City");
+                });
+
+            modelBuilder.Entity("EduCore.Models.Conversation", b =>
+                {
+                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("EduCore.Models.Country", b =>

@@ -246,6 +246,8 @@ builder.Services.AddScoped<ITeacherStatisticsRepository, TeacherStatisticsReposi
 builder.Services.AddScoped<IDemographicsStatisticsRepository, DemographicsStatisticsRepository>();
 builder.Services.AddScoped<IAssignmentRepository, AssignmentRepository>();
 builder.Services.AddScoped<IAssignmentSubmissionRepository, AssignmentSubmissionRepository>();
+builder.Services.AddScoped<IConversationRepository, ConversationRepository>();
+builder.Services.AddScoped<IMessagingRepository, MessagingRepository>();
 
 builder.Services.AddScoped<IStudentStatisticsService, StudentStatisticsService>();
 builder.Services.AddScoped<IEnrollmentStatisticsService, EnrollmentStatisticsService>();
@@ -257,6 +259,7 @@ builder.Services.AddScoped<IDemographicsStatisticsService, DemographicsStatistic
 builder.Services.AddScoped<IStatisticsOverviewService, StatisticsOverviewService>();
 builder.Services.AddScoped<IAssignmentService, AssignmentService>();
 builder.Services.AddScoped<IAssignmentSubmissionService, AssignmentSubmissionService>();
+builder.Services.AddScoped<IMessagingService, MessagingService>();
 
 builder.Services.AddScoped<IAccessGuard, AccessGuard>();
 builder.Services.AddScoped<IUserService, UserService>();
@@ -615,5 +618,6 @@ api.MapScheduleEndpoints();
 api.MapGuardianEndpoints();
 api.MapAccountTierEndpoints();
 api.MapStatisticsEndpoints();
+api.MapMessagingEndpoints();
 
 app.Run();

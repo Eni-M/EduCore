@@ -32,6 +32,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<StudentDocument> StudentDocuments => Set<StudentDocument>();
     public DbSet<StudentMedicalRecord> StudentMedicalRecords => Set<StudentMedicalRecord>();
     public DbSet<StudentAcademicRecord> StudentAcademicRecords => Set<StudentAcademicRecord>();
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+    public DbSet<Message> Messages => Set<Message>();
     public DbSet<StudentAcademicRecordSubject> StudentAcademicRecordSubjects =>
         Set<StudentAcademicRecordSubject>();
     public DbSet<Notice> Notices => Set<Notice>();
@@ -64,6 +66,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         ConfigureStudentRecords(modelBuilder);
         ConfigureCommunication(modelBuilder);
         ConfigureAssignments(modelBuilder);
+        ConfigureMessaging(modelBuilder);
 
         modelBuilder.Entity<AuditLog>().Property(a => a.Action).HasMaxLength(1000);
         modelBuilder.Entity<AuditLog>().Property(a => a.TraceId).HasMaxLength(200);
@@ -667,8 +670,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         ScopeToSchool<Notification>(modelBuilder);
     }
 
-    
-private void ConfigureAssignments(ModelBuilder modelBuilder)
+
+    private void ConfigureAssignments(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Assignment>()
             .HasAlternateKey(a => new { a.Id, a.SchoolId });
@@ -796,6 +799,103 @@ private void ConfigureAssignments(ModelBuilder modelBuilder)
             .IsRowVersion();
 
         ScopeToSchool<AssignmentSubmission>(modelBuilder);
+    }
+
+    private void ConfigureMessaging(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Conversation>()
+            .HasAlternateKey(c => new
+            {
+                c.Id,
+                c.SchoolId
+            });
+
+        modelBuilder.Entity<Conversation>()
+            .HasOne<Student>()
+            .WithMany()
+            .HasForeignKey(c => new
+            {
+                c.StudentId,
+                c.SchoolId
+            })
+            .HasPrincipalKey(s => new
+            {
+                s.Id,
+                s.SchoolId
+            })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Conversation>()
+            .HasOne<Teacher>()
+            .WithMany()
+            .HasForeignKey(c => new
+            {
+                c.TeacherId,
+                c.SchoolId
+            })
+            .HasPrincipalKey(t => new
+            {
+                t.Id,
+                t.SchoolId
+            })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Conversation>()
+            .HasOne<Guardian>()
+            .WithMany()
+            .HasForeignKey(c => c.GuardianId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Conversation>()
+            .HasIndex(c => new
+            {
+                c.SchoolId,
+                c.StudentId,
+                c.GuardianId,
+                c.TeacherId
+            })
+            .IsUnique();
+
+        modelBuilder.Entity<Conversation>()
+            .HasIndex(c => new
+            {
+                c.SchoolId,
+                c.UpdatedAt
+            });
+
+        modelBuilder.Entity<Conversation>()
+            .Property<uint>("Version")
+            .IsRowVersion();
+
+        ScopeToSchool<Conversation>(modelBuilder);
+
+        modelBuilder.Entity<Message>()
+            .HasOne(m => m.Conversation)
+            .WithMany(c => c.Messages)
+            .HasForeignKey(m => m.ConversationId)
+            .HasPrincipalKey(c => c.Id)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Message>()
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(m => m.SenderUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Message>()
+            .Property(m => m.Content)
+            .HasMaxLength(4000);
+
+        modelBuilder.Entity<Message>()
+            .HasIndex(m => new
+            {
+                m.ConversationId,
+                m.SentAt
+            });
+
+        modelBuilder.Entity<Message>()
+            .Property<uint>("Version")
+            .IsRowVersion();
     }
 
 

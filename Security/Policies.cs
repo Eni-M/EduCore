@@ -17,6 +17,7 @@ public static class Policies
     public const string StatisticsViewer = nameof(StatisticsViewer);
     public const string AnySchoolUser = nameof(AnySchoolUser);
     public const string StudentReadable = nameof(StudentReadable);
+    public const string MessagingUser = nameof(MessagingUser);
 
     public static void AddEduCorePolicies(this AuthorizationOptions options)
     {
@@ -28,6 +29,7 @@ public static class Policies
         Policy(Directorate, UserRole.Directorate);
         Policy(Teacher, UserRole.Teacher);
         Policy(Guardian, UserRole.Guardian);
+        Policy(MessagingUser, UserRole.Guardian, UserRole.Teacher);
 
         Policy(RegionalOrState, UserRole.RegionalAdmin, UserRole.StateAdmin);
         Policy(DirectorateOrTeacher, UserRole.Directorate, UserRole.Teacher);
