@@ -1,4 +1,4 @@
-using EduCore.Dtos.Pagination;
+﻿using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics.Rows;
 using EduCore.Data;
 using EduCore.Dtos.Statistics;
@@ -254,20 +254,22 @@ public class AcademicStatisticsRepository(
     {
         var (page, pageSize) = ListPagination.Normalize(pagination);
 
-        // Same student-level rows as GetAtRiskAsync via the shared builder below.
-        // Ordering is by raw average — Math.Round applies only when projecting DTOs,
-        // exactly as GetAtRiskAsync does — tie-broken by student id so LIMIT/OFFSET
-        // pages are deterministic.
+        // Same student-level rows as GetAtRiskAsync via the shared builder below, which
+        // carries the ordering: by raw average, tie-broken by student id so LIMIT/OFFSET
+        // pages are deterministic. Math.Round applies only when projecting DTOs, exactly
+        // as GetAtRiskAsync does.
         var matches = AtRiskAverages(ctx);
 
-        var totalCount = await matches.CountAsync(ct);
-
+        // The page before the count, deliberately. Both run either way, and this is the
+        // query with the GROUP BY, the HAVING and the ORDER BY -- compiling it first means
+        // a translation problem surfaces here rather than behind a COUNT that would have
+        // translated fine on its own.
         var items = await matches
-            .OrderBy(x => x.Average)
-            .ThenBy(x => x.StudentId)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
+
+        var totalCount = await matches.CountAsync(ct);
 
         return new PagedResultDto<AtRiskStudentDto>(
             items.Select(r => new AtRiskStudentDto(
@@ -315,6 +317,12 @@ public class AcademicStatisticsRepository(
                    }
                into g
                where g.Average() < atRiskUpper
+               // Ordered over the group, not over the projected record. EF can put
+               // AVG(...) in an ORDER BY beside its GROUP BY, but it cannot map a
+               // property of the projected record back to the aggregate it came from --
+               // ordering after the projection is what made this query untranslatable
+               // and the endpoint return 500.
+               orderby g.Average(), g.Key.Id
                select new AtRiskAverage(
                    g.Key.Id,
                    g.Key.FirstName,
