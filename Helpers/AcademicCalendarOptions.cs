@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 
 namespace EduCore.Helpers;
 
@@ -9,6 +9,13 @@ public class AcademicCalendarOptions
     public string FirstPeriodEnd { get; set; } = "12-26";
 
     public string SecondPeriodStart { get; set; } = "01-07";
+
+    // How far from today an academic year is allowed to start. One year back covers correcting
+    // the year just gone; one forward covers preparing the next. Anything outside that is a
+    // typo -- which is how a year named 2026/2027 came to start on 2023-01-01.
+    public int EarliestStartYearsAgo { get; set; } = 1;
+
+    public int LatestStartYearsAhead { get; set; } = 1;
 }
 
 public readonly record struct MonthDay(int Month, int Day)
@@ -39,6 +46,14 @@ public class AcademicCalendarOptionsValidator : IValidateOptions<AcademicCalenda
         if (!MonthDay.TryParse(options.SecondPeriodStart, out _))
             return ValidateOptionsResult.Fail(
                 $"AcademicCalendar:SecondPeriodStart ('{options.SecondPeriodStart}') must be in MM-dd format.");
+
+        if (options.EarliestStartYearsAgo < 0)
+            return ValidateOptionsResult.Fail(
+                $"AcademicCalendar:EarliestStartYearsAgo ({options.EarliestStartYearsAgo}) cannot be negative.");
+
+        if (options.LatestStartYearsAhead < 0)
+            return ValidateOptionsResult.Fail(
+                $"AcademicCalendar:LatestStartYearsAhead ({options.LatestStartYearsAhead}) cannot be negative.");
 
         return ValidateOptionsResult.Success;
     }

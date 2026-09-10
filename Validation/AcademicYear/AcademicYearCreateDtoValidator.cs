@@ -1,6 +1,8 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using EduCore.Dtos.AcademicYear;
+using EduCore.Helpers;
 using FluentValidation;
+using Microsoft.Extensions.Options;
 
 namespace EduCore.Validation.AcademicYear;
 
@@ -15,8 +17,10 @@ public partial class AcademicYearCreateDtoValidator : AbstractValidator<Academic
     [GeneratedRegex(@"^20\d{2}(/20\d{2})?$")]
     private static partial Regex NamePattern();
 
-    public AcademicYearCreateDtoValidator()
+    public AcademicYearCreateDtoValidator(IOptions<AcademicCalendarOptions> calendar)
     {
+        var window = calendar.Value;
+
         RuleFor(x => x.Name)
             .NotEmpty()
             .MaximumLength(50)
@@ -24,6 +28,19 @@ public partial class AcademicYearCreateDtoValidator : AbstractValidator<Academic
             .WithMessage("An academic year is named like 2026 or 2026/2027.");
 
         RuleFor(x => x.EndDate).GreaterThan(x => x.StartDate);
+
+        // Matching the dates is not enough on its own: "2023/2024" with dates to match is
+        // internally consistent and still nonsense to be creating in 2026. A year starts within
+        // reach of today -- see AcademicCalendar:EarliestStartYearsAgo / LatestStartYearsAhead.
+        RuleFor(x => x.StartDate)
+            .Must(start =>
+            {
+                var thisYear = DateTime.UtcNow.Year;
+
+                return start.Year >= thisYear - window.EarliestStartYearsAgo
+                       && start.Year <= thisYear + window.LatestStartYearsAhead;
+            })
+            .WithMessage("An academic year must start close to the current one.");
 
         RuleFor(x => x.Name)
             .Must((dto, name) => NameAgreesWithDates(name, dto.StartDate, dto.EndDate))
