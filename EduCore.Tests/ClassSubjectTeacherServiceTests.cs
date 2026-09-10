@@ -137,7 +137,7 @@ public class ClassSubjectTeacherServiceTests
         public Task<EduCore.Dtos.ClassSubjectTeacher.ClassSubjectTeacherListDto?> GetDtoAsync(
             Guid assignmentId, CancellationToken ct) =>
             Task.FromResult<EduCore.Dtos.ClassSubjectTeacher.ClassSubjectTeacherListDto?>(
-                new(assignmentId, ClassId, "10A", SubjectId, "Mathematics", TeacherId, "A Teacher", null));
+                new(assignmentId, ClassId, "10A", SubjectId, "Mathematics", TeacherId, Guid.NewGuid(), "A Teacher", true, null));
         public Task<ClassSubjectTeacher?> GetByIdAsync(Guid id, CancellationToken ct) => Task.FromResult<ClassSubjectTeacher?>(null);
         public Task AddAsync(ClassSubjectTeacher entity) { Added = entity; return Task.CompletedTask; }
         public void Update(ClassSubjectTeacher entity) { }

@@ -15,6 +15,10 @@ public class TeacherRepository(AppDbContext context) : Repository<Teacher>(conte
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(t => t.UserId == userId, ct);
 
+    public async Task<bool> IsActiveAsync(Guid teacherId, CancellationToken ct) =>
+        await _context.Teachers
+            .AnyAsync(t => t.Id == teacherId && t.User.DeactivatedAt == null, ct);
+
     public async Task<Teacher?> GetWithSubjectsAsync(Guid teacherId, CancellationToken ct) =>
         await _context.Teachers
             .AsNoTracking()

@@ -78,7 +78,7 @@ public class ListScopingTests
     }
 
     private static ClassSubjectTeacherListDto Assignment(Guid classId, Guid subjectId, string subjectName) =>
-        new(Guid.NewGuid(), classId, "10A", subjectId, subjectName, TeacherId, "A Teacher", null);
+        new(Guid.NewGuid(), classId, "10A", subjectId, subjectName, TeacherId, Guid.NewGuid(), "A Teacher", true, null);
 
     private sealed class FakeAssignmentRepository : IClassSubjectTeacherRepository
     {

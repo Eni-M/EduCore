@@ -11,6 +11,9 @@ public interface ITeacherRepository : IRepository<Teacher>
         Guid? subjectId, PaginationQueryDto pagination, string? search, CancellationToken ct);
 
     Task<Teacher?> GetByUserIdAsync(Guid userId, CancellationToken ct);
+
+    // False when the teacher does not exist or their account has been deactivated.
+    Task<bool> IsActiveAsync(Guid teacherId, CancellationToken ct);
     Task<Teacher?> GetWithSubjectsAsync(Guid teacherId, CancellationToken ct);
     Task<IEnumerable<Teacher>> GetAllWithUserAsync(CancellationToken ct);
     Task<IEnumerable<Teacher>> GetBySubjectAsync(Guid subjectId, CancellationToken ct);

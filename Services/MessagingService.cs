@@ -12,6 +12,7 @@ public class MessagingService(
     IMessagingRepository messages,
     IGuardianRepository guardians,
     IStudentRepository students,
+    ITeacherRepository teachers,
     IClassSubjectTeacherRepository assignments,
     IEnrollmentRepository enrollments,
     ICurrentUser currentUser) : IMessagingService
@@ -215,6 +216,12 @@ public class MessagingService(
             throw new ForbiddenException(
                 "The teacher does not teach this student's class.");
         }
+
+        // A deactivated teacher can never read the conversation, so starting one is a dead end.
+        // The picker hides them; this refuses a request that reaches the API anyway.
+        if (!await teachers.IsActiveAsync(dto.TeacherId, ct))
+            throw new ForbiddenException(
+                "That teacher's account is no longer active.");
     }
 
     private async Task<Guid> GetStudentSchoolIdAsync(

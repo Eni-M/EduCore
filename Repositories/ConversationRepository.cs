@@ -70,9 +70,11 @@ public class ConversationRepository(AppDbContext context)
                 tu.Id,
                 tu.FirstName + " " + tu.LastName,
                 c.UpdatedAt,
+                // Unread, from the guardian's side, is the teacher's messages they have not
+                // opened -- not their own. == tu.Id, not !=.
                 _context.Messages.Count(m =>
                     m.ConversationId == c.Id &&
-                    m.SenderUserId != tu.Id &&
+                    m.SenderUserId == tu.Id &&
                     m.ReadAt == null))
         )
         .ToListAsync(ct);
@@ -98,9 +100,10 @@ public class ConversationRepository(AppDbContext context)
                 gu.Id,
                 gu.FirstName + " " + gu.LastName,
                 c.UpdatedAt,
+                // Likewise the teacher's unread is the guardian's messages, not the teacher's.
                 _context.Messages.Count(m =>
                     m.ConversationId == c.Id &&
-                    m.SenderUserId != gu.Id &&
+                    m.SenderUserId == gu.Id &&
                     m.ReadAt == null))
         )
         .ToListAsync(ct);

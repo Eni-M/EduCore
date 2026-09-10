@@ -1,4 +1,4 @@
-using EduCore.Data;
+﻿using EduCore.Data;
 using EduCore.Dtos.ClassSubjectTeacher;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
@@ -22,7 +22,9 @@ public class ClassSubjectTeacherRepository(AppDbContext context)
             cst.SubjectId,
             s.Name,
             cst.TeacherId,
+            u.Id,
             u.FirstName + " " + u.LastName,
+            u.DeactivatedAt == null,
             cst.EndedOn);
 
     public async Task<ClassSubjectTeacherListDto?> GetDtoAsync(Guid assignmentId, CancellationToken ct) =>
