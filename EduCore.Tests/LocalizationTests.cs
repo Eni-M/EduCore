@@ -139,8 +139,12 @@ public class LocalizationTests
 
         var thrown = new HashSet<string>();
 
+        // \s* after the parenthesis: a throw whose message sits on the next line is the same
+        // throw, and without this the check silently skips every one of them -- which is how a
+        // whole service's worth of untranslated messages got past it.
         var literal = new Regex(
-            @"(?:BusinessException|NotFoundException|ForbiddenException|UnauthorizedException|ConflictException)\(""([^""]+)""\)");
+            @"(?:BusinessException|NotFoundException|ForbiddenException|UnauthorizedException|ConflictException)\(\s*""([^""]+)""\s*\)",
+            RegexOptions.Singleline);
         var validation = new Regex(@"WithMessage\(""([^""]+)""\)");
 
         foreach (var folder in new[] { "Services", "Endpoints", "Security", "Repositories", "Data", "Validation" })

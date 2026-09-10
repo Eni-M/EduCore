@@ -12,7 +12,6 @@ public class MessagingService(
     IMessagingRepository messages,
     IGuardianRepository guardians,
     IStudentRepository students,
-    ITeacherRepository teachers,
     IClassSubjectTeacherRepository assignments,
     IEnrollmentRepository enrollments,
     ICurrentUser currentUser) : IMessagingService
