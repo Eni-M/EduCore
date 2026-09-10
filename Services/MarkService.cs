@@ -1,4 +1,4 @@
-using EduCore.Dtos.Mark;
+﻿using EduCore.Dtos.Mark;
 using EduCore.Exceptions;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
@@ -12,6 +12,7 @@ public class MarkService(
     IEnrollmentRepository enrollments,
     IClassRepository classes,
     IGradingPeriodRepository gradingPeriods,
+    IAcademicYearRepository academicYears,
     IClassSubjectTeacherRepository assignments,
     IAccessGuard access,
     ICurrentUser currentUser) : IMarkService
@@ -56,9 +57,7 @@ public class MarkService(
               ?? throw new NotFoundException("Grading period", explicitPeriodId)
             : await gradingPeriods.GetContainingAsync(
                   @class.AcademicYearId, DateOnly.FromDateTime(DateTime.UtcNow), ct)
-              ?? throw new BusinessException(
-                  "Today does not fall inside any term of this class's academic year. "
-                  + "Name the term explicitly, or add one covering today.");
+              ?? throw new BusinessException(await NoTermCoversTodayAsync(@class.AcademicYearId, ct));
 
         if (gradingPeriod.AcademicYearId != @class.AcademicYearId)
             throw new BusinessException("That grading period belongs to a different academic year than this class.");
@@ -97,5 +96,20 @@ public class MarkService(
 
         return await marks.GetDtoAsync(mark.Id, ct)
                ?? throw new NotFoundException("Mark", mark.Id);
+    }
+
+    // The old wording said only that today was outside every term, which left a teacher with
+    // nothing to act on. Naming the year and its range makes the usual cause -- a year whose
+    // dates do not match its name -- visible from the message itself.
+    private async Task<string> NoTermCoversTodayAsync(Guid academicYearId, CancellationToken ct)
+    {
+        var year = await academicYears.GetByIdAcrossSchoolsAsync(academicYearId, ct);
+
+        var which = year is null
+            ? "this class's academic year"
+            : $"academic year {year.Name} ({year.StartDate:yyyy-MM-dd} to {year.EndDate:yyyy-MM-dd})";
+
+        return $"Today is not inside any term of {which}. "
+               + "Name the term explicitly, or correct the year's dates.";
     }
 }
