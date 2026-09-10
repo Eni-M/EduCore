@@ -1,6 +1,7 @@
 ﻿using EduCore.Models;
 using EduCore.Services.Email;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using EduCore.Services.Interfaces;
 
@@ -84,10 +85,7 @@ public class AccountMailInterceptor(IAccountMailQueue queue) : SaveChangesInterc
                         AccountMailKind.Welcome, user.Email, user.FirstName));
                     break;
 
-                // The hash is what actually changed; MustChangePassword moves for other reasons,
-                // and comparing the plaintext is impossible by design.
-                case EntityState.Modified
-                    when entry.Property(nameof(User.PasswordHash)).IsModified:
+                case EntityState.Modified when PasswordWasReplaced(entry):
                     requests.Add(new AccountMailRequest(
                         AccountMailKind.PasswordChanged, user.Email, user.FirstName));
                     break;
@@ -96,6 +94,21 @@ public class AccountMailInterceptor(IAccountMailQueue queue) : SaveChangesInterc
 
         if (requests.Count > 0)
             _pending[context] = requests;
+    }
+
+    // The hash is what actually changed; MustChangePassword and TwoFactorEnabled move for other
+    // reasons, and comparing the plaintext is impossible by design.
+    //
+    // IsModified alone is not enough: DbSet.Update marks every property modified whether or not
+    // its value moved, so any service that saves a user that way -- switching two-step sign-in
+    // on, say -- would otherwise tell them their password had changed. Compare the values.
+    private static bool PasswordWasReplaced(EntityEntry<User> entry)
+    {
+        var hash = entry.Property(nameof(User.PasswordHash));
+
+        return hash.IsModified
+               && !string.Equals(
+                   hash.OriginalValue as string, hash.CurrentValue as string, StringComparison.Ordinal);
     }
 
     private void Flush(DbContext? context)
