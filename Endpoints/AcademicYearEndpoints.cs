@@ -1,4 +1,4 @@
-using EduCore.Dtos.AcademicYear;
+﻿using EduCore.Dtos.AcademicYear;
 using EduCore.Dtos.GradingPeriod;
 using EduCore.Dtos.Pagination;
 using EduCore.Helpers;
@@ -32,6 +32,12 @@ public static class AcademicYearEndpoints
                 var year = await service.CreateAsync(dto, ct);
                 return Results.Created($"/api/academic-years/{year.Id}", year);
             })
+            .RequireAuthorization(Policies.Directorate);
+
+        group.MapPut("/{academicYearId:guid}",
+                async (Guid academicYearId, AcademicYearCreateDto dto,
+                    IAcademicYearService service, CancellationToken ct) =>
+                    Results.Ok(await service.UpdateAsync(academicYearId, dto, ct)))
             .RequireAuthorization(Policies.Directorate);
 
         group.MapGet("/{academicYearId:guid}/grading-periods",

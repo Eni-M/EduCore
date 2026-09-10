@@ -1,4 +1,4 @@
-using EduCore.Dtos.AcademicYear;
+﻿using EduCore.Dtos.AcademicYear;
 using EduCore.Dtos.GradingPeriod;
 using EduCore.Dtos.Pagination;
 
@@ -12,6 +12,9 @@ public interface IAcademicYearService
     Task<AcademicYearListDto> GetByIdAsync(Guid academicYearId, CancellationToken ct);
 
     Task<AcademicYearListDto> CreateAsync(AcademicYearCreateDto dto, CancellationToken ct);
+
+    Task<AcademicYearListDto> UpdateAsync(
+        Guid academicYearId, AcademicYearCreateDto dto, CancellationToken ct);
 
     Task<IEnumerable<GradingPeriodListDto>> GetGradingPeriodsAsync(Guid academicYearId, CancellationToken ct);
     Task<GradingPeriodListDto> EditGradingPeriodAsync(

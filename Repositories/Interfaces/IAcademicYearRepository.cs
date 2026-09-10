@@ -1,4 +1,4 @@
-using EduCore.Dtos.AcademicYear;
+﻿using EduCore.Dtos.AcademicYear;
 using EduCore.Models;
 
 namespace EduCore.Repositories.Interfaces;
@@ -7,9 +7,13 @@ public interface IAcademicYearRepository : IRepository<AcademicYear>
 {
     Task<IEnumerable<AcademicYear>> GetAllOrderedAsync(CancellationToken ct);
 
-    Task<IEnumerable<AcademicYearListDto>> GetAllAcrossSchoolsAsync(Guid? schoolId, CancellationToken ct);
-    Task<bool> NameExistsAsync(string name, CancellationToken ct);
-    Task<bool> OverlapsAsync(DateOnly startDate, DateOnly endDate, CancellationToken ct);
+    Task<IEnumerable<AcademicYearListDto>> GetAllAcrossSchoolsAsync(
+        Guid? schoolId, Guid? cityId, CancellationToken ct);
+
+    Task<bool> NameExistsAsync(string name, Guid? exceptId, CancellationToken ct);
+
+    Task<bool> OverlapsAsync(
+        DateOnly startDate, DateOnly endDate, Guid? exceptId, CancellationToken ct);
 
     Task<AcademicYear?> GetCurrentAsync(Guid schoolId, DateOnly onDate, CancellationToken ct);
 

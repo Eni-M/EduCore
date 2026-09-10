@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using EduCore.Dtos.AcademicYear;
 using EduCore.Dtos.GradingPeriod;
 using EduCore.Dtos.Pagination;
@@ -18,8 +18,20 @@ public class AcademicYearService(
     ICurrentUser currentUser,
     IMapper mapper) : IAcademicYearService
 {
-    public async Task<IEnumerable<AcademicYearListDto>> GetAllAsync(Guid? schoolId, CancellationToken ct) =>
-        mapper.Map<IEnumerable<AcademicYearListDto>>(await academicYears.GetAllOrderedAsync(ct));
+    public async Task<IEnumerable<AcademicYearListDto>> GetAllAsync(Guid? schoolId, CancellationToken ct)
+    {
+        // Neither the ministry nor a regional admin carries a school_id claim, and the school
+        // scope filter is "SchoolIds contains this row's school" -- so the ordinary listing
+        // returns nothing at all for them, and the schoolId they asked to filter by was being
+        // dropped on the floor. They read across schools instead.
+        if (currentUser.IsStateAdmin || currentUser.IsRegionalAdmin)
+            return await academicYears.GetAllAcrossSchoolsAsync(
+                schoolId,
+                currentUser.IsRegionalAdmin ? currentUser.RequireCityId() : null,
+                ct);
+
+        return mapper.Map<IEnumerable<AcademicYearListDto>>(await academicYears.GetAllOrderedAsync(ct));
+    }
 
     public async Task<PagedResultDto<AcademicYearListDto>> GetPagedAsync(
         Guid? schoolId, PaginationQueryDto pagination, string? search, CancellationToken ct)
@@ -34,10 +46,10 @@ public class AcademicYearService(
 
     public async Task<AcademicYearListDto> CreateAsync(AcademicYearCreateDto dto, CancellationToken ct)
     {
-        if (await academicYears.NameExistsAsync(dto.Name, ct))
+        if (await academicYears.NameExistsAsync(dto.Name, null, ct))
             throw new ConflictException($"An academic year named {dto.Name} already exists in this school.");
 
-        if (await academicYears.OverlapsAsync(dto.StartDate, dto.EndDate, ct))
+        if (await academicYears.OverlapsAsync(dto.StartDate, dto.EndDate, null, ct))
             throw new ConflictException("This academic year overlaps an existing one.");
 
         var academicYear = mapper.Map<AcademicYear>(dto);
@@ -66,6 +78,42 @@ public class AcademicYearService(
             EndDate = secondEnd
         });
 
+        await academicYears.SaveChangesAsync(ct);
+
+        return mapper.Map<AcademicYearListDto>(academicYear);
+    }
+
+    public async Task<AcademicYearListDto> UpdateAsync(
+        Guid academicYearId, AcademicYearCreateDto dto, CancellationToken ct)
+    {
+        var academicYear = await GetOwnedYearAsync(academicYearId, ct);
+
+        if (await academicYears.NameExistsAsync(dto.Name, academicYearId, ct))
+            throw new ConflictException($"An academic year named {dto.Name} already exists in this school.");
+
+        if (await academicYears.OverlapsAsync(dto.StartDate, dto.EndDate, academicYearId, ct))
+            throw new ConflictException("This academic year overlaps an existing one.");
+
+        // Terms are dated inside their year. Shrinking the year out from under one would leave
+        // marks sitting in a term that no longer belongs to any year, so it is refused here
+        // rather than silently corrected -- move the terms first.
+        var periods = (await gradingPeriods.GetByAcademicYearAsync(academicYearId, ct)).ToList();
+
+        var stranded = periods
+            .Where(p => p.StartDate < dto.StartDate || p.EndDate > dto.EndDate)
+            .Select(p => p.Name)
+            .ToList();
+
+        if (stranded.Count > 0)
+            throw new BusinessException(
+                $"These terms would fall outside the year: {string.Join(", ", stranded)}. " +
+                "Move them first, then change the year.");
+
+        academicYear.Name = dto.Name;
+        academicYear.StartDate = dto.StartDate;
+        academicYear.EndDate = dto.EndDate;
+
+        academicYears.Update(academicYear);
         await academicYears.SaveChangesAsync(ct);
 
         return mapper.Map<AcademicYearListDto>(academicYear);
