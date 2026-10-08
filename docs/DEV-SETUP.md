@@ -38,8 +38,8 @@ your-folder/
 ```
 
 ```bash
-git clone https://github.com/EniMirenaCacttus/EduCore.git
-git clone https://github.com/EniMirenaCacttus/EduCoreFront.git
+git clone https://github.com/Eni-M/EduCore.git
+git clone https://github.com/Eni-M/EduCoreFront.git
 ```
 
 ## 3. Create the backend `.env`

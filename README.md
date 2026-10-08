@@ -1,65 +1,53 @@
 # EduCore
 
-[![CI](https://github.com/EniMirenaCacttus/EduCore/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EniMirenaCacttus/EduCore/actions/workflows/ci.yml?query=branch%3Amain)
+[![CI](https://github.com/Eni-M/EduCore/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Eni-M/EduCore/actions/workflows/ci.yml?query=branch%3Amain)
 
-School management platform — REST API (.NET) with a React front end and PostgreSQL.
+A school management platform for a national education system — from the ministry down to a
+single classroom. REST API in .NET 10, React front end, PostgreSQL.
 
-## Run it (Docker)
+**Live demo:** [edu-core-front.vercel.app](https://edu-core-front.vercel.app)
 
-The two repositories must sit side by side:
+## What it does
 
-```
-parent/
-  EduCore/        # this repo (API + compose)
-  EduCoreFront/   # the web front end
-```
+- **Six roles, one hierarchy.** State admin → regional admin → school directorate →
+  teachers and students, with guardians alongside. Each tier creates and manages the one below
+  it, and sees only its own state, city or school.
+- **School life.** Classes, subjects, curriculum, timetables and shifts, lessons, attendance,
+  marks, homework with submissions, a school calendar and notices.
+- **Student records.** Schooling history, documents, medical notes and academic history.
+- **Communication.** Teacher–guardian messaging and in-app notifications.
+- **Statistics.** Enrollment, attendance, academic results, demographics, class capacity and
+  at-risk students, filterable by city, zone, school and academic year.
+- **Role-aware dashboards** behind a single endpoint.
 
-From `EduCore/`:
+## Security
 
-```bash
-cp .env.example .env
-# edit .env: set Jwt__Key, Encryption__Key, POSTGRES_PASSWORD, and (first run only) SuperAdmin__Email / SuperAdmin__Password
-```
+- JWT authentication, role-based policies, double-submit CSRF protection.
+- School isolation enforced twice: EF query filters on reads, a save interceptor on writes.
+- National identifiers encrypted at rest (AES-256), still searchable by exact match.
+- Rate limiting per user, stricter on login and password reset.
+- Immediate account revocation, with no wait for token expiry.
 
-The stack is served over HTTPS, so nginx needs a certificate at `certs/fullchain.pem`
-and `certs/privkey.pem`. For local use, generate a self-signed one:
+## Stack
 
-```bash
-mkdir -p certs && openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
-  -keyout certs/privkey.pem -out certs/fullchain.pem \
-  -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
-```
+| | |
+| --- | --- |
+| API | .NET 10 minimal APIs, EF Core, FluentValidation, AutoMapper |
+| Database | PostgreSQL |
+| Front end | React, TypeScript, Vite |
+| Files & email | S3-compatible storage, MailKit |
+| Observability | OpenTelemetry, Prometheus |
+| Delivery | Docker Compose, nginx (HTTPS), GitHub Actions CI |
 
-On Git Bash for Windows, prefix that command with `MSYS_NO_PATHCONV=1` — otherwise Git
-Bash rewrites `/CN=localhost` into a Windows path and openssl rejects the subject.
-
-```bash
-docker compose up -d --build
-```
-
-Open **https://localhost:8443** and sign in with the `SuperAdmin` account. The browser
-warns once about the self-signed certificate; accept it for local use. Port 8080 still
-answers, but only to redirect to 8443. The database schema is created automatically on
-start.
-
-For anything public, replace `certs/` with a real certificate for your domain, set
-`PUBLIC_ORIGIN` to that domain in `.env`, and set `HSTS_MAX_AGE=31536000`. `certs/` is
-gitignored — the private key never goes in the repository.
-
-## Local development
-
-```bash
-docker compose up -d db     # Postgres only
-dotnet run                  # API — needs Jwt__Key, Encryption__Key and ConnectionStrings__Default in .env
-```
-
-Run the front end from `../EduCoreFront` with `npm run dev`.
-
-Tests: `dotnet run --project EduCore.Tests/EduCore.Tests.csproj`
+435 automated tests cover the business rules, validation and statistics queries.
 
 ## Documentation
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how the system is put together
-- [docs/DEV-SETUP.md](docs/DEV-SETUP.md) — getting a working local environment
-- [docs/EXPLICIT_MIGRATIONS.md](docs/EXPLICIT_MIGRATIONS.md) — the migration workflow
-- [docs/OPTIMISATION-PLAN.md](docs/OPTIMISATION-PLAN.md) — what to speed up next, and what to leave alone
+- [Architecture](docs/ARCHITECTURE.md): how the system is put together
+- [Developer setup](docs/DEV-SETUP.md): running it locally
+- [Migrations](docs/EXPLICIT_MIGRATIONS.md): the database migration workflow
+
+## License
+
+Copyright (c) 2026 Eni Mirena. All rights reserved. The source is published for viewing only.
+No permission is granted to copy, modify, distribute or use it. See [LICENSE](LICENSE).
