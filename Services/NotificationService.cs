@@ -1,4 +1,5 @@
 using EduCore.Dtos.Notification;
+using EduCore.Dtos.Pagination;
 using EduCore.Enums;
 using EduCore.Exceptions;
 using EduCore.Models;
@@ -10,7 +11,8 @@ namespace EduCore.Services;
 
 public class NotificationService(
     INotificationRepository notifications,
-    ICurrentUser currentUser) : INotificationService
+    ICurrentUser currentUser,
+    NotificationSignals signals) : INotificationService
 {
     public async Task NotifyRoleAsync(
         Guid schoolId, UserRole role, string message, string? link, CancellationToken ct)
@@ -25,21 +27,21 @@ public class NotificationService(
         });
 
         await notifications.SaveChangesAsync(ct);
+        signals.Changed(schoolId, role);
     }
 
-    public async Task<IEnumerable<NotificationDto>> GetMineAsync(bool unreadOnly, CancellationToken ct)
+    public async Task<PagedResultDto<NotificationDto>> GetMineAsync(
+        bool unreadOnly, PaginationQueryDto pagination, CancellationToken ct)
     {
-        var role = currentUser.Role ?? throw new ForbiddenException("You have no role.");
+        var page = await notifications.GetPagedForRoleAsync(RequireRole(), unreadOnly, pagination, ct);
 
-        return (await notifications.GetForRoleAsync(role, unreadOnly, ct))
-            .Select(n => new NotificationDto(n.Id, n.Message, n.Link, n.CreatedAt, n.ReadAt));
+        return new PagedResultDto<NotificationDto>(
+            page.Items.Select(n => new NotificationDto(n.Id, n.Message, n.Link, n.CreatedAt, n.ReadAt)).ToList(),
+            page.Page, page.PageSize, page.TotalCount);
     }
 
-    public async Task<int> GetUnreadCountAsync(CancellationToken ct)
-    {
-        var role = currentUser.Role ?? throw new ForbiddenException("You have no role.");
-        return await notifications.CountUnreadForRoleAsync(role, ct);
-    }
+    public async Task<int> GetUnreadCountAsync(CancellationToken ct) =>
+        await notifications.CountUnreadForRoleAsync(RequireRole(), ct);
 
     public async Task MarkReadAsync(Guid id, CancellationToken ct)
     {
@@ -52,5 +54,17 @@ public class NotificationService(
         notification.ReadAt = DateTime.UtcNow;
         notifications.Update(notification);
         await notifications.SaveChangesAsync(ct);
+        signals.Changed(notification.SchoolId, notification.RecipientRole);
     }
+
+    public async Task MarkAllReadAsync(CancellationToken ct)
+    {
+        var role = RequireRole();
+        if (await notifications.MarkAllReadForRoleAsync(role, DateTime.UtcNow, ct) == 0) return;
+
+        foreach (var schoolId in currentUser.SchoolIds)
+            signals.Changed(schoolId, role);
+    }
+
+    private UserRole RequireRole() => currentUser.Role ?? throw new ForbiddenException("You have no role.");
 }

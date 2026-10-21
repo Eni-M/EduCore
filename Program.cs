@@ -306,6 +306,7 @@ builder.Services.AddScoped<IClassService, ClassService>();
 builder.Services.AddScoped<IClassSubjectTeacherService, ClassSubjectTeacherService>();
 builder.Services.AddScoped<ICurriculumService, CurriculumService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddSingleton<NotificationSignals>();
 // Mail transport. "Log" delivers nothing and writes what would have been sent -- fine for
 // development, and a silent failure in production, so the choice is explicit configuration
 // rather than an environment check. Password reset and the schedule digests are the only
