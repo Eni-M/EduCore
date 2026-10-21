@@ -37,6 +37,8 @@
         <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.18.0" />
         <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.18.0" />
         <PackageReference Include="PasswordGenerator" Version="3.0.0" />
+        <!-- MailKit (via MimeKit) pulls in Pkcs 10.0.0, which has known vulnerabilities and fails the -warnaserror build. -->
+        <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     </ItemGroup>
 
 </Project>
