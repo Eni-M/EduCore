@@ -71,18 +71,25 @@ public static class NotificationEndpoints
         var signal = signals.Subscribe(role, currentUser.SchoolIds);
         try
         {
+            var changed = true;
             while (true)
             {
-                var count = await service.GetUnreadCountAsync(session.Token);
-                await WriteAsync(http, $"event: unread\ndata: {{\"count\":{count}}}\n\n", session.Token);
+                // Before every write, not only on quiet pings: a steady run of changes must not keep
+                // a deactivated account's stream alive. The status is cached, so this is cheap.
+                var status = await accounts.GetAsync(currentUser.UserId, session.Token);
+                if (!status.Exists || status.IsDeactivated) return;
 
-                while (!await WaitForChangeAsync(signal.Reader, session.Token))
+                if (changed)
                 {
-                    var status = await accounts.GetAsync(currentUser.UserId, session.Token);
-                    if (!status.Exists || status.IsDeactivated) return;
-
+                    var count = await service.GetUnreadCountAsync(session.Token);
+                    await WriteAsync(http, $"event: unread\ndata: {{\"count\":{count}}}\n\n", session.Token);
+                }
+                else
+                {
                     await WriteAsync(http, ": ping\n\n", session.Token);
                 }
+
+                changed = await WaitForChangeAsync(signal.Reader, session.Token);
             }
         }
         catch (OperationCanceledException)
