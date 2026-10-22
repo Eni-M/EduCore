@@ -6,6 +6,7 @@ using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Services.Email;
 using Microsoft.Extensions.Options;
+using EduCore.Security;
 using EduCore.Services.Interfaces;
 
 namespace EduCore.Services.Account;
@@ -22,7 +23,8 @@ public class TwoFactorService(
     IEmailSender email,
     IOptions<TwoFactorOptions> options,
     IOptions<PasswordResetOptions> passwordReset,
-    IAuditTrail audit) : ITwoFactorService
+    IAuditTrail audit,
+    AuthenticatorThrottle throttle) : ITwoFactorService
 {
     private readonly TwoFactorOptions _options = options.Value;
     private readonly string _appUrl = AccountMailTemplates.AppUrlFrom(passwordReset.Value.ResetUrlTemplate);
@@ -77,9 +79,20 @@ public class TwoFactorService(
             || !challenge.IsOpen(DateTime.UtcNow, _options.MaxAttempts))
             throw new UnauthorizedException("That code is not valid. Ask for a new one.");
 
+        // App codes are capped per user as well as per challenge: a fresh challenge per sign-in
+        // would otherwise mean fresh attempts for anyone holding the password.
+        if (challenge.ViaAuthenticator)
+            throttle.EnsureAllowed(challenge.UserId);
+
         var matched = challenge.ViaAuthenticator
             ? MatchesAuthenticator(challenge.User, code)
             : Matches(challenge.CodeHash, code);
+
+        if (challenge.ViaAuthenticator)
+        {
+            if (matched) throttle.Succeeded(challenge.UserId);
+            else throttle.Failed(challenge.UserId);
+        }
 
         if (!matched)
         {

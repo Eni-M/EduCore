@@ -90,6 +90,12 @@ public class AccountMailInterceptor(IAccountMailQueue queue) : SaveChangesInterc
                         requests.Add(new AccountMailRequest(
                             AccountMailKind.PasswordChanged, user.Email, user.FirstName));
 
+                    var confirmed = entry.Property(u => u.TotpConfirmedAt);
+                    if (confirmed.OriginalValue is null && confirmed.CurrentValue is not null)
+                        requests.Add(new AccountMailRequest(AccountMailKind.AuthenticatorAdded, user.Email, user.FirstName));
+                    else if (confirmed.OriginalValue is not null && confirmed.CurrentValue is null)
+                        requests.Add(new AccountMailRequest(AccountMailKind.AuthenticatorRemoved, user.Email, user.FirstName));
+
                     // Told at the old address: the new one is whoever just took the account.
                     var oldEmail = entry.Property(u => u.Email).OriginalValue;
                     if (!string.IsNullOrWhiteSpace(oldEmail)

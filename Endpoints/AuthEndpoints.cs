@@ -140,8 +140,9 @@ public static class AuthEndpoints
 
         // An authenticator app: begin (returns the secret to add to the app), confirm with a first
         // code, or remove (which needs the password, like switching two-step sign-in off).
-        group.MapPost("/me/authenticator", async (IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
-                TypedResults.Ok(await users.BeginAuthenticatorSetupAsync(currentUser.UserId, ct)))
+        group.MapPost("/me/authenticator", async (
+                BeginAuthenticatorDto dto, IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
+                TypedResults.Ok(await users.BeginAuthenticatorSetupAsync(currentUser.UserId, dto.CurrentPassword, ct)))
             .RequireAuthorization()
             .AddEndpointFilter<ActiveAccountEndpointFilter>();
 

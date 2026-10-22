@@ -21,6 +21,8 @@ public record AuthenticatorCodeDto(string Code);
 
 public record RemoveAuthenticatorDto(string CurrentPassword);
 
+public record BeginAuthenticatorDto(string CurrentPassword);
+
 public record VerifyTwoFactorDto(Guid ChallengeId, string Code);
 
 // CurrentPassword is required only to switch the second step off.

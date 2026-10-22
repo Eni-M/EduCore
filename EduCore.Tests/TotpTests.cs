@@ -54,4 +54,25 @@ public class TotpTests
     [InlineData("12a456")]
     public void Refuses_malformed_codes(string code) =>
         Assert.Null(Totp.Verify(RfcKey, code, DateTimeOffset.UtcNow, null));
+
+    // Capped per user, across challenges: starting a new sign-in must not buy fresh guesses.
+    [Fact]
+    public void Five_wrong_codes_stop_that_users_app_codes_and_a_right_one_resets()
+    {
+        var throttle = new AuthenticatorThrottle(new Microsoft.Extensions.Caching.Memory.MemoryCache(
+            new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()));
+        var user = Guid.NewGuid();
+
+        for (var i = 0; i < 5; i++)
+        {
+            throttle.EnsureAllowed(user);
+            throttle.Failed(user);
+        }
+
+        Assert.Throws<EduCore.Exceptions.TooManyRequestsException>(() => throttle.EnsureAllowed(user));
+        throttle.EnsureAllowed(Guid.NewGuid());
+
+        throttle.Succeeded(user);
+        throttle.EnsureAllowed(user);
+    }
 }

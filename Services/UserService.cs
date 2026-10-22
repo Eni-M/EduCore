@@ -46,6 +46,7 @@ public class UserService(
     ICurrentUser currentUser,
     IMemoryCache cache,
     IAuditTrail audit,
+    AuthenticatorThrottle throttle,
     IConfiguration config) : IUserService
 {
     // Per account, not per IP: behind a PaaS proxy many users can share one address, and an
@@ -255,6 +256,11 @@ public class UserService(
         user.SetPassword(temporaryPassword, passwordHasher);
         user.MustChangePassword = true;
         user.SessionsValidFrom = DateTime.UtcNow;
+        // The recovery route for a lost phone, or an authenticator someone else attached: the
+        // school office resets the account, and sign-in falls back to emailed codes.
+        user.TotpSecret = null;
+        user.TotpConfirmedAt = null;
+        user.TotpLastStep = null;
 
         userRepository.Update(user);
         await userRepository.SaveChangesAsync(ct);
@@ -265,10 +271,15 @@ public class UserService(
 
     // Step one of adding an authenticator app: a fresh secret, stored unconfirmed. It does nothing
     // until a code from the app proves the app holds it (ConfirmAuthenticatorAsync).
-    public async Task<AuthenticatorSetupDto> BeginAuthenticatorSetupAsync(Guid userId, CancellationToken ct)
+    public async Task<AuthenticatorSetupDto> BeginAuthenticatorSetupAsync(
+        Guid userId, string currentPassword, CancellationToken ct)
     {
         var user = await userRepository.GetByIdAsync(userId, ct)
                    ?? throw new NotFoundException("User", userId);
+
+        // A borrowed session must not be able to put its own app on the account: that would lock
+        // the owner out of the next sign-in. The password proves it is the owner.
+        RequireCurrentPassword(user, currentPassword);
 
         if (user.HasAuthenticator)
             throw new ConflictException("An authenticator app is already set up. Remove it first to set up another.");
@@ -292,8 +303,15 @@ public class UserService(
         if (user.TotpSecret is null || user.HasAuthenticator)
             throw new BusinessException("Start setting up an authenticator app first.");
 
-        var step = Totp.Verify(Totp.FromBase32(user.TotpSecret), code.Trim(), DateTimeOffset.UtcNow, null)
-                   ?? throw new BusinessException("That code does not match. Check the time on your phone and try again.");
+        throttle.EnsureAllowed(userId);
+        var step = Totp.Verify(Totp.FromBase32(user.TotpSecret), code.Trim(), DateTimeOffset.UtcNow, null);
+        if (step is null)
+        {
+            throttle.Failed(userId);
+            throw new BusinessException("That code does not match. Check the time on your phone and try again.");
+        }
+
+        throttle.Succeeded(userId);
 
         user.TotpConfirmedAt = DateTime.UtcNow;
         user.TotpLastStep = step;

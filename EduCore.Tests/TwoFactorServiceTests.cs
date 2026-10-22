@@ -79,7 +79,9 @@ public class TwoFactorServiceTests
             rows, mail,
             Options.Create(new TwoFactorOptions { MaxAttempts = maxAttempts, CodeLifetimeMinutes = lifetimeMinutes }),
             Options.Create(new PasswordResetOptions { ResetUrlTemplate = "https://educore.example/reset-password" }),
-            new NullAuditTrail());
+            new NullAuditTrail(),
+            new EduCore.Security.AuthenticatorThrottle(new Microsoft.Extensions.Caching.Memory.MemoryCache(
+                new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions())));
 
         return (service, rows, mail);
     }

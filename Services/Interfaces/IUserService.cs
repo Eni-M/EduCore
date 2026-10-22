@@ -28,7 +28,7 @@ public interface IUserService
     Task SetDigestPreferenceAsync(bool optOut, CancellationToken ct);
     Task SetActiveAsync(Guid userId, bool isActive, CancellationToken ct);
 
-    Task<AuthenticatorSetupDto> BeginAuthenticatorSetupAsync(Guid userId, CancellationToken ct);
+    Task<AuthenticatorSetupDto> BeginAuthenticatorSetupAsync(Guid userId, string currentPassword, CancellationToken ct);
     Task<TwoFactorStatusDto> ConfirmAuthenticatorAsync(Guid userId, string code, CancellationToken ct);
     Task<TwoFactorStatusDto> RemoveAuthenticatorAsync(Guid userId, string currentPassword, CancellationToken ct);
 

@@ -14,7 +14,12 @@ public enum AccountMailKind
 
     // Queued rather than sent inline so a reset request takes as long whether or not the address
     // holds an account; the reply time must not say which.
-    PasswordReset
+    PasswordReset,
+
+    // An authenticator app was added to or removed from the account. Sent either way: an app the
+    // owner did not add is how a hijacked session would lock them out.
+    AuthenticatorAdded,
+    AuthenticatorRemoved
 }
 
 // Copied at the moment of the write, never the User entity -- its DbContext is long disposed by
@@ -50,6 +55,8 @@ public static class AccountMailTemplates
             AccountMailKind.PasswordChanged => PasswordChanged(request, appUrl),
             AccountMailKind.EmailChanged => EmailChanged(request, appUrl),
             AccountMailKind.PasswordReset => PasswordReset(request, appUrl),
+            AccountMailKind.AuthenticatorAdded => AuthenticatorChanged(request, appUrl, added: true),
+            AccountMailKind.AuthenticatorRemoved => AuthenticatorChanged(request, appUrl, added: false),
             _ => throw new ArgumentOutOfRangeException(nameof(request))
         };
 
@@ -81,6 +88,21 @@ public static class AccountMailTemplates
                     new EmailBlock.Paragraph("If you made this change, there is nothing to do."),
                     new EmailBlock.Paragraph(
                         "If you did not, someone else has access to your account. Contact your school office straight away."),
+                ],
+                appUrl));
+
+    private static (string, EmailBody) AuthenticatorChanged(AccountMailRequest request, string appUrl, bool added) =>
+        (added ? "An authenticator app was added to your EduCore account" : "An authenticator app was removed from your EduCore account",
+            EmailLayout.Render(
+                added ? "Authenticator app added" : "Authenticator app removed",
+                [
+                    new EmailBlock.Paragraph($"Hello {request.FirstName},"),
+                    new EmailBlock.Paragraph(added
+                        ? "An authenticator app was just set up for your EduCore account. Sign-in codes now come from that app instead of email."
+                        : "The authenticator app on your EduCore account was just removed. Sign-in codes now come by email again."),
+                    new EmailBlock.Paragraph("If you made this change, there is nothing to do."),
+                    new EmailBlock.Paragraph(
+                        "If you did not, contact your school office straight away. They can reset your account, which also removes any authenticator app."),
                 ],
                 appUrl));
 

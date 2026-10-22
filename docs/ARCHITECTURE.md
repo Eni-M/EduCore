@@ -84,6 +84,11 @@ email change is reported to the old address.
 against common and predictable choices (`Validation/PasswordBlocklist.cs`). PBKDF2-HMAC-SHA512 at
 220,000 iterations; older hashes upgrade at the next sign-in.
 
+**Authenticator apps.** Optional TOTP (`Security/Totp.cs`) in place of emailed codes. Adding one
+needs the current password, adding or removing one emails the account, and the office's password
+reset removes it (the recovery route for a lost phone). Wrong app codes are capped per user,
+five per 15 minutes (`AuthenticatorThrottle`), not only per challenge.
+
 **Audit.** Every save writes `AuditLog` rows with the school and the changed fields (old and new
 values for marks; names only for anything encrypted). `IAuditTrail` adds what a save cannot see:
 sign-in successes and failures, rejected two-step codes, and every read of a medical record or of
