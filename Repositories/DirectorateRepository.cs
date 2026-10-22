@@ -13,7 +13,7 @@ public class DirectorateRepository(AppDbContext context) : Repository<Directorat
     {
         var query = _context.Directorates
             .AsNoTracking()
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .Include(a => a.User)
             .Include(a => a.School)
             .AsQueryable();
@@ -31,7 +31,7 @@ public class DirectorateRepository(AppDbContext context) : Repository<Directorat
     {
         var query = _context.Directorates
             .AsNoTracking()
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .Include(a => a.User)
             .Include(a => a.School)
             .AsQueryable();
@@ -54,7 +54,7 @@ public class DirectorateRepository(AppDbContext context) : Repository<Directorat
     public async Task<IEnumerable<Directorate>> GetByCityAsync(Guid cityId, CancellationToken ct) =>
         await _context.Directorates
             .AsNoTracking()
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .Include(a => a.User)
             .Include(a => a.School)
             .Where(a => a.School.CityId == cityId)
@@ -64,19 +64,19 @@ public class DirectorateRepository(AppDbContext context) : Repository<Directorat
     public async Task<Directorate?> GetWithUserAsync(Guid directorateId, CancellationToken ct) =>
         await _context.Directorates
             .AsNoTracking()
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .Include(a => a.User)
             .Include(a => a.School)
             .FirstOrDefaultAsync(a => a.Id == directorateId, ct);
 
     public async Task<Directorate?> GetTrackedAsync(Guid directorateId, CancellationToken ct) =>
         await _context.Directorates
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .FirstOrDefaultAsync(a => a.Id == directorateId, ct);
 
     public async Task<Directorate?> GetByUserIdAsync(Guid userId, CancellationToken ct) =>
         await _context.Directorates
             .AsNoTracking()
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .FirstOrDefaultAsync(a => a.UserId == userId, ct);
 }

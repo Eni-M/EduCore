@@ -13,6 +13,7 @@ public class MarkUpsertDtoValidator : AbstractValidator<MarkUpsertDto>
 
         RuleFor(x => x.FirstMark).InclusiveBetween(1, 5).When(x => x.FirstMark.HasValue);
         RuleFor(x => x.SecondMark).InclusiveBetween(1, 5).When(x => x.SecondMark.HasValue);
+        RuleFor(x => x.Reason).MaximumLength(500);
 
         RuleFor(x => x)
             .Must(x => x.FirstMark.HasValue || x.SecondMark.HasValue)

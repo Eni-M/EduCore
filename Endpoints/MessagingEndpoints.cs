@@ -16,7 +16,7 @@ public static class MessagingEndpoints
                 async (
                     IMessagingService service,
                     CancellationToken ct) =>
-                    Results.Ok(
+                    TypedResults.Ok(
                         await service.GetMyConversationsAsync(ct)))
             .RequireAuthorization(
                 Policies.MessagingUser);
@@ -26,7 +26,7 @@ public static class MessagingEndpoints
                     Guid conversationId,
                     IMessagingService service,
                     CancellationToken ct) =>
-                    Results.Ok(
+                    TypedResults.Ok(
                         await service.GetConversationAsync(
                             conversationId,
                             ct)))
@@ -38,7 +38,7 @@ public static class MessagingEndpoints
                     StartConversationDto dto,
                     IMessagingService service,
                     CancellationToken ct) =>
-                    Results.Ok(
+                    TypedResults.Ok(
                         await service.StartConversationAsync(
                             dto,
                             ct)))
@@ -51,7 +51,7 @@ public static class MessagingEndpoints
                     SendMessageDto dto,
                     IMessagingService service,
                     CancellationToken ct) =>
-                    Results.Ok(
+                    TypedResults.Ok(
                         await service.SendMessageAsync(
                             conversationId,
                             dto,
@@ -69,7 +69,7 @@ public static class MessagingEndpoints
                         conversationId,
                         ct);
 
-                    return Results.NoContent();
+                    return TypedResults.NoContent();
                 })
             .RequireAuthorization(
                 Policies.MessagingUser);

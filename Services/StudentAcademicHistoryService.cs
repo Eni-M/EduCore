@@ -53,7 +53,7 @@ public class StudentAcademicHistoryService(
                     SubjectId = g.Key.SubjectId,
                     SubjectName = g.Key.SubjectName,
                     AnnualMark = grading.AnnualMark(
-                        g.Select(m => grading.FinalMark(m.FirstMark, m.SecondMark)))
+                        g.Select(m => grading.FinalMark(m.WeightedValue)))
                 })
                 .OrderBy(s => s.SubjectName)
                 .ToList();

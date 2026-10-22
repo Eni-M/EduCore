@@ -25,7 +25,8 @@ public static class AuthEndpoints
             // A second step is owed: no cookie yet, just the handle to answer with. The code
             // is in the account's mailbox and never in this response.
             if (result.Session is null)
-                return Results.Ok(new TwoFactorRequiredDto(result.TwoFactorChallengeId!.Value));
+                return Results.Ok(new TwoFactorRequiredDto(
+                    result.TwoFactorChallengeId!.Value, Authenticator: result.ViaAuthenticator));
 
             cookies.Issue(response, result.Session.Token, result.Session.User.ExpiresAt);
             return Results.Ok(result.Session.User);
@@ -43,7 +44,7 @@ public static class AuthEndpoints
         {
             var result = await users.CompleteSignInAsync(dto, ct);
             cookies.Issue(response, result.Token, result.User.ExpiresAt);
-            return Results.Ok(result.User);
+            return TypedResults.Ok(result.User);
         }).RequireRateLimiting("LoginPolicy");
 
         // Anonymous by necessity — someone who cannot sign in is the only caller. Always 204,
@@ -53,7 +54,7 @@ public static class AuthEndpoints
                 ForgotPasswordDto dto, IPasswordResetService service, CancellationToken ct) =>
             {
                 await service.RequestAsync(dto, ct);
-                return Results.NoContent();
+                return TypedResults.NoContent();
             })
             .RequireRateLimiting("PasswordResetPolicy");
 
@@ -61,7 +62,7 @@ public static class AuthEndpoints
                 ResetPasswordDto dto, IPasswordResetService service, CancellationToken ct) =>
             {
                 await service.ResetAsync(dto, ct);
-                return Results.NoContent();
+                return TypedResults.NoContent();
             })
             .RequireRateLimiting("PasswordResetPolicy");
 
@@ -69,14 +70,18 @@ public static class AuthEndpoints
         // of the cookie taken earlier stops working with it. That means signing out signs the
         // account out on every device. Still answers 204 without a valid session, so a browser
         // holding an expired cookie can always clear it.
+        // Only a token that still passes the revocation gate may end sessions: otherwise a copy
+        // that has already been revoked could keep signing the real owner out of every new one.
         group.MapPost("/logout", async (
-            ISessionCookies cookies, HttpContext http, IUserService users, CancellationToken ct) =>
+            ISessionCookies cookies, HttpContext http, IUserService users, IAccountStatusCache accounts,
+            CancellationToken ct) =>
         {
-            if (Guid.TryParse(http.User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId))
+            if (Guid.TryParse(http.User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId)
+                && (await accounts.GetAsync(userId, ct)).Admits(http.User))
                 await users.EndSessionsAsync(userId, ct);
 
             cookies.Clear(http.Response);
-            return Results.NoContent();
+            return TypedResults.NoContent();
         });
 
         // These three sit outside the /api group, so they do not inherit its account-status
@@ -86,7 +91,7 @@ public static class AuthEndpoints
         // gate would lock a must-change-password user out of the very endpoints that let them
         // finish rotating.
         group.MapGet("/me", async (IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
-                Results.Ok(await users.GetCurrentAsync(currentUser.UserId, ct)))
+                TypedResults.Ok(await users.GetCurrentAsync(currentUser.UserId, ct)))
             .RequireAuthorization()
             .AddEndpointFilter<ActiveAccountEndpointFilter>();
 
@@ -96,7 +101,7 @@ public static class AuthEndpoints
                 IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
             {
                 var challengeId = await users.RequestPasswordChangeCodeAsync(currentUser.UserId, ct);
-                return Results.Ok(new TwoFactorRequiredDto(challengeId));
+                return TypedResults.Ok(new TwoFactorRequiredDto(challengeId));
             })
             .RequireAuthorization()
             .AddEndpointFilter<ActiveAccountEndpointFilter>()
@@ -112,7 +117,7 @@ public static class AuthEndpoints
             {
                 var result = await users.ChangePasswordAsync(currentUser.UserId, dto, ct);
                 cookies.Issue(response, result.Token, result.User.ExpiresAt);
-                return Results.Ok(result.User);
+                return TypedResults.Ok(result.User);
             })
             .RequireAuthorization()
             .AddEndpointFilter<ActiveAccountEndpointFilter>();
@@ -120,7 +125,7 @@ public static class AuthEndpoints
 
         group.MapGet("/me/two-factor", async (
                 IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
-                Results.Ok(await users.GetTwoFactorStatusAsync(currentUser.UserId, ct)))
+                TypedResults.Ok(await users.GetTwoFactorStatusAsync(currentUser.UserId, ct)))
             .RequireAuthorization()
             .AddEndpointFilter<ActiveAccountEndpointFilter>();
 
@@ -129,7 +134,27 @@ public static class AuthEndpoints
         group.MapPut("/me/two-factor", async (
                 TwoFactorPreferenceDto dto, IUserService users, ICurrentUser currentUser,
                 CancellationToken ct) =>
-                Results.Ok(await users.SetTwoFactorAsync(currentUser.UserId, dto.Enabled, dto.CurrentPassword, ct)))
+                TypedResults.Ok(await users.SetTwoFactorAsync(currentUser.UserId, dto.Enabled, dto.CurrentPassword, ct)))
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
+
+        // An authenticator app: begin (returns the secret to add to the app), confirm with a first
+        // code, or remove (which needs the password, like switching two-step sign-in off).
+        group.MapPost("/me/authenticator", async (IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
+                TypedResults.Ok(await users.BeginAuthenticatorSetupAsync(currentUser.UserId, ct)))
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
+
+        group.MapPost("/me/authenticator/confirm", async (
+                AuthenticatorCodeDto dto, IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
+                TypedResults.Ok(await users.ConfirmAuthenticatorAsync(currentUser.UserId, dto.Code, ct)))
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>()
+            .RequireRateLimiting("LoginPolicy");
+
+        group.MapPost("/me/authenticator/remove", async (
+                RemoveAuthenticatorDto dto, IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
+                TypedResults.Ok(await users.RemoveAuthenticatorAsync(currentUser.UserId, dto.CurrentPassword, ct)))
             .RequireAuthorization()
             .AddEndpointFilter<ActiveAccountEndpointFilter>();
 
@@ -140,7 +165,7 @@ public static class AuthEndpoints
                 DigestPreferenceDto dto, IUserService users, CancellationToken ct) =>
             {
                 await users.SetDigestPreferenceAsync(dto.OptOut, ct);
-                return Results.NoContent();
+                return TypedResults.NoContent();
             })
             .RequireAuthorization()
             .AddEndpointFilter<ActiveAccountEndpointFilter>();
@@ -155,7 +180,7 @@ public static class AuthEndpoints
                 var result = await users.UpdateOwnCredentialsAsync(
                     currentUser.UserId, dto.FirstName, dto.LastName, dto.Email, dto.CurrentPassword, ct);
                 cookies.Issue(response, result.Token, result.User.ExpiresAt);
-                return Results.Ok(result.User);
+                return TypedResults.Ok(result.User);
             })
             .RequireAuthorization()
             .AddEndpointFilter<ActiveAccountEndpointFilter>();
@@ -166,18 +191,18 @@ public static class AuthEndpoints
 
         accounts.MapPost("/{userId:guid}/reset-password",
             async (Guid userId, IUserService users, CancellationToken ct) =>
-                Results.Ok(await users.AdminResetPasswordAsync(userId, ct)));
+                TypedResults.Ok(await users.AdminResetPasswordAsync(userId, ct)));
 
         accounts.MapPost("/{userId:guid}/deactivate", async (Guid userId, IUserService users, CancellationToken ct) =>
         {
             await users.SetActiveAsync(userId, false, ct);
-            return Results.NoContent();
+            return TypedResults.NoContent();
         });
 
         accounts.MapPost("/{userId:guid}/activate", async (Guid userId, IUserService users, CancellationToken ct) =>
         {
             await users.SetActiveAsync(userId, true, ct);
-            return Results.NoContent();
+            return TypedResults.NoContent();
         });
     }
 }

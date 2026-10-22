@@ -20,19 +20,24 @@ public class MappingProfile : Profile
         MapCommunication();
     }
 
-    private IMappingExpression<TSource, TDestination> CreateWriteMap<TSource, TDestination>()
+    // An inbound map writes only the members it names; everything else on the entity is ignored.
+    // Copying every same-named property instead meant a field added to a DTO later -- a SchoolId,
+    // a PersonalNumber -- would quietly become writable by whoever can call that endpoint. Each
+    // list is the review: to let a request set a field, add it here.
+    private IMappingExpression<TSource, TDestination> CreateWriteMap<TSource, TDestination>(params string[] writable)
     {
-        var sourceMembers = typeof(TSource)
-            .GetProperties()
-            .Select(p => p.Name)
-            .ToHashSet();
+        var sourceMembers = typeof(TSource).GetProperties().Select(p => p.Name).ToHashSet();
+
+        foreach (var name in writable)
+            if (!sourceMembers.Contains(name)
+                || typeof(TDestination).GetProperty(name)?.SetMethod is not { IsPublic: true })
+                throw new InvalidOperationException(
+                    $"{typeof(TSource).Name} -> {typeof(TDestination).Name}: '{name}' is not on both types.");
 
         var map = CreateMap<TSource, TDestination>();
 
         foreach (var member in typeof(TDestination).GetProperties()
-                     .Where(p => p.CanWrite
-                                 && (!sourceMembers.Contains(p.Name)
-                                     || p.SetMethod is not { IsPublic: true })))
+                     .Where(p => p.CanWrite && !writable.Contains(p.Name)))
             map.ForMember(member.Name, o => o.Ignore());
 
         return map;
@@ -44,38 +49,38 @@ public class MappingProfile : Profile
             .ForCtorParam("CityName", o => o.MapFrom(s => s.City != null ? s.City.Name : null))
             .ForCtorParam("ZoneName", o => o.MapFrom(s => s.Zone != null ? s.Zone.Name : null))
             .ForCtorParam("StateName", o => o.MapFrom(s => s.City != null ? s.City.State.Name : null));
-        CreateWriteMap<Dtos.School.SchoolCreateDto, School>();
-        CreateWriteMap<Dtos.School.SchoolEditDto, School>();
+        CreateWriteMap<Dtos.School.SchoolCreateDto, School>(nameof(School.Name), nameof(School.Type), nameof(School.CityId), nameof(School.ZoneId));
+        CreateWriteMap<Dtos.School.SchoolEditDto, School>(nameof(School.Name), nameof(School.Type), nameof(School.CityId), nameof(School.ZoneId));
     }
 
     private void MapSubjects()
     {
         CreateMap<Subject, Dtos.Subject.SubjectListDto>();
-        CreateWriteMap<Dtos.Subject.SubjectCreateDto, Subject>();
-        CreateWriteMap<Dtos.Subject.SubjectEditDto, Subject>();
+        CreateWriteMap<Dtos.Subject.SubjectCreateDto, Subject>(nameof(Subject.Name));
+        CreateWriteMap<Dtos.Subject.SubjectEditDto, Subject>(nameof(Subject.Name));
 
         CreateMap<TeacherSubject, Dtos.TeacherSubject.TeacherSubjectListDto>()
             .ForCtorParam("SubjectName", o => o.MapFrom(ts => ts.Subject.Name));
 
-        CreateWriteMap<Dtos.TeacherSubject.TeacherSubjectCreateDto, TeacherSubject>();
+        CreateWriteMap<Dtos.TeacherSubject.TeacherSubjectCreateDto, TeacherSubject>(nameof(TeacherSubject.TeacherId), nameof(TeacherSubject.SubjectId));
     }
 
     private void MapAcademicCalendar()
     {
         CreateMap<AcademicYear, Dtos.AcademicYear.AcademicYearListDto>()
             .ForCtorParam("SchoolName", o => o.MapFrom(_ => (string?)null));
-        CreateWriteMap<Dtos.AcademicYear.AcademicYearCreateDto, AcademicYear>();
+        CreateWriteMap<Dtos.AcademicYear.AcademicYearCreateDto, AcademicYear>(nameof(AcademicYear.Name), nameof(AcademicYear.StartDate), nameof(AcademicYear.EndDate));
     }
 
     private void MapUsers()
     {
-        CreateWriteMap<Dtos.Student.StudentCreateDto, User>();
-        CreateWriteMap<Dtos.Teacher.TeacherCreateDto, User>();
-        CreateWriteMap<Dtos.Directorate.DirectorateCreateDto, User>();
+        CreateWriteMap<Dtos.Student.StudentCreateDto, User>(nameof(User.FirstName), nameof(User.LastName), nameof(User.Email));
+        CreateWriteMap<Dtos.Teacher.TeacherCreateDto, User>(nameof(User.FirstName), nameof(User.LastName), nameof(User.Email));
+        CreateWriteMap<Dtos.Directorate.DirectorateCreateDto, User>(nameof(User.FirstName), nameof(User.LastName), nameof(User.Email));
 
-        CreateWriteMap<Dtos.Student.StudentEditDto, User>();
-        CreateWriteMap<Dtos.Teacher.TeacherEditDto, User>();
-        CreateWriteMap<Dtos.Directorate.DirectorateEditDto, User>();
+        CreateWriteMap<Dtos.Student.StudentEditDto, User>(nameof(User.FirstName), nameof(User.LastName), nameof(User.Email));
+        CreateWriteMap<Dtos.Teacher.TeacherEditDto, User>(nameof(User.FirstName), nameof(User.LastName), nameof(User.Email));
+        CreateWriteMap<Dtos.Directorate.DirectorateEditDto, User>(nameof(User.FirstName), nameof(User.LastName), nameof(User.Email));
     }
 
     private void MapStudents()
@@ -104,8 +109,8 @@ public class MappingProfile : Profile
             .ForCtorParam("OriginCityName", o => o.MapFrom(s => s.OriginCity != null ? s.OriginCity.Name : null))
             .ForCtorParam("Guardians", o => o.MapFrom(s => s.Guardians));
 
-        CreateWriteMap<Dtos.Student.StudentCreateDto, Student>();
-        CreateWriteMap<Dtos.Student.StudentEditDto, Student>();
+        CreateWriteMap<Dtos.Student.StudentCreateDto, Student>(nameof(Student.DateOfBirth), nameof(Student.PersonalNumber), nameof(Student.CountryId), nameof(Student.OriginCityId), nameof(Student.Address), nameof(Student.Gender));
+        CreateWriteMap<Dtos.Student.StudentEditDto, Student>(nameof(Student.DateOfBirth), nameof(Student.PersonalNumber), nameof(Student.CountryId), nameof(Student.OriginCityId), nameof(Student.Address), nameof(Student.Gender));
     }
 
     private void MapTeachers()
@@ -155,34 +160,33 @@ public class MappingProfile : Profile
 
     private void MapClasses()
     {
-        CreateWriteMap<Dtos.Class.ClassCreateDto, Class>();
-        CreateWriteMap<Dtos.Class.ClassEditDto, Class>();
-        CreateWriteMap<Dtos.ClassSubjectTeacher.ClassSubjectTeacherCreateDto, ClassSubjectTeacher>();
-        CreateWriteMap<Dtos.Enrollment.EnrollmentCreateDto, Enrollment>();
+        CreateWriteMap<Dtos.Class.ClassCreateDto, Class>(nameof(Class.Name), nameof(Class.AcademicYearId), nameof(Class.Grade), nameof(Class.HomeroomTeacherId), nameof(Class.Capacity), nameof(Class.ShiftId));
+        CreateWriteMap<Dtos.Class.ClassEditDto, Class>(nameof(Class.Name), nameof(Class.Grade), nameof(Class.Capacity), nameof(Class.ShiftId));
+        CreateWriteMap<Dtos.ClassSubjectTeacher.ClassSubjectTeacherCreateDto, ClassSubjectTeacher>(nameof(ClassSubjectTeacher.ClassId), nameof(ClassSubjectTeacher.SubjectId), nameof(ClassSubjectTeacher.TeacherId));
+        CreateWriteMap<Dtos.Enrollment.EnrollmentCreateDto, Enrollment>(nameof(Enrollment.StudentId), nameof(Enrollment.ClassId));
     }
     private void MapLessonRecords()
     {
-        CreateWriteMap<Dtos.DiaryEntry.DiaryEntryCreateDto, DiaryEntry>();
-        CreateWriteMap<Dtos.DiaryEntry.DiaryEntryEditDto, DiaryEntry>();
-        CreateWriteMap<Dtos.Attendance.AttendanceEditDto, Attendance>();
-        CreateWriteMap<Dtos.Mark.MarkUpsertDto, Mark>();
+        CreateWriteMap<Dtos.DiaryEntry.DiaryEntryCreateDto, DiaryEntry>(nameof(DiaryEntry.ClassId), nameof(DiaryEntry.SubjectId), nameof(DiaryEntry.TeacherId), nameof(DiaryEntry.Date), nameof(DiaryEntry.Period), nameof(DiaryEntry.Topic), nameof(DiaryEntry.Notes));
+        CreateWriteMap<Dtos.DiaryEntry.DiaryEntryEditDto, DiaryEntry>(nameof(DiaryEntry.Topic), nameof(DiaryEntry.Notes));
+        CreateWriteMap<Dtos.Attendance.AttendanceEditDto, Attendance>(nameof(Attendance.Comment), nameof(Attendance.BehaviorMark));
     }
     private void MapStudentRecords()
     {
         CreateMap<SchoolingHistory, Dtos.SchoolingHistory.SchoolingHistoryListDto>();
-        CreateWriteMap<Dtos.SchoolingHistory.SchoolingHistoryCreateDto, SchoolingHistory>();
-        CreateWriteMap<Dtos.SchoolingHistory.SchoolingHistoryEditDto, SchoolingHistory>();
+        CreateWriteMap<Dtos.SchoolingHistory.SchoolingHistoryCreateDto, SchoolingHistory>(nameof(SchoolingHistory.PreviousSchoolName), nameof(SchoolingHistory.City), nameof(SchoolingHistory.FromDate), nameof(SchoolingHistory.ToDate), nameof(SchoolingHistory.GradeOrLevel), nameof(SchoolingHistory.ExitReason), nameof(SchoolingHistory.Notes));
+        CreateWriteMap<Dtos.SchoolingHistory.SchoolingHistoryEditDto, SchoolingHistory>(nameof(SchoolingHistory.PreviousSchoolName), nameof(SchoolingHistory.City), nameof(SchoolingHistory.FromDate), nameof(SchoolingHistory.ToDate), nameof(SchoolingHistory.GradeOrLevel), nameof(SchoolingHistory.ExitReason), nameof(SchoolingHistory.Notes));
 
         CreateMap<StudentDocument, Dtos.StudentDocument.StudentDocumentListDto>();
 
         CreateMap<StudentMedicalRecord, Dtos.Medical.StudentMedicalRecordDto>();
-        CreateWriteMap<Dtos.Medical.StudentMedicalRecordUpsertDto, StudentMedicalRecord>();
+        CreateWriteMap<Dtos.Medical.StudentMedicalRecordUpsertDto, StudentMedicalRecord>(nameof(StudentMedicalRecord.BloodType), nameof(StudentMedicalRecord.Allergies), nameof(StudentMedicalRecord.ChronicConditions), nameof(StudentMedicalRecord.Medications), nameof(StudentMedicalRecord.EmergencyContactName), nameof(StudentMedicalRecord.EmergencyContactPhone), nameof(StudentMedicalRecord.Notes));
     }
     private void MapCommunication()
     {
         // The list DTOs are built by their repositories (they join for author/class/student
         // names), so only the write maps live here.
-        CreateWriteMap<Dtos.Calendar.CalendarEventCreateDto, CalendarEvent>();
-        CreateWriteMap<Dtos.Calendar.CalendarEventEditDto, CalendarEvent>();
+        CreateWriteMap<Dtos.Calendar.CalendarEventCreateDto, CalendarEvent>(nameof(CalendarEvent.Title), nameof(CalendarEvent.Description), nameof(CalendarEvent.Type), nameof(CalendarEvent.Audience), nameof(CalendarEvent.ClassId), nameof(CalendarEvent.StudentId), nameof(CalendarEvent.Date), nameof(CalendarEvent.StartTime), nameof(CalendarEvent.EndTime));
+        CreateWriteMap<Dtos.Calendar.CalendarEventEditDto, CalendarEvent>(nameof(CalendarEvent.Title), nameof(CalendarEvent.Description), nameof(CalendarEvent.Type), nameof(CalendarEvent.Date), nameof(CalendarEvent.StartTime), nameof(CalendarEvent.EndTime));
     }
 }

@@ -39,6 +39,10 @@ public class TwoFactorChallenge
     // which is what keeps a million-guess space out of reach.
     public int FailedAttempts { get; set; }
 
+    // Answered with a code from the user's authenticator app rather than an emailed one; such a
+    // challenge has no stored code hash, and nothing is sent.
+    public bool ViaAuthenticator { get; set; }
+
     public User User { get; set; } = null!;
 
     public bool IsOpen(DateTime nowUtc, int maxAttempts) =>

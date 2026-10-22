@@ -21,7 +21,8 @@ public class TwoFactorService(
     ITwoFactorChallengeRepository challenges,
     IEmailSender email,
     IOptions<TwoFactorOptions> options,
-    IOptions<PasswordResetOptions> passwordReset) : ITwoFactorService
+    IOptions<PasswordResetOptions> passwordReset,
+    IAuditTrail audit) : ITwoFactorService
 {
     private readonly TwoFactorOptions _options = options.Value;
     private readonly string _appUrl = AccountMailTemplates.AppUrlFrom(passwordReset.Value.ResetUrlTemplate);
@@ -37,12 +38,15 @@ public class TwoFactorService(
         // code still sitting in an inbox cannot be used later.
         await challenges.InvalidateOutstandingAsync(user.Id, purpose, now, ct);
 
-        var code = GenerateCode();
+        // With an authenticator app set up, the code is on the phone: nothing is emailed, and
+        // the challenge holds no code of its own.
+        var code = user.HasAuthenticator ? null : GenerateCode();
 
         var challenge = new TwoFactorChallenge
         {
             UserId = user.Id,
-            CodeHash = Hash(code),
+            CodeHash = code is null ? "" : Hash(code),
+            ViaAuthenticator = code is null,
             Purpose = purpose,
             CreatedAt = now,
             ExpiresAt = now.AddMinutes(_options.CodeLifetimeMinutes)
@@ -51,8 +55,11 @@ public class TwoFactorService(
         await challenges.AddAsync(challenge);
         await challenges.SaveChangesAsync(ct);
 
-        var (subject, body) = Compose(user, code, purpose);
-        await email.SendAsync(user.Email, subject, body, ct);
+        if (code is not null)
+        {
+            var (subject, body) = Compose(user, code, purpose);
+            await email.SendAsync(user.Email, subject, body, ct);
+        }
 
         return challenge.Id;
     }
@@ -70,12 +77,17 @@ public class TwoFactorService(
             || !challenge.IsOpen(DateTime.UtcNow, _options.MaxAttempts))
             throw new UnauthorizedException("That code is not valid. Ask for a new one.");
 
-        if (!Matches(challenge.CodeHash, code))
+        var matched = challenge.ViaAuthenticator
+            ? MatchesAuthenticator(challenge.User, code)
+            : Matches(challenge.CodeHash, code);
+
+        if (!matched)
         {
             // Counted before the throw and saved, or the cap would never be reached.
             challenge.FailedAttempts++;
             challenges.Update(challenge);
             await challenges.SaveChangesAsync(ct);
+            await audit.RecordAsync($"Two-step code rejected ({challenge.Purpose})", ct, userId: challenge.UserId);
 
             throw new UnauthorizedException("That code is not valid. Ask for a new one.");
         }
@@ -103,6 +115,21 @@ public class TwoFactorService(
 
     // Fixed-time comparison of the hashes. Comparing strings with == would return as soon as a
     // character differed, which leaks how much of a guess was right.
+    // Records the step the code belonged to, so the same code cannot be used twice.
+    private static bool MatchesAuthenticator(User user, string code)
+    {
+        if (!user.HasAuthenticator)
+            return false;
+
+        var step = Security.Totp.Verify(
+            Security.Totp.FromBase32(user.TotpSecret!), code.Trim(), DateTimeOffset.UtcNow, user.TotpLastStep);
+        if (step is null)
+            return false;
+
+        user.TotpLastStep = step;
+        return true;
+    }
+
     private static bool Matches(string storedHash, string presentedCode) =>
         CryptographicOperations.FixedTimeEquals(
             Convert.FromBase64String(storedHash),

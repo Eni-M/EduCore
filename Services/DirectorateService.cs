@@ -17,6 +17,7 @@ public class DirectorateService(
     IUserRepository userRepository,
     IUserService users,
     ICurrentUser currentUser,
+    IAccessGuard access,
     IMapper mapper) : IDirectorateService
 {
     public async Task<IEnumerable<DirectorateListDto>> GetAllAsync(CancellationToken ct) =>
@@ -40,7 +41,7 @@ public class DirectorateService(
         var directorate = await directorates.GetWithUserAsync(directorateId, ct)
                           ?? throw new NotFoundException("Directorate", directorateId);
 
-        EnsureInOwnCity(directorate.School);
+        await access.EnsureCanManageSchoolAsync(directorate.School.CityId, ct);
 
         return mapper.Map<DirectorateListDto>(directorate);
     }
@@ -50,7 +51,7 @@ public class DirectorateService(
         var school = await schools.GetByIdAsync(dto.SchoolId, ct)
                      ?? throw new NotFoundException("School", dto.SchoolId);
 
-        EnsureInOwnCity(school);
+        await access.EnsureCanManageSchoolAsync(school.CityId, ct);
 
         var user = await users.BuildLoginAsync(
             dto.FirstName, dto.LastName, dto.Email, dto.Password, UserRole.Directorate, ct);
@@ -70,11 +71,11 @@ public class DirectorateService(
 
         var currentSchool = await schools.GetByIdAsync(directorate.SchoolId, ct)
                             ?? throw new NotFoundException("School", directorate.SchoolId);
-        EnsureInOwnCity(currentSchool);
+        await access.EnsureCanManageSchoolAsync(currentSchool.CityId, ct);
 
         var targetSchool = await schools.GetByIdAsync(dto.SchoolId, ct)
                            ?? throw new NotFoundException("School", dto.SchoolId);
-        EnsureInOwnCity(targetSchool);
+        await access.EnsureCanManageSchoolAsync(targetSchool.CityId, ct);
 
         var user = await userRepository.GetByIdAsync(directorate.UserId, ct)
                    ?? throw new NotFoundException("User", directorate.UserId);
@@ -86,11 +87,5 @@ public class DirectorateService(
         await directorates.SaveChangesAsync(ct);
 
         return await GetByIdAsync(directorateId, ct);
-    }
-
-    private void EnsureInOwnCity(School school)
-    {
-        if (school.CityId is null || school.CityId != currentUser.RequireCityId())
-            throw new ForbiddenException("You can only manage directorate accounts for schools in your city.");
     }
 }

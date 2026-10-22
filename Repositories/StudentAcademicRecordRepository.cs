@@ -17,7 +17,7 @@ public class StudentAcademicRecordRepository(AppDbContext context) : IStudentAca
 {
     public async Task<string?> GetStudentNameAsync(Guid studentId, CancellationToken ct) =>
         await context.Students
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .Where(s => s.Id == studentId)
             .Select(s => (s.User.FirstName + " " + s.User.LastName).Trim())
             .FirstOrDefaultAsync(ct);
@@ -25,7 +25,7 @@ public class StudentAcademicRecordRepository(AppDbContext context) : IStudentAca
     public async Task<IReadOnlyList<StudentAcademicRecord>> GetForStudentAsync(
         Guid studentId, CancellationToken ct) =>
         await context.StudentAcademicRecords
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .Include(r => r.Subjects)
             .Where(r => r.StudentId == studentId)
             // Newest year first; SchoolName breaks ties for a student who moved mid-year and so
@@ -36,10 +36,10 @@ public class StudentAcademicRecordRepository(AppDbContext context) : IStudentAca
 
     public async Task<IReadOnlyList<EnrollmentYearRow>> GetEnrollmentYearsAsync(
         Guid studentId, CancellationToken ct) =>
-        await (from e in context.Enrollments.IgnoreQueryFilters()
-               join c in context.Classes.IgnoreQueryFilters() on e.ClassId equals c.Id
-               join y in context.AcademicYears.IgnoreQueryFilters() on c.AcademicYearId equals y.Id
-               join s in context.Schools.IgnoreQueryFilters() on e.SchoolId equals s.Id
+        await (from e in context.Enrollments.IgnoreQueryFilters(QueryFilters.SchoolOnly)
+               join c in context.Classes.IgnoreQueryFilters(QueryFilters.SchoolOnly) on e.ClassId equals c.Id
+               join y in context.AcademicYears.IgnoreQueryFilters(QueryFilters.SchoolOnly) on c.AcademicYearId equals y.Id
+               join s in context.Schools.IgnoreQueryFilters(QueryFilters.SchoolOnly) on e.SchoolId equals s.Id
                where e.StudentId == studentId
                orderby e.EnrolledAt descending
                select new EnrollmentYearRow(
@@ -57,10 +57,10 @@ public class StudentAcademicRecordRepository(AppDbContext context) : IStudentAca
 
     public async Task<IReadOnlyList<SubjectPeriodMarkRow>> GetPeriodMarksAsync(
         Guid enrollmentId, CancellationToken ct) =>
-        await (from m in context.Marks.IgnoreQueryFilters()
-               join sub in context.Subjects.IgnoreQueryFilters() on m.SubjectId equals sub.Id
+        await (from m in context.Marks.IgnoreQueryFilters(QueryFilters.SchoolOnly)
+               join sub in context.Subjects.IgnoreQueryFilters(QueryFilters.SchoolOnly) on m.SubjectId equals sub.Id
                where m.EnrollmentId == enrollmentId
-               select new SubjectPeriodMarkRow(sub.Id, sub.Name, m.FirstMark, m.SecondMark))
+               select new SubjectPeriodMarkRow(sub.Id, sub.Name, m.FirstMark, m.SecondMark, m.WeightedValue))
             .ToListAsync(ct);
 
     public void Add(StudentAcademicRecord record) => context.StudentAcademicRecords.Add(record);

@@ -15,7 +15,7 @@ public class PasswordResetService(
     IUserRepository users,
     IPasswordResetTokenRepository tokens,
     IPasswordHasher<User> passwordHasher,
-    IEmailSender email,
+    IAccountMailQueue mail,
     IOptions<PasswordResetOptions> options,
     ILogger<PasswordResetService> logger) : IPasswordResetService
 {
@@ -52,24 +52,14 @@ public class PasswordResetService(
 
         await tokens.SaveChangesAsync(ct);
 
-        var link = $"{_options.ResetUrlTemplate}?token={Uri.EscapeDataString(plaintext)}";
-
-        await email.SendAsync(
+        // Queued, not sent here: an inline SMTP round trip only for real accounts would make this
+        // reply measurably slower exactly when the address holds one.
+        mail.Enqueue(new AccountMailRequest(
+            AccountMailKind.PasswordReset,
             user.Email,
-            "Reset your EduCore password",
-            EmailLayout.Render(
-                "Reset your password",
-                [
-                    new EmailBlock.Paragraph($"Hello {user.FirstName},"),
-                    new EmailBlock.Paragraph(
-                        "Someone asked to reset the password for your EduCore account. Use the button "
-                        + $"below to choose a new one. It works once, and expires in {_options.TokenLifetimeMinutes} minutes."),
-                    new EmailBlock.Button("Choose a new password", link),
-                    new EmailBlock.Note(
-                        "If this wasn't you, ignore this email -- your password has not changed."),
-                ],
-                AccountMailTemplates.AppUrlFrom(_options.ResetUrlTemplate)),
-            ct);
+            user.FirstName,
+            Link: $"{_options.ResetUrlTemplate}?token={Uri.EscapeDataString(plaintext)}",
+            ExpiresInMinutes: _options.TokenLifetimeMinutes));
     }
 
     public async Task ResetAsync(ResetPasswordDto dto, CancellationToken ct)

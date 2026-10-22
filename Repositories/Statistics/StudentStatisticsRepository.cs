@@ -50,14 +50,29 @@ public class StudentStatisticsRepository(AppDbContext context)
                 .Select(e => e.EnrolledAt)
                 .FirstOrDefault() <= ctx.To, ct);
 
+        // One round trip for the six plain counts: grouping on a constant turns them into
+        // conditional aggregates in a single SELECT, instead of six queries to Neon in a row.
+        var counts = await students
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Active = g.Count(s => s.GraduationDate == null),
+                Graduated = g.Count(s => s.GraduationDate != null),
+                Female = g.Count(s => s.Gender == Gender.Female),
+                Male = g.Count(s => s.Gender == Gender.Male),
+                Unknown = g.Count(s => s.Gender == null),
+            })
+            .FirstOrDefaultAsync(ct);
+
         return new StudentStatisticsDto(
-            await students.CountAsync(ct),
-            await students.CountAsync(s => s.GraduationDate == null, ct),
-            await students.CountAsync(s => s.GraduationDate != null, ct),
+            counts?.Total ?? 0,
+            counts?.Active ?? 0,
+            counts?.Graduated ?? 0,
             newArrivals,
-            await students.CountAsync(s => s.Gender == Gender.Female, ct),
-            await students.CountAsync(s => s.Gender == Gender.Male, ct),
-            await students.CountAsync(s => s.Gender == null, ct));
+            counts?.Female ?? 0,
+            counts?.Male ?? 0,
+            counts?.Unknown ?? 0);
     }
 
     public async Task<IReadOnlyList<CountRow>> GetByGradeAsync(

@@ -16,7 +16,7 @@ public class GradingPeriodRepository(AppDbContext context)
                join y in _context.AcademicYears on g.AcademicYearId equals y.Id
                where g.AcademicYearId == academicYearId
                orderby g.StartDate
-               select new GradingPeriodListDto(g.Id, g.AcademicYearId, y.Name, g.Name, g.StartDate, g.EndDate))
+               select new GradingPeriodListDto(g.Id, g.AcademicYearId, y.Name, g.Name, g.StartDate, g.EndDate, g.ClosedAt))
             .ToListAsync(ct);
 
     public async Task<GradingPeriod?> GetContainingAsync(
@@ -37,6 +37,6 @@ public class GradingPeriodRepository(AppDbContext context)
     public async Task<GradingPeriod?> GetByIdAcrossSchoolsAsync(Guid gradingPeriodId, CancellationToken ct) =>
         await _context.GradingPeriods
             .AsNoTracking()
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .FirstOrDefaultAsync(g => g.Id == gradingPeriodId, ct);
 }

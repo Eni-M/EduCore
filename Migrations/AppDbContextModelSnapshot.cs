@@ -249,6 +249,12 @@ namespace EduCore.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<string>("Changes")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("SchoolId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("timestamp with time zone");
 
@@ -260,6 +266,8 @@ namespace EduCore.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SchoolId", "Timestamp");
 
                     b.HasIndex("Timestamp", "Id")
                         .IsDescending(true, false);
@@ -662,7 +670,10 @@ namespace EduCore.Migrations
 
                     b.HasIndex("SchoolId", "ClassId", "LeftAt");
 
-                    b.ToTable("Enrollments");
+                    b.ToTable("Enrollments", t =>
+                        {
+                            t.HasCheckConstraint("CK_Enrollments_ExitReasonWithLeftAt", "(\"LeftAt\" IS NULL) = (\"ExitReason\" IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("EduCore.Models.GradeCurriculum", b =>
@@ -703,6 +714,12 @@ namespace EduCore.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("AcademicYearId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ClosedByUserId")
                         .HasColumnType("uuid");
 
                     b.Property<DateOnly>("EndDate")
@@ -847,6 +864,9 @@ namespace EduCore.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<double?>("WeightedValue")
+                        .HasColumnType("double precision");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ClassId", "AcademicYearId");
@@ -866,7 +886,56 @@ namespace EduCore.Migrations
 
                     b.HasIndex("ClassSubjectTeacherId", "ClassId", "SubjectId", "TeacherId", "SchoolId");
 
-                    b.ToTable("Marks");
+                    b.ToTable("Marks", t =>
+                        {
+                            t.HasCheckConstraint("CK_Marks_FirstMark", "\"FirstMark\" IS NULL OR \"FirstMark\" BETWEEN 1 AND 5");
+
+                            t.HasCheckConstraint("CK_Marks_SecondMark", "\"SecondMark\" IS NULL OR \"SecondMark\" BETWEEN 1 AND 5");
+                        });
+                });
+
+            modelBuilder.Entity("EduCore.Models.MarkChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AfterClose")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ChangedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MarkId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("NewFirstMark")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("NewSecondMark")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("OldFirstMark")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("OldSecondMark")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MarkId", "ChangedAt");
+
+                    b.ToTable("MarkChanges");
                 });
 
             modelBuilder.Entity("EduCore.Models.Message", b =>
@@ -969,9 +1038,6 @@ namespace EduCore.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<DateTime?>("ReadAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<int>("RecipientRole")
                         .HasColumnType("integer");
 
@@ -986,9 +1052,33 @@ namespace EduCore.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("SchoolId", "RecipientRole", "ReadAt");
+                    b.HasIndex("SchoolId", "RecipientRole", "CreatedAt");
 
                     b.ToTable("Notifications");
+                });
+
+            modelBuilder.Entity("EduCore.Models.NotificationRead", b =>
+                {
+                    b.Property<Guid>("NotificationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RecipientRole")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("NotificationId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("NotificationReads");
                 });
 
             modelBuilder.Entity("EduCore.Models.OriginCity", b =>
@@ -1663,32 +1753,25 @@ namespace EduCore.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("Allergies")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasColumnType("text");
 
                     b.Property<string>("BloodType")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
+                        .HasColumnType("text");
 
                     b.Property<string>("ChronicConditions")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasColumnType("text");
 
                     b.Property<string>("EmergencyContactName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("text");
 
                     b.Property<string>("EmergencyContactPhone")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Medications")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Notes")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("SchoolId")
                         .HasColumnType("uuid");
@@ -1830,6 +1913,9 @@ namespace EduCore.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("ViaAuthenticator")
+                        .HasColumnType("boolean");
+
                     b.HasKey("Id");
 
                     b.HasIndex("UserId", "Purpose", "CompletedAt");
@@ -1877,6 +1963,15 @@ namespace EduCore.Migrations
 
                     b.Property<DateTime?>("SessionsValidFrom")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("TotpConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("TotpLastStep")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("TotpSecret")
+                        .HasColumnType("text");
 
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");
@@ -2227,6 +2322,15 @@ namespace EduCore.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("EduCore.Models.MarkChange", b =>
+                {
+                    b.HasOne("EduCore.Models.Mark", null)
+                        .WithMany()
+                        .HasForeignKey("MarkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("EduCore.Models.Message", b =>
                 {
                     b.HasOne("EduCore.Models.Conversation", "Conversation")
@@ -2259,6 +2363,21 @@ namespace EduCore.Migrations
                         .WithMany()
                         .HasForeignKey("SchoolId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EduCore.Models.NotificationRead", b =>
+                {
+                    b.HasOne("EduCore.Models.Notification", null)
+                        .WithMany()
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EduCore.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

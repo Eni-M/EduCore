@@ -12,21 +12,21 @@ public class PlatformStatsRepository(AppDbContext context) : IPlatformStatsRepos
     // anything narrower and it needs the filters back.
     public async Task<PlatformStatsDto> GetAsync(CancellationToken ct) =>
         new(
-            Schools: await context.Schools.IgnoreQueryFilters()
+            Schools: await context.Schools.IgnoreQueryFilters(QueryFilters.SchoolOnly)
                 .CountAsync(s => s.DeactivatedAt == null, ct),
 
             // Cities that actually hold a school, not every row in the geography table --
             // otherwise the figure counts reference data rather than reach.
-            Cities: await context.Schools.IgnoreQueryFilters()
+            Cities: await context.Schools.IgnoreQueryFilters(QueryFilters.SchoolOnly)
                 .Where(s => s.DeactivatedAt == null && s.CityId != null)
                 .Select(s => s.CityId)
                 .Distinct()
                 .CountAsync(ct),
 
-            Students: await context.Students.IgnoreQueryFilters().CountAsync(ct),
-            Teachers: await context.Teachers.IgnoreQueryFilters().CountAsync(ct),
+            Students: await context.Students.IgnoreQueryFilters(QueryFilters.SchoolOnly).CountAsync(ct),
+            Teachers: await context.Teachers.IgnoreQueryFilters(QueryFilters.SchoolOnly).CountAsync(ct),
 
             // A diary entry is one lesson a teacher recorded as taught.
-            Lessons: await context.DiaryEntries.IgnoreQueryFilters().CountAsync(ct),
-            Attendances: await context.Attendances.IgnoreQueryFilters().CountAsync(ct));
+            Lessons: await context.DiaryEntries.IgnoreQueryFilters(QueryFilters.SchoolOnly).CountAsync(ct),
+            Attendances: await context.Attendances.IgnoreQueryFilters(QueryFilters.SchoolOnly).CountAsync(ct));
 }

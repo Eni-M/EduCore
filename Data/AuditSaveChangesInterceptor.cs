@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Claims;
 using EduCore.Models;
 using Microsoft.EntityFrameworkCore;
@@ -25,35 +26,58 @@ public class AuditSaveChangesInterceptor(IHttpContextAccessor httpContextAccesso
         return base.SavingChangesAsync(eventData, result, cancellationToken);
     }
 
+    // Entities whose old and new values are safe and useful to keep: a mark is a legal record,
+    // and "4 -> 2" is what a grade dispute needs. Every other entity records which fields
+    // changed, never their values -- several hold encrypted or personal data.
+    private static readonly HashSet<Type> ValueAudited = [typeof(Mark), typeof(GradingPeriod)];
+
     private void AddAuditLogs(DbContext? context)
     {
         if (context is null)
             return;
 
-        var changes = context.ChangeTracker.Entries()
+        var entries = context.ChangeTracker.Entries()
             // Statistics snapshots are derived data that the app rewrites on its own schedule,
             // not something a user did. Auditing them would bury real activity under refresh
             // noise in the table that is already the largest in the database.
             .Where(e => e.Entity is not AuditLog and not SchoolStatisticsSnapshot
                         && e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
-            .Select(e => $"{e.State} {e.Entity.GetType().Name} ({Key(e)})")
             .ToList();
 
-        if (changes.Count == 0)
+        if (entries.Count == 0)
             return;
 
         var userId = CurrentUserId();
         var timestamp = DateTime.UtcNow;
 
-        var traceId = httpContextAccessor.HttpContext?.TraceIdentifier;
+        // The W3C trace id, the same one GlobalExceptionHandler reports, so an audit row lines up
+        // with the request's log lines and spans. TraceIdentifier is a per-process counter.
+        var traceId = Activity.Current?.TraceId.ToString() ?? httpContextAccessor.HttpContext?.TraceIdentifier;
 
-        context.AddRange(changes.Select(action => new AuditLog
+        context.AddRange(entries.Select(e => new AuditLog
         {
             UserId = userId,
-            Action = action,
+            SchoolId = (e.Entity as ISchoolScoped)?.SchoolId,
+            Action = $"{e.State} {e.Entity.GetType().Name} ({Key(e)})",
+            Changes = e.State == EntityState.Modified ? Changes(e) : null,
             Timestamp = timestamp,
             TraceId = traceId
         }));
+    }
+
+    private static string? Changes(EntityEntry entry)
+    {
+        var withValues = ValueAudited.Contains(entry.Entity.GetType());
+
+        var changed = entry.Properties
+            .Where(p => p.IsModified && !p.Metadata.IsShadowProperty()
+                        && !Equals(p.OriginalValue, p.CurrentValue))
+            .Select(p => withValues
+                ? $"{p.Metadata.Name}: {p.OriginalValue ?? "null"} -> {p.CurrentValue ?? "null"}"
+                : p.Metadata.Name)
+            .ToList();
+
+        return changed.Count == 0 ? null : string.Join("; ", changed);
     }
 
     private static string Key(EntityEntry entry) =>

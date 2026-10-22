@@ -1,5 +1,7 @@
 using EduCore.Data;
 using EduCore.Dtos.Location;
+using EduCore.Dtos.Pagination;
+using EduCore.Helpers;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -118,7 +120,7 @@ public class LocationRepository(AppDbContext context) : ILocationRepository
             ct);
 
     public async Task<bool> CountryIsInUseAsync(Guid countryId, CancellationToken ct) =>
-        await context.Students.IgnoreQueryFilters().AnyAsync(s => s.CountryId == countryId, ct)
+        await context.Students.IgnoreQueryFilters(QueryFilters.SchoolOnly).AnyAsync(s => s.CountryId == countryId, ct)
         || await context.OriginCities.AnyAsync(c => c.CountryId == countryId, ct);
 
     public async Task<IEnumerable<OriginCityListDto>> GetOriginCitiesAsync(Guid? countryId, CancellationToken ct)
@@ -133,6 +135,34 @@ public class LocationRepository(AppDbContext context) : ILocationRepository
             .ThenBy(c => c.Name)
             .Select(c => new OriginCityListDto(c.Id, c.Name, c.CountryId, c.Country.Name))
             .ToListAsync(ct);
+    }
+
+    // Paged and searched in SQL: origin cities are sized by the world, not by a school, so this
+    // list is the one that can outgrow loading in full.
+    public async Task<PagedResultDto<OriginCityListDto>> GetOriginCitiesPagedAsync(
+        Guid? countryId, PaginationQueryDto pagination, string? search, CancellationToken ct)
+    {
+        var (page, pageSize) = ListPagination.Normalize(pagination);
+        var query = context.OriginCities.AsNoTracking();
+
+        if (countryId is not null)
+            query = query.Where(c => c.CountryId == countryId);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = $"%{search.Trim()}%";
+            query = query.Where(c => EF.Functions.ILike(c.Name, term) || EF.Functions.ILike(c.Country.Name, term));
+        }
+
+        var total = await query.CountAsync(ct);
+        var items = await query
+            .OrderBy(c => c.Country.Name).ThenBy(c => c.Name).ThenBy(c => c.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => new OriginCityListDto(c.Id, c.Name, c.CountryId, c.Country.Name))
+            .ToListAsync(ct);
+
+        return new PagedResultDto<OriginCityListDto>(items, page, pageSize, total);
     }
 
     public async Task<OriginCity?> GetOriginCityAsync(Guid cityId, CancellationToken ct) =>
@@ -154,7 +184,7 @@ public class LocationRepository(AppDbContext context) : ILocationRepository
             ct);
 
     public async Task<bool> OriginCityIsInUseAsync(Guid cityId, CancellationToken ct) =>
-        await context.Students.IgnoreQueryFilters().AnyAsync(s => s.OriginCityId == cityId, ct);
+        await context.Students.IgnoreQueryFilters(QueryFilters.SchoolOnly).AnyAsync(s => s.OriginCityId == cityId, ct);
 
     public async Task AddStateAsync(State state) => await context.States.AddAsync(state);
     public async Task AddCityAsync(City city) => await context.Cities.AddAsync(city);

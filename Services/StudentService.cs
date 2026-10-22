@@ -25,6 +25,7 @@ public class StudentService(
     ILocationRepository locations,
     IAccessGuard access,
     ICurrentUser currentUser,
+    IAuditTrail audit,
     IMapper mapper) : IStudentService
 {
     public async Task<PagedResultDto<StudentListDto>> GetPagedAsync(
@@ -36,6 +37,9 @@ public class StudentService(
         var (page, pageSize) = Normalize(pagination);
 
         var (items, totalCount) = await students.GetPagedAsync(page, pageSize, search, includeGraduated, ct);
+
+        // The list carries personal numbers: one row per page shows who viewed them in bulk.
+        await audit.RecordAsync($"Listed Students (page {page})", ct, schoolId: currentUser.SchoolId);
 
         return new PagedResultDto<StudentListDto>(
             WithVisibleAccounts(mapper.Map<List<StudentListDto>>(items)).ToList(),
@@ -59,7 +63,25 @@ public class StudentService(
         var student = await students.GetWithGuardiansAsync(studentId, ct)
                       ?? throw new NotFoundException("Student", studentId);
 
+        await audit.RecordAsync($"Read Student ({studentId})", ct, schoolId: student.SchoolId);
+
         return mapper.Map<StudentDetailDto>(student);
+    }
+
+    public async Task<StudentSummaryDto> GetSummaryAsync(Guid studentId, CancellationToken ct)
+    {
+        await access.EnsureCanViewStudentAsync(studentId, ct);
+
+        var enrollment = await enrollments.GetActiveForStudentAsync(studentId, ct);
+        var currentClass = enrollment is null ? null : await classes.GetDtoAsync(enrollment.ClassId, ct);
+        var (recorded, present) = await attendances.CountForStudentAsync(studentId, ct);
+
+        return new StudentSummaryDto(
+            currentClass?.Id,
+            currentClass?.Name,
+            (await marks.GetByStudentAsync(studentId, null, null, ct)).ToList(),
+            recorded,
+            present);
     }
 
     public async Task<StudentProfileDto> GetProfileAsync(Guid studentId, CancellationToken ct)
@@ -170,8 +192,7 @@ public class StudentService(
                 $"They joined this class on {enrollment.EnrolledAt:yyyy-MM-dd}; a graduation " +
                 "cannot be dated before that.");
 
-        enrollment.LeftAt = dto.GraduationDate;
-        enrollment.ExitReason = EnrollmentExitReason.Graduated;
+        enrollment.End(dto.GraduationDate, EnrollmentExitReason.Graduated);
         enrollments.Update(enrollment);
 
         student.GraduationDate = dto.GraduationDate;

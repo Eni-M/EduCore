@@ -16,36 +16,36 @@ public static class LessonEndpoints
             .WithTags("Enrollments");
 
         enrollments.MapPost("/", async (EnrollmentCreateDto dto, IEnrollmentService service, CancellationToken ct) =>
-            Results.Ok(await service.EnrollAsync(dto, ct)));
+            TypedResults.Ok(await service.EnrollAsync(dto, ct)));
 
         enrollments.MapPost("/{enrollmentId:guid}/withdraw",
             async (Guid enrollmentId, EnrollmentWithdrawDto dto, IEnrollmentService service, CancellationToken ct) =>
             {
                 await service.WithdrawAsync(enrollmentId, dto, ct);
-                return Results.NoContent();
+                return TypedResults.NoContent();
             });
 
         var diary = api.MapGroup("/diary-entries").WithTags("Diary");
 
         diary.MapGet("/mine", async (DateOnly? from, DateOnly? to, IDiaryEntryService service, CancellationToken ct) =>
-                Results.Ok(await service.GetMineAsync(from, to, ct)))
+                TypedResults.Ok(await service.GetMineAsync(from, to, ct)))
             .RequireAuthorization(Policies.Teacher);
 
         diary.MapGet("/{diaryEntryId:guid}",
                 async (Guid diaryEntryId, IDiaryEntryService service, CancellationToken ct) =>
-                    Results.Ok(await service.GetDetailAsync(diaryEntryId, ct)))
+                    TypedResults.Ok(await service.GetDetailAsync(diaryEntryId, ct)))
             .RequireAuthorization(Policies.AnySchoolUser);
 
         diary.MapPost("/", async (DiaryEntryCreateDto dto, IDiaryEntryService service, CancellationToken ct) =>
             {
                 var entry = await service.CreateAsync(dto, ct);
-                return Results.Created($"/api/diary-entries/{entry.Id}", entry);
+                return TypedResults.Created($"/api/diary-entries/{entry.Id}", entry);
             })
             .RequireAuthorization(Policies.DirectorateOrTeacher);
 
         diary.MapPut("/{diaryEntryId:guid}",
                 async (Guid diaryEntryId, DiaryEntryEditDto dto, IDiaryEntryService service, CancellationToken ct) =>
-                    Results.Ok(await service.UpdateAsync(diaryEntryId, dto, ct)))
+                    TypedResults.Ok(await service.UpdateAsync(diaryEntryId, dto, ct)))
             .RequireAuthorization(Policies.DirectorateOrTeacher);
 
         var attendance = api.MapGroup("/attendance")
@@ -56,7 +56,7 @@ public static class LessonEndpoints
             async (Guid attendanceId, AttendanceEditDto dto, IAttendanceService service, CancellationToken ct) =>
             {
                 await service.UpdateAsync(attendanceId, dto, ct);
-                return Results.NoContent();
+                return TypedResults.NoContent();
             });
 
         var marks = api.MapGroup("/marks")
@@ -64,11 +64,14 @@ public static class LessonEndpoints
             .WithTags("Marks");
 
         marks.MapPost("/", async (MarkUpsertDto dto, IMarkService service, CancellationToken ct) =>
-            Results.Ok(await service.UpsertAsync(dto, ct)));
+            TypedResults.Ok(await service.UpsertAsync(dto, ct)));
+
+        marks.MapGet("/{markId:guid}/changes", async (Guid markId, IMarkService service, CancellationToken ct) =>
+            TypedResults.Ok(await service.GetChangesAsync(markId, ct)));
 
         api.MapGet("/audit-logs", async (int? page, int? pageSize, Guid? userId, DateTime? from, DateTime? to,
                     IAuditLogService service, CancellationToken ct) =>
-                Results.Ok(await service.GetPagedAsync(
+                TypedResults.Ok(await service.GetPagedAsync(
                     new Dtos.Pagination.PaginationQueryDto(page ?? 1, pageSize ?? 20), userId, from, to, ct)))
             .RequireAuthorization(Policies.StateAdmin)
             .WithTags("Audit");

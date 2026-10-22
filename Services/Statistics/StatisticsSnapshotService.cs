@@ -67,15 +67,21 @@ public class StatisticsSnapshotService(
                 schoolIds, ctx.From, ctx.To, ctx.AcademicYearId, ctx.GradingPeriodId, ct))
             .ToDictionary(s => s.SchoolId);
 
+        var refreshesLeft = _options.MaximumRefreshesPerRequest;
+
         foreach (var schoolId in schoolIds)
         {
             existing.TryGetValue(schoolId, out var snapshot);
 
-            if (snapshot is not null && !IsStale(snapshot))
+            // Fresh, or stale with this request's refresh budget spent: serve what is stored.
+            if (snapshot is not null && (!IsStale(snapshot) || refreshesLeft == 0))
             {
                 result[schoolId] = snapshot;
                 continue;
             }
+
+            if (snapshot is not null)
+                refreshesLeft--;
 
             // Narrow the query to this school so the aggregates are computed for it alone.
             var scoped = ctx with { SchoolId = schoolId, CrossSchool = false };

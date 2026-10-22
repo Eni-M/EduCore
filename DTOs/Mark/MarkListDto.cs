@@ -13,4 +13,7 @@ public record MarkListDto(
     string GradingPeriodName,
     int? FirstMark,
     int? SecondMark,
-    int? FinalMark);
+    int? FinalMark,
+    [property: System.Text.Json.Serialization.JsonIgnore] double? WeightedValue = null,
+    uint Version = 0,
+    bool PeriodClosed = false);

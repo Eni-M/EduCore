@@ -1,4 +1,5 @@
-﻿using AutoMapper;
+﻿using EduCore.Services.Interfaces;
+using AutoMapper;
 using EduCore.Dtos.Location;
 using EduCore.Dtos.School;
 using EduCore.Enums;
@@ -95,6 +96,7 @@ public class SchoolServiceLocationTests
         public Task<Country?> GetCountryAsync(Guid countryId, CancellationToken ct) => Task.FromResult<Country?>(null);
         public Task<bool> CountryNameExistsAsync(string name, Guid? excludeCountryId, CancellationToken ct) => Task.FromResult(false);
         public Task<bool> CountryIsInUseAsync(Guid countryId, CancellationToken ct) => Task.FromResult(false);
+        public Task<EduCore.Dtos.Pagination.PagedResultDto<OriginCityListDto>> GetOriginCitiesPagedAsync(Guid? countryId, EduCore.Dtos.Pagination.PaginationQueryDto pagination, string? search, CancellationToken ct) => throw new NotSupportedException();
         public Task<IEnumerable<OriginCityListDto>> GetOriginCitiesAsync(Guid? countryId, CancellationToken ct) =>
             Task.FromResult(Enumerable.Empty<OriginCityListDto>());
         public Task<OriginCity?> GetOriginCityAsync(Guid cityId, CancellationToken ct) => Task.FromResult<OriginCity?>(null);
@@ -124,6 +126,7 @@ public class SchoolServiceLocationTests
             new FakeSchoolRepository(),
             new FakeLocationRepository(cityA, zoneInCityB),
             new FakeCurrentUser { CityId = cityA.Id },
+            Stub.Of<IAccessGuard>(),
             Mapper());
 
         var dto = new SchoolCreateDto("New School", SchoolType.HighSchool, cityA.Id, zoneInCityB.Id);
@@ -139,7 +142,7 @@ public class SchoolServiceLocationTests
         var repo = new FakeSchoolRepository();
 
         var service = new SchoolService(
-            repo, new FakeLocationRepository(city, zone), new FakeCurrentUser { CityId = city.Id }, Mapper());
+            repo, new FakeLocationRepository(city, zone), new FakeCurrentUser { CityId = city.Id }, Stub.Of<IAccessGuard>(), Mapper());
 
         var dto = new SchoolCreateDto("New School", SchoolType.HighSchool, city.Id, zone.Id);
 

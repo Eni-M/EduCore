@@ -32,6 +32,15 @@ public class User
     // its hour. Null until the first of those happens.
     public DateTime? SessionsValidFrom { get; set; }
 
+    // An authenticator app as the second step (RFC 6238). The secret is sealed at rest like the
+    // medical fields. Set but unconfirmed while setup is in progress; once confirmed, sign-in asks
+    // for an app code instead of emailing one. TotpLastStep refuses a code already used.
+    public string? TotpSecret { get; set; }
+    public DateTime? TotpConfirmedAt { get; set; }
+    public long? TotpLastStep { get; set; }
+
+    public bool HasAuthenticator => TotpConfirmedAt is not null && TotpSecret is not null;
+
     public void SetPassword(string password, IPasswordHasher<User> hasher) =>
         PasswordHash = hasher.HashPassword(this, password);
 }

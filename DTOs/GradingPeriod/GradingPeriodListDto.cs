@@ -6,4 +6,5 @@ public record GradingPeriodListDto(
     string AcademicYearName,
     string Name,
     DateOnly StartDate,
-    DateOnly EndDate);
+    DateOnly EndDate,
+    DateTime? ClosedAt = null);

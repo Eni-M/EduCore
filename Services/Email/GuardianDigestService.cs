@@ -49,11 +49,11 @@ public class GuardianDigestService(
 
         // One query for the whole platform's guardian-child links, rather than one per guardian.
         var links = await (
-            from gs in db.GuardianStudents.IgnoreQueryFilters()
-            join g in db.Guardians.IgnoreQueryFilters() on gs.GuardianId equals g.Id
-            join gu in db.Users.IgnoreQueryFilters() on g.UserId equals gu.Id
-            join s in db.Students.IgnoreQueryFilters() on gs.StudentId equals s.Id
-            join su in db.Users.IgnoreQueryFilters() on s.UserId equals su.Id
+            from gs in db.GuardianStudents.IgnoreQueryFilters(QueryFilters.SchoolOnly)
+            join g in db.Guardians.IgnoreQueryFilters(QueryFilters.SchoolOnly) on gs.GuardianId equals g.Id
+            join gu in db.Users.IgnoreQueryFilters(QueryFilters.SchoolOnly) on g.UserId equals gu.Id
+            join s in db.Students.IgnoreQueryFilters(QueryFilters.SchoolOnly) on gs.StudentId equals s.Id
+            join su in db.Users.IgnoreQueryFilters(QueryFilters.SchoolOnly) on s.UserId equals su.Id
             where gu.DeactivatedAt == null
                   && !gu.EmailDigestsOptOut
                   && gu.Email != null
@@ -77,21 +77,21 @@ public class GuardianDigestService(
         // null is excluded rather than treated as recent -- an old mark must not resurface as
         // this week's news.
         var marks = await (
-            from m in db.Marks.IgnoreQueryFilters()
-            join e in db.Enrollments.IgnoreQueryFilters() on m.EnrollmentId equals e.Id
-            join sub in db.Subjects.IgnoreQueryFilters() on m.SubjectId equals sub.Id
+            from m in db.Marks.IgnoreQueryFilters(QueryFilters.SchoolOnly)
+            join e in db.Enrollments.IgnoreQueryFilters(QueryFilters.SchoolOnly) on m.EnrollmentId equals e.Id
+            join sub in db.Subjects.IgnoreQueryFilters(QueryFilters.SchoolOnly) on m.SubjectId equals sub.Id
             where studentIds.Contains(e.StudentId)
                   && m.RecordedAt != null
                   && m.RecordedAt >= sinceUtc
-            select new { e.StudentId, Subject = sub.Name, m.FirstMark, m.SecondMark })
+            select new { e.StudentId, Subject = sub.Name, m.FirstMark, m.SecondMark, m.WeightedValue })
             .ToListAsync(ct);
 
         // Attendance hangs off a diary entry, so an absence always refers to a lesson that was
         // actually taught on a known date.
         var absences = await (
-            from a in db.Attendances.IgnoreQueryFilters()
-            join e in db.Enrollments.IgnoreQueryFilters() on a.EnrollmentId equals e.Id
-            join d in db.DiaryEntries.IgnoreQueryFilters() on a.DiaryEntryId equals d.Id
+            from a in db.Attendances.IgnoreQueryFilters(QueryFilters.SchoolOnly)
+            join e in db.Enrollments.IgnoreQueryFilters(QueryFilters.SchoolOnly) on a.EnrollmentId equals e.Id
+            join d in db.DiaryEntries.IgnoreQueryFilters(QueryFilters.SchoolOnly) on a.DiaryEntryId equals d.Id
             where studentIds.Contains(e.StudentId)
                   && !a.IsPresent
                   && d.Date > since
@@ -119,7 +119,7 @@ public class GuardianDigestService(
                         return new ChildChanges(
                             link.ChildFirstName,
                             data.Marks
-                                .Select(m => $"{m.Subject}: {Describe(m.FirstMark, m.SecondMark)}")
+                                .Select(m => $"{m.Subject}: {Describe(m.WeightedValue)}")
                                 .OrderBy(line => line)
                                 .ToList(),
                             data.Absences.Count,
@@ -171,8 +171,8 @@ public class GuardianDigestService(
     // The mark as a reader recognises it: the final grade when both components exist, and an
     // explicit note when only one does, because a half-entered mark counts for nothing yet and a
     // guardian should not read it as a grade.
-    private string Describe(int? first, int? second) =>
-        grading.FinalMark(first, second) is { } final
+    private string Describe(double? weightedValue) =>
+        grading.FinalMark(weightedValue) is { } final
             ? final.ToString()
             : "recorded, not yet complete";
 

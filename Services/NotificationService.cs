@@ -9,14 +9,14 @@ using EduCore.Services.Interfaces;
 
 namespace EduCore.Services;
 
+// Bell streams are woken by NotificationSignalInterceptor whenever notification rows are saved,
+// so nothing here signals by hand.
 public class NotificationService(
     INotificationRepository notifications,
-    ICurrentUser currentUser,
-    NotificationSignals signals) : INotificationService
+    ICurrentUser currentUser) : INotificationService
 {
-    public async Task NotifyRoleAsync(
-        Guid schoolId, UserRole role, string message, string? link, CancellationToken ct)
-    {
+    public async Task StageForRoleAsync(
+        Guid schoolId, UserRole role, string message, string? link, CancellationToken ct) =>
         await notifications.AddAsync(new Notification
         {
             SchoolId = schoolId,
@@ -26,45 +26,37 @@ public class NotificationService(
             CreatedAt = DateTime.UtcNow,
         });
 
-        await notifications.SaveChangesAsync(ct);
-        signals.Changed(schoolId, role);
-    }
-
     public async Task<PagedResultDto<NotificationDto>> GetMineAsync(
-        bool unreadOnly, PaginationQueryDto pagination, CancellationToken ct)
-    {
-        var page = await notifications.GetPagedForRoleAsync(RequireRole(), unreadOnly, pagination, ct);
-
-        return new PagedResultDto<NotificationDto>(
-            page.Items.Select(n => new NotificationDto(n.Id, n.Message, n.Link, n.CreatedAt, n.ReadAt)).ToList(),
-            page.Page, page.PageSize, page.TotalCount);
-    }
+        bool unreadOnly, PaginationQueryDto pagination, CancellationToken ct) =>
+        await notifications.GetPagedForUserAsync(RequireRole(), currentUser.UserId, unreadOnly, pagination, ct);
 
     public async Task<int> GetUnreadCountAsync(CancellationToken ct) =>
-        await notifications.CountUnreadForRoleAsync(RequireRole(), ct);
+        await notifications.CountUnreadAsync(RequireRole(), currentUser.UserId, ct);
 
     public async Task MarkReadAsync(Guid id, CancellationToken ct)
     {
-        // The school filter keeps this to notifications in the caller's own school.
-        var notification = await notifications.GetByIdAsync(id, ct)
-                           ?? throw new NotFoundException("Notification", id);
+        // The school filter keeps this to notifications in the caller's own school, and the role
+        // check to the caller's own bell.
+        var notification = await notifications.GetByIdAsync(id, ct);
+        if (notification is null || notification.RecipientRole != RequireRole())
+            throw new NotFoundException("Notification", id);
 
-        if (notification.ReadAt is not null) return;
+        if (await notifications.IsReadByAsync(id, currentUser.UserId, ct))
+            return;
 
-        notification.ReadAt = DateTime.UtcNow;
-        notifications.Update(notification);
+        notifications.AddRead(new NotificationRead
+        {
+            NotificationId = id,
+            UserId = currentUser.UserId,
+            ReadAt = DateTime.UtcNow,
+            SchoolId = notification.SchoolId,
+            RecipientRole = notification.RecipientRole,
+        });
         await notifications.SaveChangesAsync(ct);
-        signals.Changed(notification.SchoolId, notification.RecipientRole);
     }
 
-    public async Task MarkAllReadAsync(CancellationToken ct)
-    {
-        var role = RequireRole();
-        if (await notifications.MarkAllReadForRoleAsync(role, DateTime.UtcNow, ct) == 0) return;
-
-        foreach (var schoolId in currentUser.SchoolIds)
-            signals.Changed(schoolId, role);
-    }
+    public async Task MarkAllReadAsync(CancellationToken ct) =>
+        await notifications.MarkAllReadAsync(RequireRole(), currentUser.UserId, DateTime.UtcNow, ct);
 
     private UserRole RequireRole() => currentUser.Role ?? throw new ForbiddenException("You have no role.");
 }

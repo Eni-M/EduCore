@@ -17,7 +17,7 @@ public static class AssignmentSubmissionEndpoints
                     Guid assignmentId,
                     IAssignmentSubmissionService service,
                     CancellationToken ct) =>
-                    Results.Ok(await service.GetForAssignmentAsync(assignmentId, ct)))
+                    TypedResults.Ok(await service.GetForAssignmentAsync(assignmentId, ct)))
             .RequireAuthorization(Policies.Teacher);
 
         group.MapPut("/{studentId:guid}",
@@ -27,7 +27,7 @@ public static class AssignmentSubmissionEndpoints
                     UpdateAssignmentSubmissionDto dto,
                     IAssignmentSubmissionService service,
                     CancellationToken ct) =>
-                    Results.Ok(await service.GradeAsync(assignmentId, studentId, dto, ct)))
+                    TypedResults.Ok(await service.GradeAsync(assignmentId, studentId, dto, ct)))
             .RequireAuthorization(Policies.Teacher);
     }
 }

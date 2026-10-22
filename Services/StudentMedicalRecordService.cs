@@ -16,6 +16,7 @@ public class StudentMedicalRecordService(
     INotificationService notifications,
     IAccessGuard access,
     ICurrentUser currentUser,
+    IAuditTrail audit,
     IMapper mapper) : IStudentMedicalRecordService
 {
     public async Task<StudentMedicalRecordDto?> GetByStudentAsync(Guid studentId, CancellationToken ct)
@@ -23,6 +24,9 @@ public class StudentMedicalRecordService(
         await access.EnsureCanViewStudentMedicalAsync(studentId, ct);
 
         var record = await records.GetByStudentAsync(studentId, ct);
+
+        // Health data about a child: every view is recorded, including views of an empty record.
+        await audit.RecordAsync($"Read StudentMedicalRecord of Student ({studentId})", ct, schoolId: record?.SchoolId);
 
         return record is null ? null : mapper.Map<StudentMedicalRecordDto>(record);
     }
@@ -34,7 +38,8 @@ public class StudentMedicalRecordService(
         var student = await students.GetByIdAsync(studentId, ct)
                       ?? throw new NotFoundException("Student", studentId);
 
-        var record = await ApplyAsync(studentId, student.SchoolId, dto, ct);
+        var record = await StageAsync(studentId, student.SchoolId, dto, ct);
+        await records.SaveChangesAsync(ct);
         return mapper.Map<StudentMedicalRecordDto>(record);
     }
 
@@ -48,21 +53,25 @@ public class StudentMedicalRecordService(
         var student = await students.GetWithGuardiansAsync(studentId, ct)
                       ?? throw new NotFoundException("Student", studentId);
 
-        var record = await ApplyAsync(studentId, student.SchoolId, dto, ct);
+        var record = await StageAsync(studentId, student.SchoolId, dto, ct);
 
-        // Surface the change to the school's directorate for review.
+        // Surface the change to the school's directorate for review -- in the same save as the
+        // change, so the record is never updated without the office being told.
         var studentName = $"{student.User.FirstName} {student.User.LastName}";
-        await notifications.NotifyRoleAsync(
+        await notifications.StageForRoleAsync(
             student.SchoolId,
             UserRole.Directorate,
             $"A guardian updated the medical record for {studentName}.",
             $"/students/{studentId}",
             ct);
 
+        await records.SaveChangesAsync(ct);
         return mapper.Map<StudentMedicalRecordDto>(record);
     }
 
-    private async Task<StudentMedicalRecord> ApplyAsync(
+    // Adds or updates the record without saving; the caller saves, together with anything else
+    // that belongs to the same change.
+    private async Task<StudentMedicalRecord> StageAsync(
         Guid studentId, Guid schoolId, StudentMedicalRecordUpsertDto dto, CancellationToken ct)
     {
         var record = await records.GetByStudentAsync(studentId, ct);
@@ -82,7 +91,6 @@ public class StudentMedicalRecordService(
             records.Update(record);
         }
 
-        await records.SaveChangesAsync(ct);
         return record;
     }
 }

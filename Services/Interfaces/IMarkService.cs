@@ -11,4 +11,5 @@ public interface IMarkService
         Guid classId, Guid? subjectId, Guid? gradingPeriodId, CancellationToken ct);
 
     Task<MarkListDto> UpsertAsync(MarkUpsertDto dto, CancellationToken ct);
+    Task<IReadOnlyList<MarkChangeDto>> GetChangesAsync(Guid markId, CancellationToken ct);
 }

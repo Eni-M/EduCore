@@ -78,7 +78,8 @@ public class TwoFactorServiceTests
         var service = new TwoFactorService(
             rows, mail,
             Options.Create(new TwoFactorOptions { MaxAttempts = maxAttempts, CodeLifetimeMinutes = lifetimeMinutes }),
-            Options.Create(new PasswordResetOptions { ResetUrlTemplate = "https://educore.example/reset-password" }));
+            Options.Create(new PasswordResetOptions { ResetUrlTemplate = "https://educore.example/reset-password" }),
+            new NullAuditTrail());
 
         return (service, rows, mail);
     }

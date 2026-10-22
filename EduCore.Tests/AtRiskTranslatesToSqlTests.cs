@@ -44,6 +44,8 @@ public class AtRiskTranslatesToSqlTests
     {
         public string Encrypt(string value) => value;
         public string Decrypt(string value) => value;
+        public string Seal(string value) => value;
+        public bool NeedsReencryption(string? stored) => false;
     }
 
     private static AppDbContext Context()
@@ -61,7 +63,7 @@ public class AtRiskTranslatesToSqlTests
         var grading = new GradingCalculator(Options.Create(weights));
 
         return new AcademicStatisticsRepository(
-            context, new MarkRepository(context, grading, Options.Create(weights)), grading);
+            context, new MarkRepository(context, grading), grading);
     }
 
     // Ministry-wide: no school, cross-school true -- exactly the shape the failing request had.

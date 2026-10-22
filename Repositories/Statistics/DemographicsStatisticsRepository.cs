@@ -11,9 +11,9 @@ public class DemographicsStatisticsRepository(AppDbContext context) : IDemograph
     public async Task<IReadOnlyList<(string City, int Schools, int Students, int Teachers, int Classes)>>
         GetByCityAsync(CancellationToken ct)
     {
-        var students = context.Students.IgnoreQueryFilters();
-        var teachers = context.Teachers.IgnoreQueryFilters();
-        var classes = context.Classes.IgnoreQueryFilters();
+        var students = context.Students.IgnoreQueryFilters(QueryFilters.SchoolOnly);
+        var teachers = context.Teachers.IgnoreQueryFilters(QueryFilters.SchoolOnly);
+        var classes = context.Classes.IgnoreQueryFilters(QueryFilters.SchoolOnly);
 
         var rows = await context.Schools
             .AsNoTracking()
@@ -43,7 +43,7 @@ public class DemographicsStatisticsRepository(AppDbContext context) : IDemograph
     public async Task<IReadOnlyList<(string City, string Zone, int Schools, int Students)>>
         GetByZoneAsync(string? city, CancellationToken ct)
     {
-        var students = context.Students.IgnoreQueryFilters();
+        var students = context.Students.IgnoreQueryFilters(QueryFilters.SchoolOnly);
 
         var query = context.Schools.AsNoTracking();
 

@@ -19,7 +19,7 @@ public class AcademicStatisticsRepository(
     private IQueryable<double> Values(StatisticsQuery ctx) => marks.WeightedValues(MarksInWindow(ctx));
 
     private IQueryable<Models.Mark> GradedMarks(StatisticsQuery ctx) =>
-        MarksInWindow(ctx).Where(m => m.FirstMark != null && m.SecondMark != null);
+        MarksInWindow(ctx).Where(m => m.WeightedValue != null);
 
     public async Task<AcademicTotals> GetTotalsAsync(StatisticsQuery ctx, CancellationToken ct)
     {
@@ -27,7 +27,7 @@ public class AcademicStatisticsRepository(
 
         var graded = await values.CountAsync(ct);
         var incomplete = await MarksInWindow(ctx)
-            .CountAsync(m => m.FirstMark == null || m.SecondMark == null, ct);
+            .CountAsync(m => m.WeightedValue == null, ct);
 
         if (graded == 0)
             return new AcademicTotals(0, incomplete, null, 0, 0, 0);
@@ -47,11 +47,11 @@ public class AcademicStatisticsRepository(
     // unique across schools, and an unbroken tie lets a row slip or repeat across a page edge.
     private IQueryable<AcademicGroup> BySubjectQuery(StatisticsQuery ctx)
     {
-        var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
+        var pass = grading.PassValue;
 
         return from m in GradedMarks(ctx)
                join s in Scope(_context.Subjects, ctx) on m.SubjectId equals s.Id
-               group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+               group m.WeightedValue!.Value
                    by new { s.Id, s.Name }
                into g
                orderby g.Key.Name, g.Key.Id
@@ -77,11 +77,11 @@ public class AcademicStatisticsRepository(
 
     private IQueryable<AcademicGroup> ByClassQuery(StatisticsQuery ctx)
     {
-        var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
+        var pass = grading.PassValue;
 
         return from m in GradedMarks(ctx)
                join c in ClassesInScope(ctx) on m.ClassId equals c.Id
-               group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+               group m.WeightedValue!.Value
                    by new { c.Id, c.Name }
                into g
                orderby g.Key.Name, g.Key.Id
@@ -100,11 +100,11 @@ public class AcademicStatisticsRepository(
     public async Task<IReadOnlyList<AcademicGroup>> GetByClassAsync(
         StatisticsQuery ctx, IReadOnlyCollection<Guid> classIds, CancellationToken ct)
     {
-        var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
+        var pass = grading.PassValue;
 
         return await (from m in GradedMarks(ctx).Where(m => classIds.Contains(m.ClassId))
                       join c in ClassesInScope(ctx) on m.ClassId equals c.Id
-                      group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+                      group m.WeightedValue!.Value
                           by new { c.Id, c.Name }
                       into g
                       orderby g.Key.Name
@@ -120,11 +120,11 @@ public class AcademicStatisticsRepository(
     public async Task<IReadOnlyList<AcademicGroup>> GetByGradeAsync(
         StatisticsQuery ctx, CancellationToken ct)
     {
-        var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
+        var pass = grading.PassValue;
 
         var rows = await (from m in GradedMarks(ctx)
                           join c in ClassesInScope(ctx) on m.ClassId equals c.Id
-                          group m.FirstMark!.Value * first + m.SecondMark!.Value * second by c.Grade
+                          group m.WeightedValue!.Value by c.Grade
                           into g
                           orderby g.Key
                           select new
@@ -145,12 +145,12 @@ public class AcademicStatisticsRepository(
     public async Task<IReadOnlyList<AcademicGroup>> GetSubjectGradeBaselinesAsync(
         StatisticsQuery ctx, CancellationToken ct)
     {
-        var (first, second, pass) = (grading.FirstMarkWeight, grading.SecondMarkWeight, grading.PassValue);
+        var pass = grading.PassValue;
 
         var rows = await (from m in GradedMarks(ctx)
                           join c in ClassesInScope(ctx) on m.ClassId equals c.Id
                           join s in Scope(_context.Subjects, ctx) on m.SubjectId equals s.Id
-                          group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+                          group m.WeightedValue!.Value
                               by new { m.SubjectId, s.Name, c.Grade }
                           into g
                           select new
@@ -201,7 +201,6 @@ public class AcademicStatisticsRepository(
     public async Task<IReadOnlyList<AtRiskStudentDto>> GetAtRiskAsync(
         StatisticsQuery ctx, CancellationToken ct)
     {
-        var (first, second) = (grading.FirstMarkWeight, grading.SecondMarkWeight);
         var (pass, atRiskUpper) = (grading.PassValue, grading.AtRiskUpperValue);
 
         var rows = await (from m in GradedMarks(ctx)
@@ -209,7 +208,7 @@ public class AcademicStatisticsRepository(
                           join st in Scope(_context.Students, ctx) on e.StudentId equals st.Id
                           join u in _context.Users on st.UserId equals u.Id
                           join c in ClassesInScope(ctx) on m.ClassId equals c.Id
-                          group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+                          group m.WeightedValue!.Value
                               by new
                               {
                                   st.Id,
@@ -297,7 +296,6 @@ public class AcademicStatisticsRepository(
 
     private IQueryable<AtRiskAverage> AtRiskAverages(StatisticsQuery ctx)
     {
-        var (first, second) = (grading.FirstMarkWeight, grading.SecondMarkWeight);
         var (pass, atRiskUpper) = (grading.PassValue, grading.AtRiskUpperValue);
 
         return from m in GradedMarks(ctx)
@@ -305,7 +303,7 @@ public class AcademicStatisticsRepository(
                join st in Scope(_context.Students, ctx) on e.StudentId equals st.Id
                join u in _context.Users on st.UserId equals u.Id
                join c in ClassesInScope(ctx) on m.ClassId equals c.Id
-               group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+               group m.WeightedValue!.Value
                    by new
                    {
                        st.Id,
@@ -338,7 +336,6 @@ public class AcademicStatisticsRepository(
     public async Task<IReadOnlyList<AtRiskClassCount>> GetAtRiskCountsByClassAsync(
         StatisticsQuery ctx, IReadOnlyCollection<Guid> classIds, CancellationToken ct)
     {
-        var (first, second) = (grading.FirstMarkWeight, grading.SecondMarkWeight);
         var atRiskUpper = grading.AtRiskUpperValue;
 
         // Same student-level risk rule as GetAtRiskAsync (average of weighted graded marks
@@ -354,7 +351,7 @@ public class AcademicStatisticsRepository(
                              join e in Scope(_context.Enrollments, ctx) on m.EnrollmentId equals e.Id
                              join st in Scope(_context.Students, ctx) on e.StudentId equals st.Id
                              join c in ClassesInScope(ctx) on m.ClassId equals c.Id
-                             group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+                             group m.WeightedValue!.Value
                                  by new { st.Id, ClassId = c.Id }
                              into g
                              where g.Average() < atRiskUpper

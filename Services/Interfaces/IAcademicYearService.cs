@@ -17,6 +17,7 @@ public interface IAcademicYearService
         Guid academicYearId, AcademicYearCreateDto dto, CancellationToken ct);
 
     Task<IEnumerable<GradingPeriodListDto>> GetGradingPeriodsAsync(Guid academicYearId, CancellationToken ct);
+    Task<GradingPeriodListDto> SetGradingPeriodClosedAsync(Guid gradingPeriodId, bool closed, CancellationToken ct);
     Task<GradingPeriodListDto> EditGradingPeriodAsync(
         Guid gradingPeriodId, GradingPeriodEditDto dto, CancellationToken ct);
 }

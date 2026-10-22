@@ -19,6 +19,11 @@ public static class ListPagination
     // the client receives; it does not reduce the database read (the caller has already
     // loaded the full list). Push paging into the SQL query if a list ever grows large
     // enough that loading it in full is the bottleneck.
+    //
+    // Still used, deliberately, only for lists bounded by their scope: one school's academic
+    // years, one year's classes, the states, cities and zones of one country, the countries,
+    // the state admins, a teacher's or student's own subjects. Lists the outside world sizes --
+    // students, guardians, schools, origin cities -- page in SQL.
     public static PagedResultDto<T> ToPagedResult<T>(
         this IEnumerable<T> source, PaginationQueryDto pagination)
     {

@@ -238,8 +238,7 @@ public class LocationService(ILocationRepository locations) : ILocationService
     public async Task<PagedResultDto<OriginCityListDto>> GetOriginCitiesPagedAsync(
         Guid? countryId, PaginationQueryDto pagination, string? search, CancellationToken ct)
     {
-        var all = await GetOriginCitiesAsync(countryId, ct);
-        return all.Search(search, c => new[] { c.Name, c.CountryName }).ToPagedResult(pagination);
+        return await locations.GetOriginCitiesPagedAsync(countryId, pagination, search, ct);
     }
 
     public async Task<OriginCityListDto> CreateOriginCityAsync(OriginCityWriteDto dto, CancellationToken ct)

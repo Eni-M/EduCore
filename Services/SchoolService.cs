@@ -14,6 +14,7 @@ public class SchoolService(
     ISchoolRepository schools,
     ILocationRepository locations,
     ICurrentUser currentUser,
+    IAccessGuard access,
     IMapper mapper) : ISchoolService
 {
     public async Task<IEnumerable<SchoolListDto>> GetAllAsync(bool activeOnly, CancellationToken ct)
@@ -49,7 +50,7 @@ public class SchoolService(
         var school = await schools.GetWithLocationAsync(schoolId, ct)
                      ?? throw new NotFoundException("School", schoolId);
 
-        await EnsureInCallerScopeAsync(school.CityId, ct);
+        await access.EnsureCanManageSchoolAsync(school.CityId, ct);
 
         return mapper.Map<SchoolListDto>(school);
     }
@@ -77,7 +78,7 @@ public class SchoolService(
         var school = await schools.GetByIdAsync(schoolId, ct)
                      ?? throw new NotFoundException("School", schoolId);
 
-        await EnsureInCallerScopeAsync(school.CityId, ct);
+        await access.EnsureCanManageSchoolAsync(school.CityId, ct);
 
         if (await schools.NameExistsAsync(dto.Name, schoolId, ct))
             throw new ConflictException($"A school named {dto.Name} already exists.");
@@ -100,7 +101,7 @@ public class SchoolService(
         var school = await schools.GetByIdAsync(schoolId, ct)
                      ?? throw new NotFoundException("School", schoolId);
 
-        await EnsureInCallerScopeAsync(school.CityId, ct);
+        await access.EnsureCanManageSchoolAsync(school.CityId, ct);
 
         school.DeactivatedAt = isActive ? null : DateTime.UtcNow;
 
@@ -128,27 +129,6 @@ public class SchoolService(
         }
 
         return requestedCityId;
-    }
-
-    private async Task EnsureInCallerScopeAsync(Guid? schoolCityId, CancellationToken ct)
-    {
-        if (currentUser.IsRegionalAdmin)
-        {
-            if (schoolCityId != currentUser.RequireCityId())
-                throw new ForbiddenException("This school is not in your city.");
-
-            return;
-        }
-
-        if (currentUser.IsStateAdmin)
-        {
-            if (schoolCityId is not { } cityId)
-                throw new ForbiddenException("This school is not in your state.");
-
-            var city = await locations.GetCityAsync(cityId, ct);
-            if (city?.StateId != currentUser.RequireStateId())
-                throw new ForbiddenException("This school is not in your state.");
-        }
     }
 
     private async Task ValidateLocationAsync(Guid? cityId, Guid? zoneId, CancellationToken ct)

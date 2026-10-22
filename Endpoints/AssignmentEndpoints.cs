@@ -17,7 +17,7 @@ public static class AssignmentEndpoints
                     Guid classId,
                     IAssignmentService service,
                     CancellationToken ct) =>
-                    Results.Ok(await service.GetByClassAsync(classId, ct)))
+                    TypedResults.Ok(await service.GetByClassAsync(classId, ct)))
             .RequireAuthorization(Policies.AnySchoolUser);
 
         group.MapGet("/teacher/{teacherId:guid}",
@@ -25,7 +25,7 @@ public static class AssignmentEndpoints
                     Guid teacherId,
                     IAssignmentService service,
                     CancellationToken ct) =>
-                    Results.Ok(await service.GetByTeacherAsync(teacherId, ct)))
+                    TypedResults.Ok(await service.GetByTeacherAsync(teacherId, ct)))
             .RequireAuthorization(Policies.AnySchoolUser);
 
         group.MapGet("/{assignmentId:guid}",
@@ -33,7 +33,7 @@ public static class AssignmentEndpoints
                     Guid assignmentId,
                     IAssignmentService service,
                     CancellationToken ct) =>
-                    Results.Ok(await service.GetDetailsAsync(assignmentId, ct)))
+                    TypedResults.Ok(await service.GetDetailsAsync(assignmentId, ct)))
             .RequireAuthorization(Policies.AnySchoolUser);
 
         group.MapPost("/",
@@ -44,7 +44,7 @@ public static class AssignmentEndpoints
                 {
                     var assignment = await service.CreateAsync(dto, ct);
 
-                    return Results.Created(
+                    return TypedResults.Created(
                         $"/api/assignments/{assignment.Id}",
                         assignment);
                 })
@@ -58,7 +58,7 @@ public static class AssignmentEndpoints
              CancellationToken ct) =>
          {
              var updated = await service.UploadAssignmentFileAsync(assignmentId, file, ct);
-             return Results.Ok(updated);
+             return TypedResults.Ok(updated);
          })
      .RequireAuthorization(Policies.Teacher)
      .DisableAntiforgery();
@@ -71,7 +71,7 @@ public static class AssignmentEndpoints
                     CancellationToken ct) =>
                 {
                     var submission = await service.SubmitAssignmentAsync(assignmentId, file, ct);
-                    return Results.Created($"/api/assignments/{assignmentId}/submissions/{submission.Id}", submission);
+                    return TypedResults.Created($"/api/assignments/{assignmentId}/submissions/{submission.Id}", submission);
                 })
             .RequireAuthorization(Policies.StudentReadable)
             .DisableAntiforgery();
@@ -82,7 +82,7 @@ public static class AssignmentEndpoints
                     Guid assignmentId,
                     IAssignmentService service,
                     CancellationToken ct) =>
-                    Results.Ok(await service.GetMySubmissionAsync(assignmentId, ct)))
+                    TypedResults.Ok(await service.GetMySubmissionAsync(assignmentId, ct)))
             .RequireAuthorization(Policies.StudentReadable);
     }
 }

@@ -85,9 +85,17 @@ public class AccountMailInterceptor(IAccountMailQueue queue) : SaveChangesInterc
                         AccountMailKind.Welcome, user.Email, user.FirstName));
                     break;
 
-                case EntityState.Modified when PasswordWasReplaced(entry):
-                    requests.Add(new AccountMailRequest(
-                        AccountMailKind.PasswordChanged, user.Email, user.FirstName));
+                case EntityState.Modified:
+                    if (PasswordWasReplaced(entry))
+                        requests.Add(new AccountMailRequest(
+                            AccountMailKind.PasswordChanged, user.Email, user.FirstName));
+
+                    // Told at the old address: the new one is whoever just took the account.
+                    var oldEmail = entry.Property(u => u.Email).OriginalValue;
+                    if (!string.IsNullOrWhiteSpace(oldEmail)
+                        && !string.Equals(oldEmail, user.Email, StringComparison.OrdinalIgnoreCase))
+                        requests.Add(new AccountMailRequest(
+                            AccountMailKind.EmailChanged, oldEmail, user.FirstName, NewEmail: user.Email));
                     break;
             }
         }

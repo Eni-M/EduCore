@@ -9,6 +9,20 @@ namespace EduCore.Repositories;
 public class AttendanceRepository(AppDbContext context)
     : Repository<Attendance>(context), IAttendanceRepository
 {
+    public async Task<(int Recorded, int Present)> CountForStudentAsync(Guid studentId, CancellationToken ct)
+    {
+        var counts = await (
+                from a in _context.Attendances.AsNoTracking()
+                join e in _context.Enrollments on a.EnrollmentId equals e.Id
+                where e.StudentId == studentId
+                group a by 1
+                into g
+                select new { Recorded = g.Count(), Present = g.Count(a => a.IsPresent) })
+            .FirstOrDefaultAsync(ct);
+
+        return (counts?.Recorded ?? 0, counts?.Present ?? 0);
+    }
+
     public async Task<IEnumerable<AttendanceListDto>> GetByStudentAsync(
         Guid studentId,
         DateOnly? fromDate,

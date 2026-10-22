@@ -14,7 +14,7 @@ public static class GuardianEndpoints
 
         group.MapGet("/", async (int? page, int? pageSize, string? search,
                 IGuardianService service, CancellationToken ct) =>
-            Results.Ok(await service.GetPagedAsync(
+            TypedResults.Ok(await service.GetPagedAsync(
                 new Dtos.Pagination.PaginationQueryDto(page ?? 1, pageSize ?? 20), search, ct)));
 
         group.MapGet("/search", async (string? query, IGuardianService service, CancellationToken ct) =>
@@ -23,24 +23,24 @@ public static class GuardianEndpoints
                 : Results.Ok(await service.SearchAsync(query, ct)));
 
         group.MapGet("/{guardianId:guid}", async (Guid guardianId, IGuardianService service, CancellationToken ct) =>
-            Results.Ok(await service.GetByIdAsync(guardianId, ct)));
+            TypedResults.Ok(await service.GetByIdAsync(guardianId, ct)));
 
         group.MapPost("/", async (GuardianCreateDto dto, IGuardianService service, CancellationToken ct) =>
         {
             var guardian = await service.CreateAsync(dto, ct);
-            return Results.Created($"/api/guardians/{guardian.Id}", guardian);
+            return TypedResults.Created($"/api/guardians/{guardian.Id}", guardian);
         });
 
         group.MapPut("/{guardianId:guid}",
             async (Guid guardianId, GuardianEditDto dto, IGuardianService service, CancellationToken ct) =>
-                Results.Ok(await service.UpdateAsync(guardianId, dto, ct)));
+                TypedResults.Ok(await service.UpdateAsync(guardianId, dto, ct)));
 
         group.MapPut("/{guardianId:guid}/children",
             async (Guid guardianId, GuardianLinksDto dto, IGuardianService service, CancellationToken ct) =>
-                Results.Ok(await service.SetChildrenAsync(guardianId, dto, ct)));
+                TypedResults.Ok(await service.SetChildrenAsync(guardianId, dto, ct)));
 
         api.MapGet("/guardian/children", async (IGuardianService service, CancellationToken ct) =>
-                Results.Ok(await service.GetMyChildrenAsync(ct)))
+                TypedResults.Ok(await service.GetMyChildrenAsync(ct)))
             .RequireAuthorization(Policies.Guardian)
             .WithTags("Guardian portal");
     }

@@ -7,16 +7,30 @@ public enum AccountMailKind
     Welcome,
 
     // Sent for every change, whoever made it.
-    PasswordChanged
+    PasswordChanged,
+
+    // To the address being left behind, so a hijacked session moving the account away is noticed.
+    EmailChanged,
+
+    // Queued rather than sent inline so a reset request takes as long whether or not the address
+    // holds an account; the reply time must not say which.
+    PasswordReset
 }
 
 // Copied at the moment of the write, never the User entity -- its DbContext is long disposed by
 // the time the background sender runs.
-public record AccountMailRequest(AccountMailKind Kind, string Email, string FirstName);
+// Link is set only for PasswordReset (single-use, short-lived), NewEmail only for EmailChanged.
+public record AccountMailRequest(
+    AccountMailKind Kind,
+    string Email,
+    string FirstName,
+    string? Link = null,
+    int? ExpiresInMinutes = null,
+    string? NewEmail = null);
 
 // Composes account emails as pure functions, so the wording is testable without a mail server.
-// No message carries a password, a token, or a link holding either -- they point at the reset
-// flow, which is single-use and time-limited.
+// No message carries a password. The reset message is the one that carries a token, in the link
+// the user asked for; it is single-use and time-limited.
 //
 // Each message is written once as a list of blocks; EmailLayout renders that to HTML and to
 // plain text, so the two cannot drift apart.
@@ -34,6 +48,8 @@ public static class AccountMailTemplates
         {
             AccountMailKind.Welcome => Welcome(request, appUrl),
             AccountMailKind.PasswordChanged => PasswordChanged(request, appUrl),
+            AccountMailKind.EmailChanged => EmailChanged(request, appUrl),
+            AccountMailKind.PasswordReset => PasswordReset(request, appUrl),
             _ => throw new ArgumentOutOfRangeException(nameof(request))
         };
 
@@ -50,6 +66,36 @@ public static class AccountMailTemplates
                     new EmailBlock.Button("Sign in", appUrl),
                     new EmailBlock.Note(
                         "If nobody has given you a password, use the \"Forgot your password?\" link on the sign-in page and we will email you one that works once."),
+                ],
+                appUrl));
+
+    private static (string, EmailBody) EmailChanged(AccountMailRequest request, string appUrl) =>
+        ("Your EduCore sign-in email was changed",
+            EmailLayout.Render(
+                "Your sign-in email was changed",
+                [
+                    new EmailBlock.Paragraph($"Hello {request.FirstName},"),
+                    new EmailBlock.Paragraph(
+                        "The email address you sign in to EduCore with has just been changed. From now on, sign-in codes and password resets go to:"),
+                    new EmailBlock.Code(request.NewEmail ?? "", Spaced: false),
+                    new EmailBlock.Paragraph("If you made this change, there is nothing to do."),
+                    new EmailBlock.Paragraph(
+                        "If you did not, someone else has access to your account. Contact your school office straight away."),
+                ],
+                appUrl));
+
+    private static (string, EmailBody) PasswordReset(AccountMailRequest request, string appUrl) =>
+        ("Reset your EduCore password",
+            EmailLayout.Render(
+                "Reset your password",
+                [
+                    new EmailBlock.Paragraph($"Hello {request.FirstName},"),
+                    new EmailBlock.Paragraph(
+                        "Someone asked to reset the password for your EduCore account. Use the button "
+                        + $"below to choose a new one. It works once, and expires in {request.ExpiresInMinutes} minutes."),
+                    new EmailBlock.Button("Choose a new password", request.Link ?? appUrl),
+                    new EmailBlock.Note(
+                        "If this wasn't you, ignore this email -- your password has not changed."),
                 ],
                 appUrl));
 

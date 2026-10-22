@@ -12,17 +12,17 @@ public static class EnrollmentStatisticsEndpoints
 
         enrollment.MapGet("/", async (
                 [AsParameters] StatisticsFilter filter, IEnrollmentStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetSummaryAsync(filter, ct)));
+            TypedResults.Ok(await service.GetSummaryAsync(filter, ct)));
 
         // One row per academic year, and one per exit reason: both bounded by the domain, so
         // neither is paged. A page parameter would cost a round trip and buy nothing.
         enrollment.MapGet("/by-year", async (
                 [AsParameters] StatisticsFilter filter, IEnrollmentStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetByAcademicYearAsync(filter, ct)));
+            TypedResults.Ok(await service.GetByAcademicYearAsync(filter, ct)));
 
         enrollment.MapGet("/exits-by-reason", async (
                 [AsParameters] StatisticsFilter filter, IEnrollmentStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetExitsByReasonAsync(filter, ct)));
+            TypedResults.Ok(await service.GetExitsByReasonAsync(filter, ct)));
 
         // One row per class in scope — thousands across a region. Paged in the database;
         // no paging params → full list, for chart and export callers.

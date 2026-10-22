@@ -10,11 +10,7 @@ public class ChangePasswordDtoValidator : AbstractValidator<ChangePasswordDto>
         RuleFor(x => x.CurrentPassword).NotEmpty();
 
         RuleFor(x => x.NewPassword)
-            .NotEmpty()
-            .Length(8, 128)
-            .Matches(@"[a-z]").WithMessage("'New Password' must contain a lowercase letter.")
-            .Matches(@"[A-Z]").WithMessage("'New Password' must contain an uppercase letter.")
-            .Matches(@"\d").WithMessage("'New Password' must contain a digit.")
+            .Password()
             .NotEqual(x => x.CurrentPassword).WithMessage("'New Password' must differ from the current password.");
 
         RuleFor(x => x.ConfirmNewPassword)

@@ -64,14 +64,7 @@ public class EnrollmentService(
         var enrollment = await enrollments.GetByIdAsync(enrollmentId, ct)
                          ?? throw new NotFoundException("Enrollment", enrollmentId);
 
-        if (enrollment.LeftAt is not null)
-            throw new ConflictException("This enrollment has already been ended.");
-
-        if (dto.LeftAt < enrollment.EnrolledAt)
-            throw new BusinessException("A student cannot leave a class before they joined it.");
-
-        enrollment.LeftAt = dto.LeftAt;
-        enrollment.ExitReason = dto.ExitReason;
+        enrollment.End(dto.LeftAt, dto.ExitReason);
 
         enrollments.Update(enrollment);
         await enrollments.SaveChangesAsync(ct);

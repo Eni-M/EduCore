@@ -70,6 +70,7 @@ public sealed class ClassStatisticsServiceTests
         public Measure Apply(Measure measure) => measure;
         public IReadOnlyList<Measure> Apply(IEnumerable<Measure> measures) => measures.ToList();
         public bool ShouldSuppress(int sampleSize) => false;
+        public IReadOnlyList<T> Complement<T>(IReadOnlyList<T> rows, Func<T, Measure> measure, Func<T, Measure, T> with) => rows;
     }
 
     private sealed class FakeStudents(

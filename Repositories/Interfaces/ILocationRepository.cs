@@ -1,4 +1,5 @@
 using EduCore.Dtos.Location;
+using EduCore.Dtos.Pagination;
 using EduCore.Models;
 
 namespace EduCore.Repositories.Interfaces;
@@ -33,6 +34,8 @@ public interface ILocationRepository
     Task<bool> CountryIsInUseAsync(Guid countryId, CancellationToken ct);
 
     Task<IEnumerable<OriginCityListDto>> GetOriginCitiesAsync(Guid? countryId, CancellationToken ct);
+    Task<PagedResultDto<OriginCityListDto>> GetOriginCitiesPagedAsync(
+        Guid? countryId, PaginationQueryDto pagination, string? search, CancellationToken ct);
     Task<OriginCity?> GetOriginCityAsync(Guid cityId, CancellationToken ct);
     Task<OriginCityListDto?> GetOriginCityDtoAsync(Guid cityId, CancellationToken ct);
     Task<bool> OriginCityNameExistsInCountryAsync(

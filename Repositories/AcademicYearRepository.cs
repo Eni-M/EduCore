@@ -27,7 +27,7 @@ public class AcademicYearRepository(AppDbContext context)
     public async Task<IEnumerable<AcademicYearListDto>> GetAllAcrossSchoolsAsync(
         Guid? schoolId, Guid? cityId, CancellationToken ct)
     {
-        var query = _context.AcademicYears.AsNoTracking().IgnoreQueryFilters();
+        var query = _context.AcademicYears.AsNoTracking().IgnoreQueryFilters(QueryFilters.SchoolOnly);
 
         if (schoolId is not null)
             query = query.Where(a => a.SchoolId == schoolId);
@@ -72,14 +72,14 @@ public class AcademicYearRepository(AppDbContext context)
     public async Task<AcademicYear?> GetByIdAcrossSchoolsAsync(Guid academicYearId, CancellationToken ct) =>
         await _context.AcademicYears
             .AsNoTracking()
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .FirstOrDefaultAsync(a => a.Id == academicYearId, ct);
 
     public async Task<AcademicYear?> GetCurrentAsync(Guid schoolId, DateOnly onDate, CancellationToken ct) =>
         AcademicYearPicker.CurrentOn(
             await _context.AcademicYears
                 .AsNoTracking()
-                .IgnoreQueryFilters()
+                .IgnoreQueryFilters(QueryFilters.SchoolOnly)
                 .Where(a => a.SchoolId == schoolId)
                 .ToListAsync(ct),
             onDate);

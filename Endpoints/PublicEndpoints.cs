@@ -12,6 +12,6 @@ public static class PublicEndpoints
         var group = app.MapGroup("/api/public").WithTags("Public");
 
         group.MapGet("/stats", async (IPlatformStatsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetAsync(ct)));
+            TypedResults.Ok(await service.GetAsync(ct)));
     }
 }

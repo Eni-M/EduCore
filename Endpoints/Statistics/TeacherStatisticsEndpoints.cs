@@ -12,7 +12,7 @@ public static class TeacherStatisticsEndpoints
 
         teachers.MapGet("/", async (
                 [AsParameters] StatisticsFilter filter, ITeacherStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetSummaryAsync(filter, ct)));
+            TypedResults.Ok(await service.GetSummaryAsync(filter, ct)));
 
         // One row per teacher in scope, which across a region is thousands. Paged in the
         // database; no paging params → full list, for chart and export callers.
@@ -37,6 +37,6 @@ public static class TeacherStatisticsEndpoints
                 [AsParameters] StatisticsFilter filter,
                 ITeacherStatisticsService service,
                 CancellationToken ct) =>
-            Results.Ok(await service.GetDetailAsync(filter, teacherId, ct)));
+            TypedResults.Ok(await service.GetDetailAsync(filter, teacherId, ct)));
     }
 }

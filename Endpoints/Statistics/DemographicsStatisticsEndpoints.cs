@@ -11,10 +11,10 @@ public static class DemographicsStatisticsEndpoints
             .RequireAuthorization(Policies.StateAdmin);
 
         demographics.MapGet("/", async (IDemographicsStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetOverviewAsync(ct)));
+            TypedResults.Ok(await service.GetOverviewAsync(ct)));
 
         demographics.MapGet("/by-zone", async (
                 string? city, IDemographicsStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetByZoneAsync(city, ct)));
+            TypedResults.Ok(await service.GetByZoneAsync(city, ct)));
     }
 }

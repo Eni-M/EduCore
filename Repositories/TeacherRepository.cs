@@ -12,7 +12,7 @@ public class TeacherRepository(AppDbContext context) : Repository<Teacher>(conte
     public async Task<Teacher?> GetByUserIdAsync(Guid userId, CancellationToken ct) =>
         await _context.Teachers
             .AsNoTracking()
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .FirstOrDefaultAsync(t => t.UserId == userId, ct);
 
     public async Task<bool> IsActiveAsync(Guid teacherId, CancellationToken ct) =>

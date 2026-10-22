@@ -17,9 +17,10 @@ public class ObservabilityOptions
     // Prometheus text format; nothing needs installing to read it.
     public string MetricsPath { get; set; } = "/metrics";
 
-    // Metrics name no individual but do reveal school size and usage. Off by default: the
-    // endpoint is meant for the monitoring network, not the internet.
-    public bool MetricsRequireAuthentication { get; set; } = false;
+    // Metrics name no individual but do reveal school size and usage, and the hosted API is on
+    // the open internet. On by default, restricted to the national tier; a private monitoring
+    // network that scrapes without a session (the compose stack) turns it off explicitly.
+    public bool MetricsRequireAuthentication { get; set; } = true;
 
     public bool TracingEnabled { get; set; } = true;
 

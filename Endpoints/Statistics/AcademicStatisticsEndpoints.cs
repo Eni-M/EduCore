@@ -12,7 +12,7 @@ public static class AcademicStatisticsEndpoints
 
         academic.MapGet("/", async (
                 [AsParameters] StatisticsFilter filter, IAcademicStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetSummaryAsync(filter, ct)));
+            TypedResults.Ok(await service.GetSummaryAsync(filter, ct)));
 
         // Subjects and classes both scale with the size of the scope, so both are paged in the
         // database. No paging params → full list, for the chart and export callers.
@@ -36,18 +36,18 @@ public static class AcademicStatisticsEndpoints
         // rows and five buckets. Not paged: the charts read them whole.
         academic.MapGet("/by-grade", async (
                 [AsParameters] StatisticsFilter filter, IAcademicStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetByGradeAsync(filter, ct)));
+            TypedResults.Ok(await service.GetByGradeAsync(filter, ct)));
 
         academic.MapGet("/distribution", async (
                 [AsParameters] StatisticsFilter filter, IAcademicStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetDistributionAsync(filter, ct)));
+            TypedResults.Ok(await service.GetDistributionAsync(filter, ct)));
 
         academic.MapGet("/subject-comparison/{subjectId:guid}", async (
                 Guid subjectId,
                 [AsParameters] StatisticsFilter filter,
                 IAcademicStatisticsService service,
                 CancellationToken ct) =>
-            Results.Ok(await service.GetSubjectComparisonAsync(filter, subjectId, ct)));
+            TypedResults.Ok(await service.GetSubjectComparisonAsync(filter, subjectId, ct)));
 
         // At-risk is one row per student across the whole scope, so it can be vast; page it for the
         // table. No paging params → full list (chart/export callers).

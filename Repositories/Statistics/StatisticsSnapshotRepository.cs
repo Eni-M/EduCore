@@ -14,7 +14,7 @@ public class StatisticsSnapshotRepository(AppDbContext context)
     // exactly the rows they are entitled to read. The scope is applied explicitly instead —
     // callers pass school ids the scope resolver already authorised.
     private IQueryable<SchoolStatisticsSnapshot> Snapshots =>
-        _context.SchoolStatisticsSnapshots.IgnoreQueryFilters();
+        _context.SchoolStatisticsSnapshots.IgnoreQueryFilters(QueryFilters.SchoolOnly);
 
     public Task<SchoolStatisticsSnapshot?> GetAsync(SnapshotKey key, CancellationToken ct) =>
         Snapshots.FirstOrDefaultAsync(
@@ -48,7 +48,7 @@ public class StatisticsSnapshotRepository(AppDbContext context)
     {
         if (snapshot.Id == Guid.Empty)
         {
-            snapshot.Id = Guid.NewGuid();
+            snapshot.Id = Guid.CreateVersion7();
             await _context.SchoolStatisticsSnapshots.AddAsync(snapshot, ct);
         }
         else

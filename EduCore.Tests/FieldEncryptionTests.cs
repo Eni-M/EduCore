@@ -58,4 +58,66 @@ public class FieldEncryptionTests
     {
         Assert.Throws<ArgumentException>(() => new AesFieldEncryptor(new byte[16]));
     }
+
+    // The IV is the MAC of the plaintext, so changing any ciphertext byte is caught on decrypt
+    // instead of yielding a different plaintext.
+    [Fact]
+    public void A_tampered_ciphertext_is_rejected()
+    {
+        var encryptor = NewEncryptor();
+        var stored = encryptor.Encrypt("1234567890");
+        var prefix = stored[..stored.LastIndexOf(':')];
+        var bytes = Convert.FromBase64String(stored[(prefix.Length + 1)..]);
+        bytes[^1] ^= 0x01;
+        bytes[^17] ^= 0x01;
+
+        Assert.ThrowsAny<CryptographicException>(
+            () => encryptor.Decrypt($"{prefix}:{Convert.ToBase64String(bytes)}"));
+    }
+
+    [Fact]
+    public void Values_written_before_rotation_keep_their_original_envelope()
+    {
+        Assert.StartsWith("enc:v1:", NewEncryptor().Encrypt("1234567890"));
+    }
+
+    [Fact]
+    public void After_rotation_old_values_still_decrypt_and_are_flagged_for_rewrite()
+    {
+        var oldKey = RandomNumberGenerator.GetBytes(32);
+        var stored = NewEncryptor(oldKey).Encrypt("1234567890");
+
+        var rotated = new AesFieldEncryptor(
+            new Dictionary<string, byte[]> { ["v1"] = oldKey, ["v2"] = RandomNumberGenerator.GetBytes(32) }, "v2");
+
+        Assert.Equal("1234567890", rotated.Decrypt(stored));
+        Assert.True(rotated.NeedsReencryption(stored));
+        Assert.StartsWith("enc:v2:", rotated.Encrypt("1234567890"));
+        Assert.False(rotated.NeedsReencryption(rotated.Encrypt("1234567890")));
+    }
+
+    [Fact]
+    public void Legacy_plaintext_is_flagged_for_rewrite()
+    {
+        Assert.True(NewEncryptor().NeedsReencryption("1234567890"));
+        Assert.False(NewEncryptor().NeedsReencryption(null));
+    }
+
+    // Medical notes: never searched, so equal values must not look equal at rest.
+    [Fact]
+    public void Sealed_values_are_randomised_authenticated_and_round_trip()
+    {
+        var encryptor = NewEncryptor();
+        var first = encryptor.Seal("Peanut allergy");
+        var second = encryptor.Seal("Peanut allergy");
+
+        Assert.NotEqual(first, second);
+        Assert.Equal("Peanut allergy", encryptor.Decrypt(first));
+
+        var prefix = first[..first.LastIndexOf(':')];
+        var bytes = Convert.FromBase64String(first[(prefix.Length + 1)..]);
+        bytes[^1] ^= 0x01;
+        Assert.ThrowsAny<CryptographicException>(
+            () => encryptor.Decrypt($"{prefix}:{Convert.ToBase64String(bytes)}"));
+    }
 }

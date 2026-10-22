@@ -1,5 +1,5 @@
 ﻿using System.Diagnostics;
-using EduCore.Dtos.Errors;
+using Microsoft.AspNetCore.Mvc;
 using EduCore.Localization;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +9,8 @@ namespace EduCore.Exceptions;
 
 public class GlobalExceptionHandler(
     ILogger<GlobalExceptionHandler> logger,
-    IMessageLocalizer localizer) : IExceptionHandler
+    IMessageLocalizer localizer,
+    IProblemDetailsService problemDetails) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
@@ -44,6 +45,7 @@ public class GlobalExceptionHandler(
             BusinessException => (StatusCodes.Status400BadRequest, "Business Error", exception.Message),
             ConflictException => (StatusCodes.Status409Conflict, "Conflict", exception.Message),
             ForbiddenException => (StatusCodes.Status403Forbidden, "Forbidden", exception.Message),
+            TooManyRequestsException => (StatusCodes.Status429TooManyRequests, "Too Many Requests", exception.Message),
             DbUpdateConcurrencyException => (
                 StatusCodes.Status409Conflict,
                 "Conflict",
@@ -62,18 +64,35 @@ public class GlobalExceptionHandler(
 
         // Translated here rather than at the 240 throw sites: every message the API sends a
         // person passes through this one place, so the services stay readable in English.
-        var errorResponse = new ErrorResponseDto(
-            StatusCode: statusCode,
-            Timestamp: DateTime.UtcNow,
-            Message: localizer.Translate(message),
-            Error: error,
-            TraceId: traceId,
-            Path: httpContext.Request.Path,
-            FieldErrors: (exception as RequestValidationException)?.FieldErrors
-        );
+        var translated = localizer.Translate(message);
+
+        // RFC 9457 application/problem+json. The fields of the body this replaced ride along as
+        // extension members (which the RFC allows), so a client written against it keeps working
+        // while new ones read title/detail/status.
+        var problem = new ProblemDetails
+        {
+            Type = $"https://httpwg.org/specs/rfc9110.html#status.{statusCode}",
+            Title = error,
+            Status = statusCode,
+            Detail = translated,
+            Instance = httpContext.Request.Path,
+        };
+
+        problem.Extensions["traceId"] = traceId;
+        problem.Extensions["timestamp"] = DateTime.UtcNow;
+        problem.Extensions["fieldErrors"] = (exception as RequestValidationException)?.FieldErrors;
+        problem.Extensions["statusCode"] = statusCode;
+        problem.Extensions["message"] = translated;
+        problem.Extensions["error"] = error;
+        problem.Extensions["path"] = httpContext.Request.Path.Value;
 
         httpContext.Response.StatusCode = statusCode;
-        await httpContext.Response.WriteAsJsonAsync(errorResponse, cancellationToken);
+        await problemDetails.WriteAsync(new ProblemDetailsContext
+        {
+            HttpContext = httpContext,
+            ProblemDetails = problem,
+            Exception = exception,
+        });
 
         return true;
     }

@@ -13,7 +13,7 @@ public static class AttendanceStatisticsEndpoints
 
         attendance.MapGet("/", async (
                 [AsParameters] StatisticsFilter filter, IAttendanceStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetSummaryAsync(filter, ct)));
+            TypedResults.Ok(await service.GetSummaryAsync(filter, ct)));
 
         // One row per class in scope — thousands across a region. Paged in the database;
         // no paging params → full list, for chart and export callers.
@@ -27,7 +27,7 @@ public static class AttendanceStatisticsEndpoints
 
         attendance.MapGet("/by-grade", async (
                 [AsParameters] StatisticsFilter filter, IAttendanceStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetByGradeAsync(filter, ct)));
+            TypedResults.Ok(await service.GetByGradeAsync(filter, ct)));
 
         attendance.MapGet("/by-subject", async (
                 int? page, int? pageSize,
@@ -39,7 +39,7 @@ public static class AttendanceStatisticsEndpoints
 
         attendance.MapGet("/trend", async (
                 [AsParameters] StatisticsFilter filter, IAttendanceStatisticsService service, CancellationToken ct) =>
-            Results.Ok(await service.GetTrendAsync(filter, ct)));
+            TypedResults.Ok(await service.GetTrendAsync(filter, ct)));
 
         // Per-student rows across the whole scope — vast. Paged in the database; no paging
         // params → full list, for the chart and export callers that need every student.

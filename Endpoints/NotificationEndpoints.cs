@@ -21,25 +21,25 @@ public static class NotificationEndpoints
             .WithTags("Notifications");
 
         group.MapGet("/", async (bool? unreadOnly, int? page, int? pageSize, INotificationService service, CancellationToken ct) =>
-            Results.Ok(await service.GetMineAsync(
+            TypedResults.Ok(await service.GetMineAsync(
                 unreadOnly ?? false, new PaginationQueryDto(page ?? 1, pageSize ?? 20), ct)));
 
         // The authoritative count on demand. The bell does not poll this; it is pushed by /stream.
         group.MapGet("/unread-count", async (INotificationService service, CancellationToken ct) =>
-            Results.Ok(new { count = await service.GetUnreadCountAsync(ct) }));
+            TypedResults.Ok(new { count = await service.GetUnreadCountAsync(ct) }));
 
         group.MapGet("/stream", StreamUnreadCountAsync);
 
         group.MapPost("/{id:guid}/read", async (Guid id, INotificationService service, CancellationToken ct) =>
         {
             await service.MarkReadAsync(id, ct);
-            return Results.NoContent();
+            return TypedResults.NoContent();
         });
 
         group.MapPost("/read-all", async (INotificationService service, CancellationToken ct) =>
         {
             await service.MarkAllReadAsync(ct);
-            return Results.NoContent();
+            return TypedResults.NoContent();
         });
     }
 

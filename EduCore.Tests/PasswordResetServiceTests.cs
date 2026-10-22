@@ -306,16 +306,21 @@ public class PasswordResetServiceTests
         public Task<bool> SaveChangesAsync(CancellationToken ct) => Task.FromResult(true);
     }
 
-    private sealed class RecordingEmailSender : IEmailSender
+    // The reset mail is queued now, not sent inline. Rendering each queued request through the
+    // real templates keeps these tests reading the email a user would receive.
+    private sealed class RecordingEmailSender : IAccountMailQueue
     {
         public List<(string To, string Subject, string Body, string Html)> Sent { get; } = [];
 
-        public Task SendAsync(string toEmail, string subject, EmailBody body, CancellationToken ct)
+        public void Enqueue(AccountMailRequest request)
         {
+            var (subject, body) = AccountMailTemplates.Compose(request, "https://educore.example");
             // Body is the text part, so the existing link assertions still read what a
             // text-only client would see; Html is kept so a test can check both carry the link.
-            Sent.Add((toEmail, subject, body.Text, body.Html));
-            return Task.CompletedTask;
+            Sent.Add((request.Email, subject, body.Text, body.Html));
         }
+
+        public IAsyncEnumerable<AccountMailRequest> ReadAllAsync(CancellationToken ct) =>
+            throw new NotSupportedException();
     }
 }

@@ -81,6 +81,7 @@ builder.Services.AddScoped<SchoolScopeInterceptor>();
 builder.Services.AddScoped<StatisticsInvalidationInterceptor>();
 builder.Services.AddScoped<AccountStatusInvalidationInterceptor>();
 builder.Services.AddScoped<AccountMailInterceptor>();
+builder.Services.AddScoped<NotificationSignalInterceptor>();
 
 var defaultConnectionString = builder.Configuration.GetConnectionString("Default")
     ?? builder.Configuration["DATABASE_URL"]
@@ -90,6 +91,7 @@ var defaultConnectionString = builder.Configuration.GetConnectionString("Default
 // while the container is still being built, so nothing can be pulled out of it yet.
 var database = builder.Configuration.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>()
                ?? new DatabaseOptions();
+FailStartupOn(database.Validate());
 
 builder.Services.AddDbContext<AppDbContext>((sp, options) =>
     options.UseNpgsql(defaultConnectionString, npgsql =>
@@ -119,7 +121,8 @@ builder.Services.AddDbContext<AppDbContext>((sp, options) =>
             sp.GetRequiredService<SchoolScopeInterceptor>(),
             sp.GetRequiredService<StatisticsInvalidationInterceptor>(),
             sp.GetRequiredService<AccountStatusInvalidationInterceptor>(),
-            sp.GetRequiredService<AccountMailInterceptor>()));
+            sp.GetRequiredService<AccountMailInterceptor>(),
+            sp.GetRequiredService<NotificationSignalInterceptor>()));
 
 // AutoMapper 15+ is commercially licensed. The key is a secret like the others: .env locally,
 // an environment variable (AutoMapper__LicenseKey) in deployment. Without it AutoMapper still
@@ -162,6 +165,9 @@ builder.Services.AddScoped<IStudentMedicalRecordRepository, StudentMedicalRecord
 builder.Services.AddScoped<INoticeRepository, NoticeRepository>();
 builder.Services.AddScoped<ICalendarEventRepository, CalendarEventRepository>();
 
+// OWASP's 2025 floor for PBKDF2-HMAC-SHA512, against Identity's default of 100,000. Stored hashes
+// carry their own count, so older ones still verify and are rehashed at the next sign-in.
+builder.Services.Configure<PasswordHasherOptions>(o => o.IterationCount = 220_000);
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
 // Field-level encryption for national identifiers at rest. Requires a 32-byte key, supplied
@@ -176,7 +182,19 @@ if (encryptionKeyBytes.Length != 32)
         "Encryption:Key must be a base64-encoded 32-byte key. Set Encryption__Key in .env " +
         "(see .env.example) or as an environment variable. Generate one with: openssl rand -base64 32");
 
-builder.Services.AddSingleton<IFieldEncryptor>(new AesFieldEncryptor(encryptionKeyBytes));
+// Rotation: put the new key in Encryption:Key with a new Encryption:KeyId, and move the old one
+// under Encryption:PreviousKeys:{its id} so existing values still decrypt. The original key's id
+// is "v1". Start-up then rewrites every value under the new key (FieldReencryption), after which
+// the previous key can be dropped.
+var encryptionKeys = new Dictionary<string, byte[]>
+{
+    [builder.Configuration["Encryption:KeyId"] ?? AesFieldEncryptor.LegacyKeyId] = encryptionKeyBytes
+};
+foreach (var previous in builder.Configuration.GetSection("Encryption:PreviousKeys").GetChildren())
+    encryptionKeys.TryAdd(previous.Key, Convert.FromBase64String(previous.Value ?? ""));
+
+builder.Services.AddSingleton<IFieldEncryptor>(new AesFieldEncryptor(
+    encryptionKeys, builder.Configuration["Encryption:KeyId"] ?? AesFieldEncryptor.LegacyKeyId));
 
 builder.Services.AddOptions<GradingOptions>()
     .Bind(builder.Configuration.GetSection(GradingOptions.SectionName))
@@ -332,6 +350,13 @@ builder.Services.AddScoped<IScheduleDigestService, ScheduleDigestService>();
 builder.Services.AddScoped<IGuardianDigestService, GuardianDigestService>();
 builder.Services.AddHostedService<ScheduledEmailBackgroundService>();
 
+builder.Services.AddOptions<RetentionOptions>()
+    .Bind(builder.Configuration.GetSection(RetentionOptions.SectionName))
+    .Validate(o => o.AuditLogDays >= 0 && o.SpentTokenDays >= 1,
+        "Retention:AuditLogDays must be 0 (keep) or more, and Retention:SpentTokenDays at least 1.")
+    .ValidateOnStart();
+builder.Services.AddHostedService<RetentionBackgroundService>();
+
 // Account emails -- welcome, password changed -- are queued by AccountMailInterceptor from the
 // write that causes them and sent here, off the request path. A singleton queue, because the
 // interceptor writing to it is scoped and the sender draining it is a background service.
@@ -348,6 +373,7 @@ builder.Services.AddScoped<IScheduleService, ScheduleService>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IMarkService, MarkService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<IAuditTrail, AuditTrail>();
 builder.Services.AddScoped<ISchoolingHistoryService, SchoolingHistoryService>();
 builder.Services.AddScoped<IStudentDocumentService, StudentDocumentService>();
 builder.Services.AddScoped<IPlatformStatsService, PlatformStatsService>();
@@ -383,6 +409,11 @@ if (string.IsNullOrWhiteSpace(jwtKey) || Encoding.UTF8.GetByteCount(jwtKey) < 32
     throw new InvalidOperationException(
         "Jwt:Key must be at least 32 bytes. Set Jwt__Key in .env (see .env.example) " +
         "or as an environment variable. Generate one with: openssl rand -base64 32");
+
+// The rest of the token settings and the digest hour, read raw below and in
+// ScheduledEmailBackgroundService: checked here so a typo stops start-up instead of producing
+// tokens nothing accepts, or a digest scheduled for an hour that never comes.
+FailStartupOn(StartupChecks.TokenAndScheduleSettings(builder.Configuration));
 
 var sessionCookieName =
     builder.Configuration.GetSection(SessionCookieOptions.SectionName)["CookieName"] ?? "educore.session";
@@ -438,6 +469,7 @@ builder.Services.AddCors(options =>
 // Rate limiting: per-user (by user id claim) otherwise per-IP token-bucket limiter.
 var rateLimits = builder.Configuration.GetSection(RateLimitOptions.SectionName).Get<RateLimitOptions>()
                  ?? new RateLimitOptions();
+FailStartupOn(rateLimits.Validate());
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -535,9 +567,9 @@ await using (var startupScope = app.Services.CreateAsyncScope())
     // Off by default, because the separate one-shot job in compose.yaml is the better shape and
     // remains the default one.
     //
-    // ONLY SAFE ON A SINGLE INSTANCE. Two replicas starting together both migrate, and they race:
-    // that is the specific defect the compose `migrate` service was introduced to remove. Before
-    // scaling past one instance, turn this off and run migrations as their own step again.
+    // EF Core 9+ takes a database-wide lock while migrating, so two replicas starting together no
+    // longer race. What remains is privilege: migrating on start needs the app's own role to hold
+    // DDL rights. The compose `migrate` service, with its own role, is still the better shape.
     //
     // A failure here stops start-up, which is the intent: a deploy that cannot migrate should be
     // visibly dead rather than quietly serving against a schema it does not match.
@@ -557,6 +589,17 @@ await using (var startupScope = app.Services.CreateAsyncScope())
             "Run `dotnet EduCore.dll --migrate` before starting the API -- compose does this in "
             + "the `migrate` service. On a single-instance host with no separate migration step, "
             + "set MigrateOnStart=true instead.");
+
+    // Encrypts legacy plaintext and moves values off rotated-out keys. Idempotent, and cheap once
+    // everything is current. Off only for a deliberate reason, e.g. investigating a key problem.
+    if (app.Configuration.GetValue("Encryption:ReencryptOnStart", true))
+    {
+        var rewritten = await FieldReencryption.RunAsync(
+            db, startupScope.ServiceProvider.GetRequiredService<IFieldEncryptor>(), CancellationToken.None);
+
+        if (rewritten > 0)
+            app.Logger.LogInformation("Re-encrypted {Count} field value(s) under the current key.", rewritten);
+    }
 }
 
 if (app.Environment.IsDevelopment())
@@ -608,6 +651,15 @@ foreach (var network in trustedNetworks)
 
 foreach (var proxy in trustedProxies)
     forwardedOptions.KnownProxies.Add(IPAddress.Parse(proxy));
+
+// PaaS hosts publish no proxy addresses to list, so trust a fixed number of hops instead.
+var trustedHops = app.Configuration.GetValue("ForwardedHeaders:TrustedHops", 0);
+if (trustedHops > 0)
+{
+    forwardedOptions.KnownIPNetworks.Clear();
+    forwardedOptions.KnownProxies.Clear();
+    forwardedOptions.ForwardLimit = trustedHops;
+}
 
 app.UseForwardedHeaders(forwardedOptions);
 
@@ -668,3 +720,16 @@ api.MapStatisticsEndpoints();
 api.MapMessagingEndpoints();
 
 app.Run();
+
+// Start-up validation for settings read before the container exists, so IValidateOptions cannot
+// reach them. All failures at once, the way ValidateOnStart reports them.
+static void FailStartupOn(IEnumerable<string> failures)
+{
+    var list = failures.ToList();
+    if (list.Count > 0)
+        throw new InvalidOperationException(
+            "Invalid configuration:" + Environment.NewLine + "  " + string.Join(Environment.NewLine + "  ", list));
+}
+
+// Lets the integration tests host the real app in memory (WebApplicationFactory<Program>).
+public partial class Program;

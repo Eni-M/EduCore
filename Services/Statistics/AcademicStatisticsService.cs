@@ -125,7 +125,7 @@ public class AcademicStatisticsService(
                 suppressor.Apply(Measures.Rate(c.Passed, c.GradedMarks))))
             .ToList();
 
-        return new SubjectComparisonDto(subjectId, subject?.Label ?? "Unknown subject", rows);
+        return new SubjectComparisonDto(subjectId, subject?.Label ?? "Unknown subject", Complemented(rows));
     }
 
     private IReadOnlyList<AcademicByKeyDto> WithOverallBaseline(
@@ -133,7 +133,7 @@ public class AcademicStatisticsService(
     {
         var baseline = RoundOrNull(overall.AverageFinalMark);
 
-        return groups
+        return Complemented(groups
             .Select(g => new AcademicByKeyDto(
                 g.Key,
                 g.Label,
@@ -142,8 +142,13 @@ public class AcademicStatisticsService(
                     .Average(g.AverageFinalMark, g.GradedMarks)
                     .WithBaseline(baseline, baselineLabel)),
                 suppressor.Apply(Measures.Rate(g.Passed, g.GradedMarks))))
-            .ToList();
+            .ToList());
     }
+
+    private IReadOnlyList<AcademicByKeyDto> Complemented(IReadOnlyList<AcademicByKeyDto> rows) =>
+        suppressor.Complement(
+            suppressor.Complement(rows, r => r.AverageFinalMark, (r, m) => r with { AverageFinalMark = m }),
+            r => r.PassRate, (r, m) => r with { PassRate = m });
 
     private static double? RoundOrNull(double? value) =>
         value is null ? null : Math.Round(value.Value, 2);

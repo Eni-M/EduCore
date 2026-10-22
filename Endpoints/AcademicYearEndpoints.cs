@@ -24,30 +24,40 @@ public static class AcademicYearEndpoints
 
         group.MapGet("/{academicYearId:guid}",
                 async (Guid academicYearId, IAcademicYearService service, CancellationToken ct) =>
-                    Results.Ok(await service.GetByIdAsync(academicYearId, ct)))
+                    TypedResults.Ok(await service.GetByIdAsync(academicYearId, ct)))
             .RequireAuthorization(Policies.AnySchoolUser);
 
         group.MapPost("/", async (AcademicYearCreateDto dto, IAcademicYearService service, CancellationToken ct) =>
             {
                 var year = await service.CreateAsync(dto, ct);
-                return Results.Created($"/api/academic-years/{year.Id}", year);
+                return TypedResults.Created($"/api/academic-years/{year.Id}", year);
             })
             .RequireAuthorization(Policies.Directorate);
 
         group.MapPut("/{academicYearId:guid}",
                 async (Guid academicYearId, AcademicYearCreateDto dto,
                     IAcademicYearService service, CancellationToken ct) =>
-                    Results.Ok(await service.UpdateAsync(academicYearId, dto, ct)))
+                    TypedResults.Ok(await service.UpdateAsync(academicYearId, dto, ct)))
             .RequireAuthorization(Policies.Directorate);
 
         group.MapGet("/{academicYearId:guid}/grading-periods",
                 async (Guid academicYearId, IAcademicYearService service, CancellationToken ct) =>
-                    Results.Ok(await service.GetGradingPeriodsAsync(academicYearId, ct)))
+                    TypedResults.Ok(await service.GetGradingPeriodsAsync(academicYearId, ct)))
             .RequireAuthorization(Policies.AnySchoolUser);
 
         group.MapPut("/grading-periods/{gradingPeriodId:guid}",
                 async (Guid gradingPeriodId, GradingPeriodEditDto dto, IAcademicYearService service, CancellationToken ct) =>
-                    Results.Ok(await service.EditGradingPeriodAsync(gradingPeriodId, dto, ct)))
+                    TypedResults.Ok(await service.EditGradingPeriodAsync(gradingPeriodId, dto, ct)))
+            .RequireAuthorization(Policies.Directorate);
+
+        group.MapPost("/grading-periods/{gradingPeriodId:guid}/close",
+                async (Guid gradingPeriodId, IAcademicYearService service, CancellationToken ct) =>
+                    TypedResults.Ok(await service.SetGradingPeriodClosedAsync(gradingPeriodId, true, ct)))
+            .RequireAuthorization(Policies.Directorate);
+
+        group.MapPost("/grading-periods/{gradingPeriodId:guid}/reopen",
+                async (Guid gradingPeriodId, IAcademicYearService service, CancellationToken ct) =>
+                    TypedResults.Ok(await service.SetGradingPeriodClosedAsync(gradingPeriodId, false, ct)))
             .RequireAuthorization(Policies.Directorate);
     }
 }

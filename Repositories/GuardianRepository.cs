@@ -13,7 +13,7 @@ public class GuardianRepository(AppDbContext context) : Repository<Guardian>(con
         await _context.Guardians
             .AsNoTracking()
             .Include(g => g.Children)
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .FirstOrDefaultAsync(g => g.UserId == userId, ct);
 
     public async Task<Guardian?> GetWithChildrenAsync(Guid guardianId, CancellationToken ct) =>
@@ -22,13 +22,13 @@ public class GuardianRepository(AppDbContext context) : Repository<Guardian>(con
             .Include(g => g.User)
             .Include(g => g.Children).ThenInclude(c => c.Student).ThenInclude(s => s.User)
             .Include(g => g.Children).ThenInclude(c => c.Student).ThenInclude(s => s.School)
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .FirstOrDefaultAsync(g => g.Id == guardianId, ct);
 
     public async Task<Guardian?> GetTrackedWithChildrenAsync(Guid guardianId, CancellationToken ct) =>
         await _context.Guardians
             .Include(g => g.Children)
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .FirstOrDefaultAsync(g => g.Id == guardianId, ct);
 
     public async Task<(IReadOnlyList<Guardian> Items, int TotalCount)> GetPagedBySchoolAsync(
@@ -40,7 +40,7 @@ public class GuardianRepository(AppDbContext context) : Repository<Guardian>(con
             .Include(g => g.User)
             .Include(g => g.Children).ThenInclude(c => c.Student).ThenInclude(s => s.User)
             .Include(g => g.Children).ThenInclude(c => c.Student).ThenInclude(s => s.School)
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .Where(g => g.Children.Any(c => c.SchoolId == schoolId));
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -67,7 +67,7 @@ public class GuardianRepository(AppDbContext context) : Repository<Guardian>(con
         return await _context.Guardians
             .AsNoTracking()
             .Include(g => g.User)
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             // NationalId is encrypted at rest, so only an exact match is possible (a substring
             // LIKE would run against ciphertext). The equality converter makes the exact match
             // work; names still support partial search.
@@ -83,18 +83,18 @@ public class GuardianRepository(AppDbContext context) : Repository<Guardian>(con
         await _context.Guardians
             .AsNoTracking()
             .Include(g => g.User)
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .FirstOrDefaultAsync(g => g.Id == guardianId, ct);
 
     public async Task<bool> NationalIdExistsAsync(string nationalId, CancellationToken ct) =>
         await _context.Guardians
             .AsNoTracking()
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .AnyAsync(g => g.NationalId == nationalId, ct);
 
     public async Task<GuardianStudent?> GetLinkAsync(Guid guardianId, Guid studentId, CancellationToken ct) =>
         await _context.GuardianStudents
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .FirstOrDefaultAsync(gs => gs.GuardianId == guardianId && gs.StudentId == studentId, ct);
 
     public async Task<IReadOnlyList<GuardianStudent>> GetContactsForStudentAsync(
@@ -102,7 +102,7 @@ public class GuardianRepository(AppDbContext context) : Repository<Guardian>(con
         await _context.GuardianStudents
             .AsNoTracking()
             .Include(gs => gs.Guardian).ThenInclude(g => g.User)
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .Where(gs => gs.StudentId == studentId)
             .OrderBy(gs => gs.Guardian.User.LastName).ThenBy(gs => gs.Guardian.User.FirstName)
             .ToListAsync(ct);
@@ -110,18 +110,18 @@ public class GuardianRepository(AppDbContext context) : Repository<Guardian>(con
     public async Task<bool> LinkExistsAsync(Guid guardianId, Guid studentId, CancellationToken ct) =>
         await _context.GuardianStudents
             .AsNoTracking()
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .AnyAsync(gs => gs.GuardianId == guardianId && gs.StudentId == studentId, ct);
 
     public async Task<bool> HasChildInClassAsync(Guid guardianId, Guid classId, CancellationToken ct) =>
         await _context.Enrollments
             .AsNoTracking()
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .AnyAsync(
                 e => e.ClassId == classId
                      && e.LeftAt == null
                      && _context.GuardianStudents
-                         .IgnoreQueryFilters()
+                         .IgnoreQueryFilters(QueryFilters.SchoolOnly)
                          .Any(gs => gs.GuardianId == guardianId && gs.StudentId == e.StudentId),
                 ct);
 

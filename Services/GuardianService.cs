@@ -17,13 +17,16 @@ public class GuardianService(
     IUserRepository userRepository,
     IUserService users,
     IAccessGuard access,
-    ICurrentUser currentUser) : IGuardianService
+    ICurrentUser currentUser,
+    IAuditTrail audit) : IGuardianService
 {
     public async Task<IEnumerable<GuardianContactDto>> GetByStudentAsync(Guid studentId, CancellationToken ct)
     {
         await access.EnsureCanViewStudentAsync(studentId, ct);
 
         var contacts = await guardians.GetContactsForStudentAsync(studentId, ct);
+
+        await audit.RecordAsync($"Read guardians of Student ({studentId})", ct, schoolId: currentUser.SchoolId);
 
         return contacts.Select(gs => new GuardianContactDto(
             gs.Guardian.Id,
@@ -92,6 +95,8 @@ public class GuardianService(
         var (items, totalCount) = await guardians.GetPagedBySchoolAsync(
             schoolId, new PaginationQueryDto(page, pageSize), search, ct);
 
+        await audit.RecordAsync($"Listed Guardians (page {page})", ct, schoolId: schoolId);
+
         return new PagedResultDto<GuardianListDto>(
             items.Select(g => ToListDto(g, schoolId)).ToList(),
             page,
@@ -107,6 +112,8 @@ public class GuardianService(
                        ?? throw new NotFoundException("Guardian", guardianId);
 
         EnsureManageable(guardian, schoolId);
+
+        await audit.RecordAsync($"Read Guardian ({guardianId})", ct, schoolId: schoolId);
 
         return ToListDto(guardian, schoolId);
     }

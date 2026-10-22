@@ -3,8 +3,8 @@ using EduCore.Enums;
 
 namespace EduCore.Models;
 
-// An in-app notification shown on a role's dashboard within one school. Recipients are addressed
-// by role (e.g. every Directorate user of the school), scoped by the usual school filter.
+// An in-app notification within one school, addressed by role (e.g. every Directorate user of the
+// school) and scoped by the usual school filter. Who has read it is per user, in NotificationRead.
 public class Notification : ISchoolScoped
 {
     public Guid Id { get; set; }
@@ -16,5 +16,4 @@ public class Notification : ISchoolScoped
     public string? Link { get; set; }
 
     public DateTime CreatedAt { get; set; }
-    public DateTime? ReadAt { get; set; }
 }

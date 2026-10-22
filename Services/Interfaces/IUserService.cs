@@ -28,6 +28,10 @@ public interface IUserService
     Task SetDigestPreferenceAsync(bool optOut, CancellationToken ct);
     Task SetActiveAsync(Guid userId, bool isActive, CancellationToken ct);
 
+    Task<AuthenticatorSetupDto> BeginAuthenticatorSetupAsync(Guid userId, CancellationToken ct);
+    Task<TwoFactorStatusDto> ConfirmAuthenticatorAsync(Guid userId, string code, CancellationToken ct);
+    Task<TwoFactorStatusDto> RemoveAuthenticatorAsync(Guid userId, string currentPassword, CancellationToken ct);
+
     // Signs the account out everywhere: every token issued before now stops being accepted.
     Task EndSessionsAsync(Guid userId, CancellationToken ct);
 

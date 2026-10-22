@@ -132,7 +132,7 @@ public class AccessGuardGuardianTests
 
     private static AccessGuard Guard() =>
         new(new FakeClassRepository(), new FakeEnrollmentRepository(), new FakeAssignmentRepository(),
-            new FakeGuardianRepository(), new FakeCurrentUser());
+            new FakeGuardianRepository(), Stub.Of<ILocationRepository>(), new FakeCurrentUser());
 
     [Fact]
     public async Task Guardian_can_view_a_linked_child() =>

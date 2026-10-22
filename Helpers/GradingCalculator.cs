@@ -11,14 +11,12 @@ public class GradingCalculator(IOptions<GradingOptions> options) : IGradingCalcu
             ? first.Value * _options.FirstMarkWeight + second.Value * _options.SecondMarkWeight
             : null;
 
-    public int? FinalMark(int? first, int? second)
-    {
-        var weighted = WeightedValue(first, second);
+    public int? FinalMark(int? first, int? second) => FinalMark(WeightedValue(first, second));
 
-        return weighted is null
+    public int? FinalMark(double? weightedValue) =>
+        weightedValue is null
             ? null
-            : (int)Math.Round(weighted.Value, MidpointRounding.AwayFromZero);
-    }
+            : (int)Math.Round(weightedValue.Value, MidpointRounding.AwayFromZero);
 
     public int? AnnualMark(IEnumerable<int?> periodFinalMarks)
     {

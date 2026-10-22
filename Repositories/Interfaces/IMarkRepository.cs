@@ -20,6 +20,9 @@ public interface IMarkRepository : IRepository<Mark>
     IQueryable<ValuedMark> Value(IQueryable<Mark> marks);
 
     IQueryable<double> WeightedValues(IQueryable<Mark> marks);
+    void ExpectVersion(Mark mark, uint version);
+    void AddChange(MarkChange change);
+    Task<IReadOnlyList<MarkChangeDto>> GetChangesAsync(Guid markId, CancellationToken ct);
 
     int? FinalMark(int? firstMark, int? secondMark);
 }

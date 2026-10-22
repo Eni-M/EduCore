@@ -1,4 +1,5 @@
 using System.Linq;
+using EduCore.Exceptions;
 using EduCore.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -42,9 +43,9 @@ public class SchoolScopeInterceptor(ICurrentUser currentUser) : SaveChangesInter
                 continue;
 
             if (!schoolIds.Contains(entry.Entity.SchoolId))
-                throw new InvalidOperationException(
-                    $"Cannot save {entry.Entity.GetType().Name} for school {entry.Entity.SchoolId} " +
-                    $"while acting for school(s) {(schoolIds.Count == 0 ? "none" : string.Join(", ", schoolIds))}.");
+                // A 403, as docs/ARCHITECTURE.md promises -- not a 500 that reads as a server fault.
+                // No school ids in the message: it goes back to the caller.
+                throw new ForbiddenException("You cannot change records that belong to another school.");
         }
     }
 }

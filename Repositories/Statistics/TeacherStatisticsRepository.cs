@@ -59,7 +59,7 @@ public class TeacherStatisticsRepository(
 
         return from t in TeachersInScope(ctx)
                join u in _context.Users on t.UserId equals u.Id
-               join sc in _context.Schools.IgnoreQueryFilters() on t.SchoolId equals sc.Id
+               join sc in _context.Schools.IgnoreQueryFilters(QueryFilters.SchoolOnly) on t.SchoolId equals sc.Id
                orderby sc.Name, u.LastName, u.FirstName, t.Id
                select new TeacherWorkloadDto(
                    t.Id,
@@ -106,7 +106,7 @@ public class TeacherStatisticsRepository(
 
         return from t in TeachersInScope(ctx)
                join u in _context.Users on t.UserId equals u.Id
-               join sc in _context.Schools.IgnoreQueryFilters() on t.SchoolId equals sc.Id
+               join sc in _context.Schools.IgnoreQueryFilters(QueryFilters.SchoolOnly) on t.SchoolId equals sc.Id
                orderby sc.Name, u.LastName, u.FirstName, t.Id
                select new TeacherCoverageDto(
                    t.Id,
@@ -149,14 +149,12 @@ public class TeacherStatisticsRepository(
     {
         var pass = grading.PassValue;
 
-        var first = grading.FirstMarkWeight;
-        var second = grading.SecondMarkWeight;
 
         var rows = await (from m in MarksInWindow(ctx)
-                          where m.TeacherId == teacherId && m.FirstMark != null && m.SecondMark != null
+                          where m.TeacherId == teacherId && m.WeightedValue != null
                           join c in ClassesInScope(ctx) on m.ClassId equals c.Id
                           join s in Scope(_context.Subjects, ctx) on m.SubjectId equals s.Id
-                          group m.FirstMark!.Value * first + m.SecondMark!.Value * second
+                          group m.WeightedValue!.Value
                               by new { ClassId = c.Id, ClassName = c.Name, c.Grade, SubjectId = s.Id, SubjectName = s.Name }
                           into g
                           orderby g.Key.ClassName, g.Key.SubjectName

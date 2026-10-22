@@ -24,6 +24,12 @@ public class StatisticsSnapshotOptions
     // A snapshot older than this is recomputed no matter how few writes there were. Windows
     // that end "today" move on their own as time passes, with no write to notice it.
     public int MaximumAgeMinutes { get; set; } = 720;
+
+    // How many stale schools one cross-school request may recompute. Each refresh is about 16
+    // round trips, so refreshing a whole page of 80 stale schools in one request was ~1,300
+    // queries. Past this many, the rest are served from their existing snapshot, a little out of
+    // date, and catch up on later requests. A school with no snapshot yet is always computed.
+    public int MaximumRefreshesPerRequest { get; set; } = 10;
 }
 
 public class StatisticsSnapshotOptionsValidator : IValidateOptions<StatisticsSnapshotOptions>
@@ -31,6 +37,10 @@ public class StatisticsSnapshotOptionsValidator : IValidateOptions<StatisticsSna
     public ValidateOptionsResult Validate(string? name, StatisticsSnapshotOptions options)
     {
         var failures = new List<string>();
+
+        if (options.MaximumRefreshesPerRequest < 1)
+            failures.Add(
+                $"MaximumRefreshesPerRequest ({options.MaximumRefreshesPerRequest}) must be at least 1.");
 
         if (options.ChangeRatio is < 0 or > 1)
             failures.Add($"ChangeRatio ({options.ChangeRatio}) must be between 0 and 1.");

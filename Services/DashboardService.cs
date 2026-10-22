@@ -52,15 +52,15 @@ public class DashboardService(
 
     private async Task<DashboardDto> StudentAsync(CancellationToken ct)
     {
-        var profile = await students.GetProfileAsync(currentUser.RequireStudentId(), ct);
+        var profile = await students.GetSummaryAsync(currentUser.RequireStudentId(), ct);
 
         var today = profile.CurrentClassId is { } classId
             ? await TodayForClassAsync(classId, includeTeacher: true, ct)
             : [];
 
         var marks = profile.Marks.Where(m => m.FinalMark is not null).ToList();
-        var attendance = profile.Attendances.ToList();
-        var present = attendance.Count(a => a.IsPresent);
+        var recorded = profile.AttendanceRecorded;
+        var present = profile.AttendancePresent;
 
         var stats = new List<DashboardStatDto>
         {
@@ -72,9 +72,9 @@ public class DashboardService(
                 marks.Count == 0 ? "no marks yet" : $"across {marks.Count} marks",
                 AverageTone(marks)),
             new("Attendance",
-                DashboardFormat.AttendancePercent(present, attendance.Count),
-                attendance.Count == 0 ? "nothing recorded" : $"{attendance.Count} lessons recorded",
-                DashboardFormat.AttendanceTone(present, attendance.Count))
+                DashboardFormat.AttendancePercent(present, recorded),
+                recorded == 0 ? "nothing recorded" : $"{recorded} lessons recorded",
+                DashboardFormat.AttendanceTone(present, recorded))
         };
 
         var failing = marks
@@ -92,11 +92,11 @@ public class DashboardService(
                 string.Join(", ", failing),
                 "/my-marks"));
 
-        if (attendance.Count > 0 && present * 100.0 / attendance.Count < 90)
+        if (recorded > 0 && present * 100.0 / recorded < 90)
             attention.Add(new DashboardAlertDto(
                 DashboardTone.Warning,
                 "Attendance below 90%",
-                $"You were absent from {attendance.Count - present} of {attendance.Count} recorded lessons.",
+                $"You were absent from {recorded - present} of {recorded} recorded lessons.",
                 "/my-attendance"));
 
         return new DashboardDto(
@@ -184,12 +184,12 @@ public class DashboardService(
         // many children should not be able to fan out an unbounded number of queries per request.
         foreach (var child in children.Take(_maxChildrenDetailed))
         {
-            var profile = await students.GetProfileAsync(child.StudentId, ct);
+            var profile = await students.GetSummaryAsync(child.StudentId, ct);
             var name = child.FirstName;
 
             var marks = profile.Marks.Where(m => m.FinalMark is not null).ToList();
-            var attendance = profile.Attendances.ToList();
-            var present = attendance.Count(a => a.IsPresent);
+            var recorded = profile.AttendanceRecorded;
+            var present = profile.AttendancePresent;
 
             stats.Add(new DashboardStatDto(
                 $"{name} · average",
@@ -197,12 +197,12 @@ public class DashboardService(
                 profile.CurrentClassName ?? "not enrolled",
                 AverageTone(marks)));
 
-            if (attendance.Count > 0)
+            if (recorded > 0)
                 stats.Add(new DashboardStatDto(
                     $"{name} · attendance",
-                    DashboardFormat.AttendancePercent(present, attendance.Count),
-                    $"{attendance.Count} lessons recorded",
-                    DashboardFormat.AttendanceTone(present, attendance.Count)));
+                    DashboardFormat.AttendancePercent(present, recorded),
+                    $"{recorded} lessons recorded",
+                    DashboardFormat.AttendanceTone(present, recorded)));
 
             var failing = marks
                 .Where(m => !grading.IsPass(m.FinalMark!.Value))
@@ -217,11 +217,11 @@ public class DashboardService(
                     string.Join(", ", failing),
                     "/guardian"));
 
-            if (attendance.Count > 0 && present * 100.0 / attendance.Count < 90)
+            if (recorded > 0 && present * 100.0 / recorded < 90)
                 attention.Add(new DashboardAlertDto(
                     DashboardTone.Warning,
                     $"{name}'s attendance is below 90%",
-                    $"Absent from {attendance.Count - present} of {attendance.Count} recorded lessons.",
+                    $"Absent from {recorded - present} of {recorded} recorded lessons.",
                     "/guardian"));
 
             recent.AddRange(RecentMarks(profile.Marks, "/guardian", withStudentName: true));

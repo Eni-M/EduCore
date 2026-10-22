@@ -10,6 +10,7 @@ using EduCore.Security;
 using EduCore.Services.Account;
 using EduCore.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using PasswordGenerator;
@@ -43,18 +44,54 @@ public class UserService(
     ITwoFactorService twoFactor,
     IOptions<TwoFactorOptions> twoFactorOptions,
     ICurrentUser currentUser,
+    IMemoryCache cache,
+    IAuditTrail audit,
     IConfiguration config) : IUserService
 {
+    // Per account, not per IP: behind a PaaS proxy many users can share one address, and an
+    // attacker can rotate addresses. Ten wrong passwords in fifteen minutes pauses that email
+    // for the rest of the window. Counted for unknown emails too, so the lockout itself says
+    // nothing about which addresses hold accounts.
+    // ponytail: in-process counter, one instance; move it to the database or a shared cache
+    // before running more than one replica.
+    private const int MaxFailedSignIns = 10;
+    private static readonly TimeSpan SignInWindow = TimeSpan.FromMinutes(15);
+
+    private sealed record FailedSignIns(int Count, DateTimeOffset ExpiresAt);
+
+    // Verified against when the email is unknown, so a miss costs the same PBKDF2 work as a
+    // wrong password and the reply time does not reveal which emails hold accounts.
+    private static string? _dummyHash;
+
     public async Task<LoginResultDto> LoginAsync(LoginUserDto dto, CancellationToken ct)
     {
+        var failuresKey = $"sign-in-failures:{dto.Email.Trim().ToLowerInvariant()}";
+        var failures = cache.Get<FailedSignIns>(failuresKey);
+        if (failures?.Count >= MaxFailedSignIns)
+        {
+            await audit.RecordAsync("Sign-in refused: too many failed attempts", ct);
+            throw new TooManyRequestsException(
+                "Too many failed sign-in attempts. Wait 15 minutes, or reset your password.");
+        }
+
         var user = await userRepository.GetByEmailAsync(dto.Email, ct);
 
-        if (user is null)
-            throw new UnauthorizedException("Invalid email or password.");
+        var result = user is null
+            ? VerifyAgainstDummy(dto.Password)
+            : passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.Password);
 
-        var result = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.Password);
-        if (result == PasswordVerificationResult.Failed)
+        if (user is null || result == PasswordVerificationResult.Failed)
+        {
+            // The window runs from the first failure; later failures do not extend it.
+            var expiresAt = failures?.ExpiresAt ?? DateTimeOffset.UtcNow.Add(SignInWindow);
+            cache.Set(failuresKey, new FailedSignIns((failures?.Count ?? 0) + 1, expiresAt), expiresAt);
+
+            await audit.RecordAsync(user is null ? "Sign-in failed: unknown email" : "Sign-in failed", ct, userId: user?.Id);
+
             throw new UnauthorizedException("Invalid email or password.");
+        }
+
+        cache.Remove(failuresKey);
 
         if (user.DeactivatedAt is not null)
             throw new UnauthorizedException("This account has been deactivated.");
@@ -71,8 +108,9 @@ public class UserService(
         // read the mailbox before anything is signed in.
         if (twoFactor.SignInRequiresSecondStep(user))
             return LoginResultDto.NeedsSecondStep(
-                await twoFactor.IssueAsync(user, TwoFactorPurpose.SignIn, ct));
+                await twoFactor.IssueAsync(user, TwoFactorPurpose.SignIn, ct), user.HasAuthenticator);
 
+        await audit.RecordAsync("Signed in", ct, userId: user.Id);
         return LoginResultDto.SignedIn(await BuildAuthResponseAsync(user, ct));
     }
 
@@ -86,6 +124,7 @@ public class UserService(
         if (user.DeactivatedAt is not null)
             throw new UnauthorizedException("This account has been deactivated.");
 
+        await audit.RecordAsync("Signed in with a two-step code", ct, userId: user.Id);
         return await BuildAuthResponseAsync(user, ct);
     }
 
@@ -106,7 +145,7 @@ public class UserService(
                    ?? throw new NotFoundException("User", userId);
 
         var required = twoFactorOptions.Value.IsRequiredFor(user.Role);
-        return new TwoFactorStatusDto(required || user.TwoFactorEnabled, required);
+        return new TwoFactorStatusDto(required || user.TwoFactorEnabled, required, user.HasAuthenticator);
     }
 
     public async Task<TwoFactorStatusDto> SetTwoFactorAsync(
@@ -206,7 +245,7 @@ public class UserService(
 
         await EnsureCanManageAsync(user, ct);
 
-        var temporaryPassword = new Password(12)
+        var temporaryPassword = new Password(16)
             .IncludeLowercase()
             .IncludeUppercase()
             .IncludeNumeric()
@@ -224,6 +263,67 @@ public class UserService(
     }
 
 
+    // Step one of adding an authenticator app: a fresh secret, stored unconfirmed. It does nothing
+    // until a code from the app proves the app holds it (ConfirmAuthenticatorAsync).
+    public async Task<AuthenticatorSetupDto> BeginAuthenticatorSetupAsync(Guid userId, CancellationToken ct)
+    {
+        var user = await userRepository.GetByIdAsync(userId, ct)
+                   ?? throw new NotFoundException("User", userId);
+
+        if (user.HasAuthenticator)
+            throw new ConflictException("An authenticator app is already set up. Remove it first to set up another.");
+
+        var secret = Totp.ToBase32(Totp.NewSecret());
+        user.TotpSecret = secret;
+        user.TotpConfirmedAt = null;
+        user.TotpLastStep = null;
+
+        userRepository.Update(user);
+        await userRepository.SaveChangesAsync(ct);
+
+        return new AuthenticatorSetupDto(secret, Totp.Uri(secret, user.Email));
+    }
+
+    public async Task<TwoFactorStatusDto> ConfirmAuthenticatorAsync(Guid userId, string code, CancellationToken ct)
+    {
+        var user = await userRepository.GetByIdAsync(userId, ct)
+                   ?? throw new NotFoundException("User", userId);
+
+        if (user.TotpSecret is null || user.HasAuthenticator)
+            throw new BusinessException("Start setting up an authenticator app first.");
+
+        var step = Totp.Verify(Totp.FromBase32(user.TotpSecret), code.Trim(), DateTimeOffset.UtcNow, null)
+                   ?? throw new BusinessException("That code does not match. Check the time on your phone and try again.");
+
+        user.TotpConfirmedAt = DateTime.UtcNow;
+        user.TotpLastStep = step;
+        // Turning an authenticator on turns two-step sign-in on.
+        user.TwoFactorEnabled = true;
+
+        userRepository.Update(user);
+        await userRepository.SaveChangesAsync(ct);
+
+        return await GetTwoFactorStatusAsync(userId, ct);
+    }
+
+    public async Task<TwoFactorStatusDto> RemoveAuthenticatorAsync(Guid userId, string currentPassword, CancellationToken ct)
+    {
+        var user = await userRepository.GetByIdAsync(userId, ct)
+                   ?? throw new NotFoundException("User", userId);
+
+        // Removing a factor weakens the account, like switching two-step sign-in off.
+        RequireCurrentPassword(user, currentPassword);
+
+        user.TotpSecret = null;
+        user.TotpConfirmedAt = null;
+        user.TotpLastStep = null;
+
+        userRepository.Update(user);
+        await userRepository.SaveChangesAsync(ct);
+
+        return await GetTwoFactorStatusAsync(userId, ct);
+    }
+
     public async Task EndSessionsAsync(Guid userId, CancellationToken ct)
     {
         var user = await userRepository.GetByIdAsync(userId, ct);
@@ -232,6 +332,14 @@ public class UserService(
         user.SessionsValidFrom = DateTime.UtcNow;
         userRepository.Update(user);
         await userRepository.SaveChangesAsync(ct);
+    }
+
+    private PasswordVerificationResult VerifyAgainstDummy(string password)
+    {
+        var placeholder = new User();
+        _dummyHash ??= passwordHasher.HashPassword(placeholder, Guid.NewGuid().ToString());
+        passwordHasher.VerifyHashedPassword(placeholder, _dummyHash, password);
+        return PasswordVerificationResult.Failed;
     }
 
     // Not UnauthorizedException: the client treats any 401 as an expired session and signs out,

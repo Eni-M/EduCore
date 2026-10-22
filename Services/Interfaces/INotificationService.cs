@@ -6,9 +6,10 @@ namespace EduCore.Services.Interfaces;
 
 public interface INotificationService
 {
-    // Raise a notification for everyone of a role within a school. Saves immediately and wakes
-    // that role's open bell streams.
-    Task NotifyRoleAsync(Guid schoolId, UserRole role, string message, string? link, CancellationToken ct);
+    // Adds a notification for everyone of a role within a school to the caller's unit of work. It
+    // is saved by the caller's own SaveChanges, together with the change it reports, so the two
+    // commit or fail as one; the save wakes that role's bell streams.
+    Task StageForRoleAsync(Guid schoolId, UserRole role, string message, string? link, CancellationToken ct);
 
     // The current user's notifications (matched to their role, within their school scope).
     // Fetched on demand only -- when the bell opens or the notifications page loads; the stream

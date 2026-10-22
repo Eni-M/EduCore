@@ -12,6 +12,10 @@ public interface IStudentService
     Task<StudentDetailDto> GetByIdAsync(Guid studentId, CancellationToken ct);
     Task<StudentProfileDto> GetProfileAsync(Guid studentId, CancellationToken ct);
 
+    // What a dashboard card needs about one student: class, marks and attendance counts, without
+    // the guardians, identifiers and full attendance history the profile carries.
+    Task<StudentSummaryDto> GetSummaryAsync(Guid studentId, CancellationToken ct);
+
     Task<StudentDetailDto> CreateAsync(StudentCreateDto dto, CancellationToken ct);
     Task<StudentDetailDto> UpdateAsync(Guid studentId, StudentEditDto dto, CancellationToken ct);
 

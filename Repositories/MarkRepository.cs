@@ -13,10 +13,8 @@ namespace EduCore.Repositories;
 
 public class MarkRepository(
     AppDbContext context,
-    IGradingCalculator grading,
-    IOptions<GradingOptions> weights) : Repository<Mark>(context), IMarkRepository
+    IGradingCalculator grading) : Repository<Mark>(context), IMarkRepository
 {
-    private readonly GradingOptions _weights = weights.Value;
 
     private IQueryable<MarkListDto> Project(IQueryable<Mark> marks) =>
         from m in marks
@@ -41,27 +39,31 @@ public class MarkRepository(
             g.Name,
             m.FirstMark,
             m.SecondMark,
-            null);
+            null,
+            m.WeightedValue,
+            EF.Property<uint>(m, "Version"),
+            g.ClosedAt != null);
 
     private IEnumerable<MarkListDto> WithFinalMarks(IEnumerable<MarkListDto> marks) =>
-        marks.Select(m => m with { FinalMark = grading.FinalMark(m.FirstMark, m.SecondMark) });
+        marks.Select(m => m with { FinalMark = grading.FinalMark(m.WeightedValue) });
 
     public int? FinalMark(int? firstMark, int? secondMark) => grading.FinalMark(firstMark, secondMark);
 
-    public IQueryable<ValuedMark> Value(IQueryable<Mark> marks) => Value(marks, _weights);
+    // Every reader uses the weighted value stored when the mark was written, under the weights
+    // in force then. Recomputing from today's Grading weights would let a policy change for next
+    // year rewrite last year's finals, pass rates and graduations.
+    public IQueryable<ValuedMark> Value(IQueryable<Mark> marks) => ValueOf(marks);
 
-    public IQueryable<double> WeightedValues(IQueryable<Mark> marks) =>
-        WeightedValues(marks, _weights);
+    public IQueryable<double> WeightedValues(IQueryable<Mark> marks) => WeightedValuesOf(marks);
 
-    public static IQueryable<double> WeightedValues(IQueryable<Mark> marks, GradingOptions weights) =>
+    public static IQueryable<double> WeightedValuesOf(IQueryable<Mark> marks) =>
         marks
-            .Where(m => m.FirstMark != null && m.SecondMark != null)
-            .Select(m => m.FirstMark!.Value * weights.FirstMarkWeight
-                         + m.SecondMark!.Value * weights.SecondMarkWeight);
+            .Where(m => m.WeightedValue != null)
+            .Select(m => m.WeightedValue!.Value);
 
-    public static IQueryable<ValuedMark> Value(IQueryable<Mark> marks, GradingOptions weights) =>
+    public static IQueryable<ValuedMark> ValueOf(IQueryable<Mark> marks) =>
         marks
-            .Where(m => m.FirstMark != null && m.SecondMark != null)
+            .Where(m => m.WeightedValue != null)
             .Select(m => new ValuedMark(
                 m.Id,
                 m.EnrollmentId,
@@ -69,8 +71,7 @@ public class MarkRepository(
                 m.SubjectId,
                 m.TeacherId,
                 m.GradingPeriodId,
-                m.FirstMark!.Value * weights.FirstMarkWeight
-                + m.SecondMark!.Value * weights.SecondMarkWeight));
+                m.WeightedValue!.Value));
 
     private static IQueryable<Mark> Filter(IQueryable<Mark> marks, Guid? subjectId, Guid? gradingPeriodId)
     {
@@ -90,6 +91,24 @@ public class MarkRepository(
 
         return mark is null ? null : WithFinalMarks([mark]).First();
     }
+
+    // Makes the save conditional on the row still being at the version the client saw: EF puts
+    // the original xmin in the UPDATE's WHERE, and a mismatch becomes a 409.
+    public void ExpectVersion(Mark mark, uint version) =>
+        _context.Entry(mark).Property<uint>("Version").OriginalValue = version;
+
+    public void AddChange(MarkChange change) => _context.MarkChanges.Add(change);
+
+    public async Task<IReadOnlyList<MarkChangeDto>> GetChangesAsync(Guid markId, CancellationToken ct) =>
+        await (from c in _context.MarkChanges.AsNoTracking()
+               join u in _context.Users on c.ChangedByUserId equals u.Id
+               where c.MarkId == markId
+               orderby c.ChangedAt descending
+               select new MarkChangeDto(
+                   c.ChangedAt, u.FirstName + " " + u.LastName,
+                   c.OldFirstMark, c.OldSecondMark, c.NewFirstMark, c.NewSecondMark,
+                   c.Reason, c.AfterClose))
+            .ToListAsync(ct);
 
     public async Task<Mark?> GetForUpsertAsync(
         Guid enrollmentId, Guid subjectId, Guid gradingPeriodId, CancellationToken ct) =>

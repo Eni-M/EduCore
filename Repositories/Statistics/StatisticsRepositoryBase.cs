@@ -19,7 +19,7 @@ public abstract class StatisticsRepositoryBase(AppDbContext context)
                 "A statistics query reached the database without a school scope. " +
                 "StatisticsScopeResolver must produce either a school id or an explicit cross-school context.");
 
-        query = query.AsNoTracking().IgnoreQueryFilters();
+        query = query.AsNoTracking().IgnoreQueryFilters(QueryFilters.SchoolOnly);
 
         if (ctx.SchoolId is not null)
             query = query.Where(e => e.SchoolId == ctx.SchoolId);

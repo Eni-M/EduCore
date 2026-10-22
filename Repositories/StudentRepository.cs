@@ -10,7 +10,7 @@ public class StudentRepository(AppDbContext context) : Repository<Student>(conte
     public async Task<Student?> GetByUserIdAsync(Guid userId, CancellationToken ct) =>
         await _context.Students
             .AsNoTracking()
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .FirstOrDefaultAsync(s => s.UserId == userId, ct);
 
     public async Task<Student?> GetWithGuardiansAsync(Guid studentId, CancellationToken ct) =>
@@ -27,7 +27,7 @@ public class StudentRepository(AppDbContext context) : Repository<Student>(conte
         Guid? excludeStudentId,
         CancellationToken ct) =>
         await _context.Students
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .AnyAsync(
                 s => s.PersonalNumber == personalNumber
                      && (excludeStudentId == null || s.Id != excludeStudentId),

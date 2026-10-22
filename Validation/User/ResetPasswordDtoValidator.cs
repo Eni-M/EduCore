@@ -10,11 +10,7 @@ public class ResetPasswordDtoValidator : AbstractValidator<ResetPasswordDto>
         RuleFor(x => x.Token).NotEmpty();
 
         RuleFor(x => x.NewPassword)
-            .NotEmpty()
-            .Length(8, 128)
-            .Matches(@"[a-z]").WithMessage("'New Password' must contain a lowercase letter.")
-            .Matches(@"[A-Z]").WithMessage("'New Password' must contain an uppercase letter.")
-            .Matches(@"\d").WithMessage("'New Password' must contain a digit.");
+            .Password();
 
         RuleFor(x => x.ConfirmNewPassword)
             .NotEmpty()

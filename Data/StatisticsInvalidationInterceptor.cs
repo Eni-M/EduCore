@@ -1,4 +1,5 @@
-﻿using EduCore.Models;
+﻿using EduCore.Data;
+using EduCore.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -133,6 +134,6 @@ public class StatisticsInvalidationInterceptor : SaveChangesInterceptor
     // still be bumped. It exposes nothing — the statement only increments a number.
     private static IQueryable<SchoolStatisticsSnapshot> Query(DbContext context, Guid schoolId) =>
         context.Set<SchoolStatisticsSnapshot>()
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .Where(x => x.SchoolId == schoolId);
 }

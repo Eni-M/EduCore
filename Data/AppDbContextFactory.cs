@@ -55,6 +55,8 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
     private class DesignTimeFieldEncryptor : IFieldEncryptor
     {
         public string Encrypt(string value) => value;
+        public string Seal(string value) => value;
         public string Decrypt(string value) => value;
+        public bool NeedsReencryption(string? stored) => false;
     }
 }

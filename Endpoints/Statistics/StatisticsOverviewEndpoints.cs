@@ -13,8 +13,8 @@ public static class StatisticsOverviewEndpoints
                 int? page, int? pageSize,
                 [AsParameters] StatisticsFilter filter, IStatisticsOverviewService service, CancellationToken ct) =>
             page is null && pageSize is null
-                ? Results.Ok(await service.GetSchoolOverviewAsync(filter, ct))
-                : Results.Ok(await service.GetSchoolOverviewAsync(
+                ? TypedResults.Ok(await service.GetSchoolOverviewAsync(filter, ct))
+                : TypedResults.Ok(await service.GetSchoolOverviewAsync(
                     filter, new PaginationQueryDto(page ?? 1, pageSize ?? 20), ct)));
 
         // The per-school comparison table is one row per school nationwide. Paging params page
@@ -23,7 +23,7 @@ public static class StatisticsOverviewEndpoints
         group.MapGet("/platform-overview", async (
                 int? page, int? pageSize,
                 [AsParameters] StatisticsFilter filter, IStatisticsOverviewService service, CancellationToken ct) =>
-                Results.Ok(await service.GetPlatformOverviewAsync(
+                TypedResults.Ok(await service.GetPlatformOverviewAsync(
                     filter,
                     page is null && pageSize is null
                         ? null

@@ -153,6 +153,9 @@ public class CalendarServiceTests
         public Task EnsureCanViewStudentAsync(Guid studentId, CancellationToken ct) => Task.CompletedTask;
         public Task EnsureCanViewStudentMedicalAsync(Guid studentId, CancellationToken ct) => Task.CompletedTask;
         public Task<bool> CanViewStudentMedicalAsync(Guid studentId, CancellationToken ct) => Task.FromResult(true);
+        public Task EnsureCanManageSchoolAsync(Guid? schoolCityId, CancellationToken ct) => Task.CompletedTask;
+        public void EnsureCanWriteMarks(Guid assignedTeacherId) { }
+        public void EnsureConversationParticipant(Guid guardianId, Guid teacherId) { }
     }
 
     private sealed class FakeStudentRepo : IStudentRepository

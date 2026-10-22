@@ -17,6 +17,11 @@ namespace EduCore.Tests;
 // pass/fail is derived from the current rules rather than frozen into the stored row.
 public class StudentAcademicHistoryServiceTests
 {
+    // A period mark as stored: the weighted value is computed once, at 40/60, when written.
+    private static SubjectPeriodMarkRow Row(Guid? subjectId, string subjectName, int? first, int? second) =>
+        new(subjectId, subjectName, first, second,
+            first is { } f && second is { } s ? f * 0.40 + s * 0.60 : null);
+
     private static readonly Guid StudentId = Guid.NewGuid();
     private static readonly Guid CurrentSchool = Guid.NewGuid();
     private static readonly Guid PreviousSchool = Guid.NewGuid();
@@ -34,6 +39,9 @@ public class StudentAcademicHistoryServiceTests
         public Task EnsureCanViewStudentAsync(Guid studentId, CancellationToken ct) => Task.CompletedTask;
         public Task EnsureCanViewStudentMedicalAsync(Guid studentId, CancellationToken ct) => Task.CompletedTask;
         public Task<bool> CanViewStudentMedicalAsync(Guid studentId, CancellationToken ct) => Task.FromResult(true);
+        public Task EnsureCanManageSchoolAsync(Guid? schoolCityId, CancellationToken ct) => Task.CompletedTask;
+        public void EnsureCanWriteMarks(Guid assignedTeacherId) { }
+        public void EnsureConversationParticipant(Guid guardianId, Guid teacherId) { }
     }
 
     private sealed class FakeCurrentUser : ICurrentUser
@@ -193,8 +201,8 @@ public class StudentAcademicHistoryServiceTests
         {
             [EnrollmentTwo] =
             [
-                new(Maths, "Mathematics", 4, 5),
-                new(Maths, "Mathematics", 3, 3)
+                Row(Maths, "Mathematics", 4, 5),
+                Row(Maths, "Mathematics", 3, 3)
             ]
         });
 
@@ -212,7 +220,7 @@ public class StudentAcademicHistoryServiceTests
         // first answer and put every historical record permanently out of step with the rules.
         var marks = new Dictionary<Guid, List<SubjectPeriodMarkRow>>
         {
-            [EnrollmentTwo] = [new(Maths, "Mathematics", 3, 3)]
+            [EnrollmentTwo] = [Row(Maths, "Mathematics", 3, 3)]
         };
 
         var (lenient, _) = Build(marks, passMark: 2);
@@ -229,7 +237,7 @@ public class StudentAcademicHistoryServiceTests
         // transcript that conflates them accuses a student of failing a subject nobody graded.
         var (service, _) = Build(new Dictionary<Guid, List<SubjectPeriodMarkRow>>
         {
-            [EnrollmentTwo] = [new(HistorySubject, "History", null, null)]
+            [EnrollmentTwo] = [Row(HistorySubject, "History", null, null)]
         });
 
         var year = CurrentYear(await CompiledAsync(service));
@@ -247,8 +255,8 @@ public class StudentAcademicHistoryServiceTests
         {
             [EnrollmentTwo] =
             [
-                new(Maths, "Mathematics", 5, 5),
-                new(HistorySubject, "History", 1, 1)
+                Row(Maths, "Mathematics", 5, 5),
+                Row(HistorySubject, "History", 1, 1)
             ]
         });
 

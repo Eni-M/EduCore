@@ -25,6 +25,6 @@ public static class ClassStatisticsEndpoints
                 [AsParameters] StatisticsFilter filter,
                 IClassStatisticsService service,
                 CancellationToken ct) =>
-            Results.Ok(await service.GetDetailAsync(filter, classId, ct)));
+            TypedResults.Ok(await service.GetDetailAsync(filter, classId, ct)));
     }
 }

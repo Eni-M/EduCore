@@ -48,7 +48,7 @@ public class AssignmentService(
 
         var assignment = new Assignment
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             SchoolId = currentUser.RequireSchoolId(),
             ClassSubjectTeacherId = classSubjectTeacher.Id,
             ClassId = classSubjectTeacher.ClassId,
@@ -141,7 +141,7 @@ public class AssignmentService(
         {
             var submission = new AssignmentSubmission
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.CreateVersion7(),
                 AssignmentId = assignmentId,
                 StudentId = studentId,
                 SchoolId = currentUser.RequireSchoolId(),

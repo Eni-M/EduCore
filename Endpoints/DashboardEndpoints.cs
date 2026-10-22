@@ -13,6 +13,6 @@ public static class DashboardEndpoints
         // No policy beyond authentication for the same reason: every role has a dashboard, and the
         // data inside it is already scoped by the services this composes.
         group.MapGet("/dashboard", async (IDashboardService service, CancellationToken ct) =>
-            Results.Ok(await service.GetAsync(ct)));
+            TypedResults.Ok(await service.GetAsync(ct)));
     }
 }

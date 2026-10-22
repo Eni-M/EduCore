@@ -24,15 +24,21 @@ public class GradingRuleAgreementTests
         return data;
     }
 
-    private static double QueryValue(int? first, int? second, GradingOptions? options = null)
+    // A mark as MarkService writes it: the weighted value computed once, under the weights in
+    // force at the time, and stored. The queries read it back rather than recomputing.
+    private static Mark Written(int? first, int? second, GradingOptions? options = null) => new()
     {
-        var mark = new Mark { Id = Guid.NewGuid(), FirstMark = first, SecondMark = second };
+        Id = Guid.NewGuid(),
+        FirstMark = first,
+        SecondMark = second,
+        WeightedValue = Calculator(options).WeightedValue(first, second)
+    };
 
-        return MarkRepository
-            .Value(new[] { mark }.AsQueryable(), options ?? Options)
+    private static double QueryValue(int? first, int? second, GradingOptions? options = null) =>
+        MarkRepository
+            .ValueOf(new[] { Written(first, second, options) }.AsQueryable())
             .Single()
             .Value;
-    }
 
     [Theory]
     [MemberData(nameof(AllMarkPairs))]
@@ -45,9 +51,7 @@ public class GradingRuleAgreementTests
     [InlineData(null, null)]
     public void TheQuery_SkipsMarksTheCalculatorCannotGrade(int? first, int? second)
     {
-        var mark = new Mark { Id = Guid.NewGuid(), FirstMark = first, SecondMark = second };
-
-        Assert.Empty(MarkRepository.Value(new[] { mark }.AsQueryable(), Options));
+        Assert.Empty(MarkRepository.ValueOf(new[] { Written(first, second) }.AsQueryable()));
         Assert.Null(Calculator().FinalMark(first, second));
     }
 
@@ -116,5 +120,18 @@ public class GradingRuleAgreementTests
                 calculator.IsPass(calculator.FinalMark(first, second)!.Value),
                 value >= calculator.PassValue);
         }
+    }
+
+    // The point of storing it: a later change to the Grading weights must not rewrite a mark
+    // that was recorded under the old ones.
+    [Fact]
+    public void Changing_the_weights_does_not_rewrite_a_mark_already_recorded()
+    {
+        var recorded = Written(1, 5);
+        var reweighted = Calculator(new GradingOptions { FirstMarkWeight = 0.7, SecondMarkWeight = 0.3 });
+
+        Assert.Equal(3, Calculator().FinalMark(recorded.WeightedValue));
+        Assert.Equal(3, reweighted.FinalMark(recorded.WeightedValue));
+        Assert.Equal(2, reweighted.FinalMark(1, 5));
     }
 }

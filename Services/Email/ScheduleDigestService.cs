@@ -10,7 +10,7 @@ namespace EduCore.Services.Email;
 // Builds the scheduled digests with targeted EF projections: only the rows and columns a digest
 // needs leave PostgreSQL, joins run in SQL, and grouping/formatting happens on small records.
 //
-// IgnoreQueryFilters() is deliberate and required: this runs from a background scope with no
+// IgnoreQueryFilters(QueryFilters.SchoolOnly) is deliberate and required: this runs from a background scope with no
 // signed-in user, so the per-request school filter would otherwise match nothing. It is safe
 // because every email is grouped by its owning teacher/class/school -- a recipient only ever sees
 // their own school's data. Deactivated users are excluded explicitly instead.
@@ -117,7 +117,7 @@ public class ScheduleDigestService(
                 e.SchoolId, e.DayOfWeek, p.PeriodNumber, p.StartTime, p.EndTime,
                 s.Name, e.ClassId, c.Name, e.TeacherId, u.Email, u.FirstName);
 
-        return await query.IgnoreQueryFilters().ToListAsync(ct);
+        return await query.IgnoreQueryFilters(QueryFilters.SchoolOnly).ToListAsync(ct);
     }
 
     private async Task<List<Recipient>> StudentsForClassesAsync(
@@ -133,12 +133,12 @@ public class ScheduleDigestService(
             where u.DeactivatedAt == null && !u.EmailDigestsOptOut
             select new Recipient(en.ClassId, u.Email, u.FirstName);
 
-        return await query.IgnoreQueryFilters().ToListAsync(ct);
+        return await query.IgnoreQueryFilters(QueryFilters.SchoolOnly).ToListAsync(ct);
     }
 
     private async Task<List<Mail>> MeetingMailsAsync(DateOnly date, CancellationToken ct)
     {
-        var meetings = await db.CalendarEvents.AsNoTracking().IgnoreQueryFilters()
+        var meetings = await db.CalendarEvents.AsNoTracking().IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .Where(e => e.Type == CalendarEventType.Meeting && e.Date == date)
             .Select(e => new MeetingRow(e.SchoolId, e.Title, e.StartTime))
             .ToListAsync(ct);
@@ -172,7 +172,7 @@ public class ScheduleDigestService(
             where u.DeactivatedAt == null && !u.EmailDigestsOptOut
             select new Contact(d.SchoolId, u.Email, u.FirstName);
 
-        return await query.IgnoreQueryFilters().ToListAsync(ct);
+        return await query.IgnoreQueryFilters(QueryFilters.SchoolOnly).ToListAsync(ct);
     }
 
     // School holidays on the given dates, so a schedule digest is not sent for a closed day.
@@ -181,7 +181,7 @@ public class ScheduleDigestService(
     private async Task<HashSet<(Guid School, DateOnly Date)>> HolidaysAsync(
         IReadOnlyCollection<DateOnly> dates, CancellationToken ct)
     {
-        var rows = await db.CalendarEvents.AsNoTracking().IgnoreQueryFilters()
+        var rows = await db.CalendarEvents.AsNoTracking().IgnoreQueryFilters(QueryFilters.SchoolOnly)
             .Where(e => e.Type == CalendarEventType.Holiday && dates.Contains(e.Date))
             .Select(e => new { e.SchoolId, e.Date })
             .ToListAsync(ct);

@@ -15,6 +15,7 @@ public class MessagingService(
     ITeacherRepository teachers,
     IClassSubjectTeacherRepository assignments,
     IEnrollmentRepository enrollments,
+    IAccessGuard access,
     ICurrentUser currentUser) : IMessagingService
 {
     public async Task<IEnumerable<ConversationListDto>> GetMyConversationsAsync(
@@ -41,7 +42,7 @@ public class MessagingService(
             ?? throw new NotFoundException(
                 "Conversation", conversationId);
 
-        EnsureParticipant(
+        access.EnsureConversationParticipant(
             conversation.GuardianId,
             conversation.TeacherId);
 
@@ -72,7 +73,7 @@ public class MessagingService(
 
         var conversation = new Conversation
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             SchoolId = schoolId,
             StudentId = dto.StudentId,
             GuardianId = dto.GuardianId,
@@ -106,13 +107,13 @@ public class MessagingService(
             ?? throw new NotFoundException(
                 "Conversation", conversationId);
 
-        EnsureParticipant(
+        access.EnsureConversationParticipant(
             conversation.GuardianId,
             conversation.TeacherId);
 
         var message = new Message
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             ConversationId = conversationId,
             SenderUserId = currentUser.UserId,
             Content = content,
@@ -138,7 +139,7 @@ public class MessagingService(
             ?? throw new NotFoundException(
                 "Conversation", conversationId);
 
-        EnsureParticipant(
+        access.EnsureConversationParticipant(
             conversation.GuardianId,
             conversation.TeacherId);
 
@@ -146,32 +147,6 @@ public class MessagingService(
             conversationId,
             currentUser.UserId,
             ct);
-    }
-
-    private void EnsureParticipant(
-        Guid guardianId,
-        Guid teacherId)
-    {
-        if (currentUser.IsGuardian)
-        {
-            if (currentUser.GuardianId != guardianId)
-                throw new ForbiddenException(
-                    "You do not have access to this conversation.");
-
-            return;
-        }
-
-        if (currentUser.IsTeacher)
-        {
-            if (currentUser.TeacherId != teacherId)
-                throw new ForbiddenException(
-                    "You do not have access to this conversation.");
-
-            return;
-        }
-
-        throw new ForbiddenException(
-            "You do not have access to this conversation.");
     }
 
     private async Task ValidateParticipantsAsync(

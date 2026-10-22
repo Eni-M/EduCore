@@ -144,7 +144,7 @@ public class AttendanceStatisticsService(
             ? (double?)null
             : Math.Round(overall.Present * 100.0 / overall.Records, 2);
 
-        return groups
+        var rows = groups
             .Select(g => new AttendanceByKeyDto(
                 g.Key,
                 g.Label,
@@ -152,5 +152,9 @@ public class AttendanceStatisticsService(
                 suppressor.Apply(Measures.Rate(g.Present, g.Records).WithBaseline(baseline, baselineLabel)),
                 suppressor.Apply(Measures.Rate(g.ExcusedAbsences, g.Records))))
             .ToList();
+
+        return suppressor.Complement(
+            suppressor.Complement(rows, r => r.AttendanceRate, (r, m) => r with { AttendanceRate = m }),
+            r => r.ExcusedAbsenceRate, (r, m) => r with { ExcusedAbsenceRate = m });
     }
 }

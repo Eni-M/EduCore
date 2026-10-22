@@ -1,5 +1,7 @@
+using EduCore.Security;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -45,6 +47,8 @@ public static class ObservabilityExtensions
                     // application's shape the database is the thing most likely to be the
                     // bottleneck, so these matter more than the rest.
                     .AddMeter("Npgsql")
+                    // EF Core's own counters: queries, saves, compiled-query cache hits.
+                    .AddMeter("Microsoft.EntityFrameworkCore")
                     .AddPrometheusExporter();
             });
         }
@@ -75,6 +79,20 @@ public static class ObservabilityExtensions
             });
         }
 
+        // Logs through the same pipeline as traces, so each record carries the trace and span id
+        // of the request that wrote it and a collector can join the two. Console logging stays as
+        // it is; this only adds the OTLP export when a collector is configured.
+        if (options.ShipsTraces)
+        {
+            builder.Logging.AddOpenTelemetry(logging =>
+            {
+                logging.SetResourceBuilder(resource);
+                logging.IncludeFormattedMessage = true;
+                logging.IncludeScopes = true;
+                logging.AddOtlpExporter(exporter => exporter.Endpoint = new Uri(options.OtlpEndpoint));
+            });
+        }
+
         return options;
     }
 
@@ -90,6 +108,6 @@ public static class ObservabilityExtensions
         metrics.DisableRateLimiting();
 
         if (options.MetricsRequireAuthentication)
-            metrics.RequireAuthorization();
+            metrics.RequireAuthorization(Policies.StateAdmin);
     }
 }

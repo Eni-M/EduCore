@@ -76,4 +76,41 @@ public class CellSuppressorTests
         Assert.False(Suppressor(minimum: 3).Apply(Measure.Of(3.5, 4)).Suppressed);
         Assert.True(Suppressor(minimum: 10).Apply(Measure.Of(3.5, 4)).Suppressed);
     }
+
+    // What it was computed from is part of what is being withheld.
+    [Fact]
+    public void A_suppressed_measure_carries_no_sample_size() =>
+        Assert.Equal(0, Suppressor().Apply(Measure.Of(80, 3)).SampleSize);
+
+    private sealed record Row(string Name, Measure Rate);
+
+    private static IReadOnlyList<Row> Complement(params Row[] rows) =>
+        Suppressor().Complement(rows, r => r.Rate, (r, m) => r with { Rate = m });
+
+    // One hidden class next to a published school total can be recovered by subtraction, so the
+    // smallest published sibling is hidden with it.
+    [Fact]
+    public void A_lone_hidden_sibling_takes_the_smallest_published_one_with_it()
+    {
+        var s = Suppressor();
+        var rows = Complement(
+            new Row("A", s.Apply(Measure.Of(80, 3))),
+            new Row("B", s.Apply(Measure.Of(70, 40))),
+            new Row("C", s.Apply(Measure.Of(90, 12))));
+
+        Assert.True(rows.Single(r => r.Name == "C").Rate.Suppressed);
+        Assert.False(rows.Single(r => r.Name == "B").Rate.Suppressed);
+    }
+
+    [Fact]
+    public void Two_hidden_siblings_need_no_partner()
+    {
+        var s = Suppressor();
+        var rows = Complement(
+            new Row("A", s.Apply(Measure.Of(80, 3))),
+            new Row("B", s.Apply(Measure.Of(70, 2))),
+            new Row("C", s.Apply(Measure.Of(90, 12))));
+
+        Assert.False(rows.Single(r => r.Name == "C").Rate.Suppressed);
+    }
 }

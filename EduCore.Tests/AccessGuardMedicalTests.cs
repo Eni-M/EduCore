@@ -128,7 +128,7 @@ public class AccessGuardMedicalTests
 
     private static AccessGuard Guard(ICurrentUser user) =>
         new(new FakeClassRepository(), new FakeEnrollmentRepository(), new FakeAssignmentRepository(),
-            new FakeGuardianRepository(), user);
+            new FakeGuardianRepository(), Stub.Of<ILocationRepository>(), user);
 
     [Fact]
     public async Task Homeroom_teacher_can_view_medical() =>

@@ -143,7 +143,7 @@ public class LocalizationTests
         // throw, and without this the check silently skips every one of them -- which is how a
         // whole service's worth of untranslated messages got past it.
         var literal = new Regex(
-            @"(?:BusinessException|NotFoundException|ForbiddenException|UnauthorizedException|ConflictException)\(\s*""([^""]+)""\s*\)",
+            @"(?:BusinessException|NotFoundException|ForbiddenException|UnauthorizedException|ConflictException|TooManyRequestsException)\(\s*""([^""]+)""\s*\)",
             RegexOptions.Singleline);
         var validation = new Regex(@"WithMessage\(""([^""]+)""\)");
 

@@ -41,4 +41,5 @@ public record SubjectPeriodMarkRow(
     Guid? SubjectId,
     string SubjectName,
     int? FirstMark,
-    int? SecondMark);
+    int? SecondMark,
+    double? WeightedValue);

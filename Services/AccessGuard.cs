@@ -10,8 +10,51 @@ public class AccessGuard(
     IEnrollmentRepository enrollments,
     IClassSubjectTeacherRepository assignments,
     IGuardianRepository guardians,
+    ILocationRepository locations,
     ICurrentUser currentUser) : IAccessGuard
 {
+    public async Task EnsureCanManageSchoolAsync(Guid? schoolCityId, CancellationToken ct)
+    {
+        if (currentUser.IsRegionalAdmin)
+        {
+            if (schoolCityId is null || schoolCityId != currentUser.RequireCityId())
+                throw new ForbiddenException("This school is not in your city.");
+
+            return;
+        }
+
+        if (currentUser.IsStateAdmin)
+        {
+            var city = schoolCityId is { } cityId ? await locations.GetCityAsync(cityId, ct) : null;
+            if (city?.StateId != currentUser.RequireStateId())
+                throw new ForbiddenException("This school is not in your state.");
+
+            return;
+        }
+
+        throw new ForbiddenException("You are not allowed to manage this school.");
+    }
+
+    public void EnsureCanWriteMarks(Guid assignedTeacherId)
+    {
+        if (currentUser.IsDirectorate)
+            return;
+
+        if (currentUser.IsTeacher && currentUser.TeacherId == assignedTeacherId)
+            return;
+
+        throw new ForbiddenException("Only the teacher assigned to this class-subject can give marks for it.");
+    }
+
+    public void EnsureConversationParticipant(Guid guardianId, Guid teacherId)
+    {
+        if ((currentUser.IsGuardian && currentUser.GuardianId == guardianId)
+            || (currentUser.IsTeacher && currentUser.TeacherId == teacherId))
+            return;
+
+        throw new ForbiddenException("You do not have access to this conversation.");
+    }
+
     public async Task EnsureCanViewClassAsync(Guid classId, CancellationToken ct)
     {
         var @class = await classes.GetByIdAsync(classId, ct)

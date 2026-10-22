@@ -40,6 +40,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<Notice> Notices => Set<Notice>();
     public DbSet<CalendarEvent> CalendarEvents => Set<CalendarEvent>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<NotificationRead> NotificationReads => Set<NotificationRead>();
 
     public DbSet<State> States => Set<State>();
     public DbSet<City> Cities => Set<City>();
@@ -47,6 +48,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<Country> Countries => Set<Country>();
     public DbSet<OriginCity> OriginCities => Set<OriginCity>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<MarkChange> MarkChanges => Set<MarkChange>();
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<TeacherSubject> TeacherSubjects => Set<TeacherSubject>();
     public DbSet<ClassSubjectTeacher> ClassSubjectTeachers => Set<ClassSubjectTeacher>();
@@ -56,6 +58,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<SchoolShift> SchoolShifts => Set<SchoolShift>();
     public DbSet<ShiftPeriod> ShiftPeriods => Set<ShiftPeriod>();
     public DbSet<ScheduleEntry> ScheduleEntries => Set<ScheduleEntry>();
+
+    // Read by EncryptorModelCacheKeyFactory: the cached model is bound to this encryptor.
+    internal IFieldEncryptor Encryptor => encryptor;
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
+        optionsBuilder.ReplaceService<
+            Microsoft.EntityFrameworkCore.Infrastructure.IModelCacheKeyFactory, EncryptorModelCacheKeyFactory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -71,6 +80,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
 
         modelBuilder.Entity<AuditLog>().Property(a => a.Action).HasMaxLength(1000);
         modelBuilder.Entity<AuditLog>().Property(a => a.TraceId).HasMaxLength(200);
+        modelBuilder.Entity<AuditLog>().HasIndex(a => new { a.SchoolId, a.Timestamp });
 
         // The admin listing sorts Timestamp DESC, Id and pages 20 rows. Without this the
         // dominant unfiltered case is a parallel sequential scan over the whole table followed
@@ -82,7 +92,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     }
 
     private void ScopeToSchool<T>(ModelBuilder modelBuilder) where T : class, ISchoolScoped =>
-        modelBuilder.Entity<T>().HasQueryFilter(e => currentUser.SchoolIds.Contains(e.SchoolId));
+        modelBuilder.Entity<T>().HasQueryFilter(QueryFilters.School, e => currentUser.SchoolIds.Contains(e.SchoolId));
 
     private void ConfigureUsers(ModelBuilder modelBuilder)
     {
@@ -98,6 +108,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         modelBuilder.Entity<User>().Property(u => u.LastName).HasMaxLength(100);
         modelBuilder.Entity<User>().Property(u => u.Email).HasMaxLength(320);
         modelBuilder.Entity<User>().Property(u => u.PasswordHash).HasMaxLength(500);
+        // The authenticator secret is a credential: sealed at rest, never stored in the clear.
+        modelBuilder.Entity<User>().Property(nameof(User.TotpSecret)).HasConversion(new ValueConverter<string, string>(
+            v => encryptor.Seal(v),
+            v => encryptor.Decrypt(v)));
         modelBuilder.Entity<User>().Property<uint>("Version").IsRowVersion();
 
         modelBuilder.Entity<PasswordResetToken>()
@@ -348,6 +362,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .IsUnique()
             .HasFilter("\"LeftAt\" IS NULL");
         modelBuilder.Entity<Enrollment>().Property<uint>("Version").IsRowVersion();
+        // A student leaves with a reason, and only a student who has left has one -- the rule
+        // WithdrawAsync and GraduateAsync each apply, now enforced where both write.
+        modelBuilder.Entity<Enrollment>().ToTable(t => t.HasCheckConstraint(
+            "CK_Enrollments_ExitReasonWithLeftAt", "(\"LeftAt\" IS NULL) = (\"ExitReason\" IS NULL)"));
         modelBuilder.Entity<Enrollment>().HasIndex(e => new { e.SchoolId, e.ClassId, e.LeftAt });
         ScopeToSchool<Enrollment>(modelBuilder);
 
@@ -538,6 +556,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .HasPrincipalKey(g => new { g.Id, g.AcademicYearId, g.SchoolId })
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Mark>().Property<uint>("Version").IsRowVersion();
+
+        // Marks are recorded 1 to 5; the validator says so, and now the database does too.
+        modelBuilder.Entity<Mark>().ToTable(t =>
+        {
+            t.HasCheckConstraint("CK_Marks_FirstMark", "\"FirstMark\" IS NULL OR \"FirstMark\" BETWEEN 1 AND 5");
+            t.HasCheckConstraint("CK_Marks_SecondMark", "\"SecondMark\" IS NULL OR \"SecondMark\" BETWEEN 1 AND 5");
+        });
+
+        modelBuilder.Entity<MarkChange>()
+            .HasOne<Mark>().WithMany()
+            .HasForeignKey(c => c.MarkId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<MarkChange>().HasIndex(c => new { c.MarkId, c.ChangedAt });
+        modelBuilder.Entity<MarkChange>().Property(c => c.Reason).HasMaxLength(500);
+        ScopeToSchool<MarkChange>(modelBuilder);
         modelBuilder.Entity<Mark>()
             .HasIndex(m => new { m.EnrollmentId, m.SubjectId, m.GradingPeriodId })
             .IsUnique();
@@ -585,13 +618,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .HasPrincipalKey(s => new { s.Id, s.SchoolId })
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<StudentMedicalRecord>().HasIndex(m => m.StudentId).IsUnique();
-        modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.BloodType).HasMaxLength(10);
-        modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.Allergies).HasMaxLength(2000);
-        modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.ChronicConditions).HasMaxLength(2000);
-        modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.Medications).HasMaxLength(2000);
-        modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.EmergencyContactName).HasMaxLength(200);
-        modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.EmergencyContactPhone).HasMaxLength(30);
-        modelBuilder.Entity<StudentMedicalRecord>().Property(m => m.Notes).HasMaxLength(4000);
+        // Health data is special-category data and is never searched, so every text field is
+        // sealed with randomised AES-GCM. The columns are unbounded text because ciphertext is
+        // longer than its plaintext; the plaintext limits live in the upsert validator.
+        var sealedText = new ValueConverter<string, string>(
+            v => encryptor.Seal(v),
+            v => encryptor.Decrypt(v));
+
+        foreach (var property in new[]
+                 {
+                     nameof(StudentMedicalRecord.BloodType), nameof(StudentMedicalRecord.Allergies),
+                     nameof(StudentMedicalRecord.ChronicConditions), nameof(StudentMedicalRecord.Medications),
+                     nameof(StudentMedicalRecord.EmergencyContactName),
+                     nameof(StudentMedicalRecord.EmergencyContactPhone), nameof(StudentMedicalRecord.Notes),
+                 })
+            modelBuilder.Entity<StudentMedicalRecord>().Property(property).HasConversion(sealedText);
         modelBuilder.Entity<StudentMedicalRecord>().Property<uint>("Version").IsRowVersion();
         ScopeToSchool<StudentMedicalRecord>(modelBuilder);
 
@@ -675,11 +716,22 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .HasOne<School>().WithMany()
             .HasForeignKey(n => n.SchoolId)
             .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<Notification>().HasIndex(n => new { n.SchoolId, n.RecipientRole, n.ReadAt });
+        modelBuilder.Entity<Notification>().HasIndex(n => new { n.SchoolId, n.RecipientRole, n.CreatedAt });
         modelBuilder.Entity<Notification>().Property(n => n.Message).HasMaxLength(1000);
         modelBuilder.Entity<Notification>().Property(n => n.Link).HasMaxLength(500);
         modelBuilder.Entity<Notification>().Property<uint>("Version").IsRowVersion();
         ScopeToSchool<Notification>(modelBuilder);
+
+        // Not school-scoped: a read row belongs to one user, and every query filters on that user.
+        modelBuilder.Entity<NotificationRead>().HasKey(r => new { r.NotificationId, r.UserId });
+        modelBuilder.Entity<NotificationRead>()
+            .HasOne<Notification>().WithMany()
+            .HasForeignKey(r => r.NotificationId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<NotificationRead>()
+            .HasOne<User>().WithMany()
+            .HasForeignKey(r => r.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 
 

@@ -153,14 +153,40 @@ public class AcademicYearService(
         gradingPeriods.Update(gradingPeriod);
         await gradingPeriods.SaveChangesAsync(ct);
 
-        return new GradingPeriodListDto(
+        return ToDto(gradingPeriod, academicYear);
+    }
+
+    // Closing a term freezes its marks for teachers; the office may still correct one, with a
+    // reason that MarkService keeps. Reopening is allowed -- mistakes happen -- and is itself
+    // audited, since the period's ClosedAt change is a value-audited write.
+    public async Task<GradingPeriodListDto> SetGradingPeriodClosedAsync(
+        Guid gradingPeriodId, bool closed, CancellationToken ct)
+    {
+        var gradingPeriod = await gradingPeriods.GetByIdAsync(gradingPeriodId, ct)
+                            ?? throw new NotFoundException("Grading period", gradingPeriodId);
+
+        var academicYear = await GetOwnedYearAsync(gradingPeriod.AcademicYearId, ct);
+
+        if (gradingPeriod.IsClosed != closed)
+        {
+            gradingPeriod.ClosedAt = closed ? DateTime.UtcNow : null;
+            gradingPeriod.ClosedByUserId = closed ? currentUser.UserId : null;
+            gradingPeriods.Update(gradingPeriod);
+            await gradingPeriods.SaveChangesAsync(ct);
+        }
+
+        return ToDto(gradingPeriod, academicYear);
+    }
+
+    private static GradingPeriodListDto ToDto(GradingPeriod gradingPeriod, AcademicYear academicYear) =>
+        new(
             gradingPeriod.Id,
             academicYear.Id,
             academicYear.Name,
             gradingPeriod.Name,
             gradingPeriod.StartDate,
-            gradingPeriod.EndDate);
-    }
+            gradingPeriod.EndDate,
+            gradingPeriod.ClosedAt);
 
     private async Task<AcademicYear> GetOwnedYearAsync(Guid academicYearId, CancellationToken ct) =>
         await academicYears.GetByIdAsync(academicYearId, ct)

@@ -1,5 +1,6 @@
 ﻿using EduCore.Dtos.Mark;
 using EduCore.Exceptions;
+using EduCore.Helpers;
 using EduCore.Models;
 using EduCore.Repositories.Interfaces;
 using EduCore.Security;
@@ -15,7 +16,8 @@ public class MarkService(
     IAcademicYearRepository academicYears,
     IClassSubjectTeacherRepository assignments,
     IAccessGuard access,
-    ICurrentUser currentUser) : IMarkService
+    ICurrentUser currentUser,
+    IGradingCalculator grading) : IMarkService
 {
     public async Task<IEnumerable<MarkListDto>> GetByStudentAsync(
         Guid studentId,
@@ -37,6 +39,16 @@ public class MarkService(
         return await marks.GetByClassAsync(classId, subjectId, gradingPeriodId, ct);
     }
 
+    public async Task<IReadOnlyList<MarkChangeDto>> GetChangesAsync(Guid markId, CancellationToken ct)
+    {
+        // The school filter already keeps this to the caller's school; the class check keeps a
+        // teacher to classes they can see.
+        var mark = await marks.GetByIdAsync(markId, ct) ?? throw new NotFoundException("Mark", markId);
+        await access.EnsureCanViewClassAsync(mark.ClassId, ct);
+
+        return await marks.GetChangesAsync(markId, ct);
+    }
+
     public async Task<MarkListDto> UpsertAsync(MarkUpsertDto dto, CancellationToken ct)
     {
         var enrollment = await enrollments.GetByIdAsync(dto.EnrollmentId, ct)
@@ -49,8 +61,7 @@ public class MarkService(
                          ?? throw new BusinessException(
                              "No teacher is currently assigned to teach that subject to this class.");
 
-        if (currentUser.IsTeacher && assignment.TeacherId != currentUser.TeacherId)
-            throw new ForbiddenException("Only the teacher assigned to this class-subject can give marks for it.");
+        access.EnsureCanWriteMarks(assignment.TeacherId);
 
         var gradingPeriod = dto.GradingPeriodId is { } explicitPeriodId
             ? await gradingPeriods.GetByIdAsync(explicitPeriodId, ct)
@@ -61,6 +72,18 @@ public class MarkService(
 
         if (gradingPeriod.AcademicYearId != @class.AcademicYearId)
             throw new BusinessException("That grading period belongs to a different academic year than this class.");
+
+        // A closed term's marks are the record. Teachers cannot touch them; the office can correct
+        // one, but must say why -- the reason is kept with the change.
+        if (gradingPeriod.IsClosed)
+        {
+            if (!currentUser.IsDirectorate)
+                throw new ForbiddenException(
+                    "This term is closed. Ask the school office to correct the mark.");
+
+            if (string.IsNullOrWhiteSpace(dto.Reason))
+                throw new BusinessException("Give a reason for changing a mark in a closed term.");
+        }
 
         var mark = await marks.GetForUpsertAsync(
             enrollment.Id, dto.SubjectId, gradingPeriod.Id, ct);
@@ -79,6 +102,8 @@ public class MarkService(
                 GradingPeriodId = gradingPeriod.Id,
                 FirstMark = dto.FirstMark,
                 SecondMark = dto.SecondMark,
+                // Weighted now, under today's weights, and never again -- see Mark.WeightedValue.
+                WeightedValue = grading.WeightedValue(dto.FirstMark, dto.SecondMark),
                 RecordedAt = DateTime.UtcNow
             };
 
@@ -86,9 +111,36 @@ public class MarkService(
         }
         else
         {
+            if (dto.Version is { } version)
+                marks.ExpectVersion(mark, version);
+
+            var (oldFirst, oldSecond) = (mark.FirstMark, mark.SecondMark);
+
             mark.FirstMark = dto.FirstMark ?? mark.FirstMark;
             mark.SecondMark = dto.SecondMark ?? mark.SecondMark;
-            mark.RecordedAt = DateTime.UtcNow;
+
+            // Only the components that moved are reweighted; an untouched mark keeps the value it
+            // was recorded with, even if the weights have changed since.
+            if (mark.FirstMark != oldFirst || mark.SecondMark != oldSecond)
+            {
+                mark.WeightedValue = grading.WeightedValue(mark.FirstMark, mark.SecondMark);
+                mark.RecordedAt = DateTime.UtcNow;
+
+                marks.AddChange(new MarkChange
+                {
+                    MarkId = mark.Id,
+                    SchoolId = mark.SchoolId,
+                    ChangedByUserId = currentUser.UserId,
+                    ChangedAt = DateTime.UtcNow,
+                    OldFirstMark = oldFirst,
+                    OldSecondMark = oldSecond,
+                    NewFirstMark = mark.FirstMark,
+                    NewSecondMark = mark.SecondMark,
+                    Reason = string.IsNullOrWhiteSpace(dto.Reason) ? null : dto.Reason.Trim(),
+                    AfterClose = gradingPeriod.IsClosed,
+                });
+            }
+
             marks.Update(mark);
         }
 
