@@ -15,7 +15,8 @@ public record TwoFactorRequiredDto(Guid ChallengeId, bool TwoFactorRequired = tr
 
 public record VerifyTwoFactorDto(Guid ChallengeId, string Code);
 
-public record TwoFactorPreferenceDto(bool Enabled);
+// CurrentPassword is required only to switch the second step off.
+public record TwoFactorPreferenceDto(bool Enabled, string? CurrentPassword = null);
 
 // What the client needs to render the toggle: whether it is on, and whether the user is even
 // allowed to turn it off.

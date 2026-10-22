@@ -77,7 +77,7 @@ public static class NotificationEndpoints
                 // Before every write, not only on quiet pings: a steady run of changes must not keep
                 // a deactivated account's stream alive. The status is cached, so this is cheap.
                 var status = await accounts.GetAsync(currentUser.UserId, session.Token);
-                if (!status.Exists || status.IsDeactivated) return;
+                if (!status.Admits(http.User)) return;
 
                 if (changed)
                 {

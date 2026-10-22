@@ -93,6 +93,9 @@ public class PasswordResetService(
         // there is nothing left to force on next sign-in.
         token.User.MustChangePassword = false;
 
+        // Whoever prompted the reset may be holding a live session; it ends here.
+        token.User.SessionsValidFrom = now;
+
         token.UsedAt = now;
         tokens.Update(token);
         users.Update(token.User);

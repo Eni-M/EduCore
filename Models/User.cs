@@ -27,6 +27,11 @@ public class User
     public UserRole Role { get; set; }
     public DateTime? DeactivatedAt { get; set; }
 
+    // Tokens issued before this moment no longer count. Moved forward on sign-out and on every
+    // password change or reset, so a copied session cookie dies with them instead of living out
+    // its hour. Null until the first of those happens.
+    public DateTime? SessionsValidFrom { get; set; }
+
     public void SetPassword(string password, IPasswordHasher<User> hasher) =>
         PasswordHash = hasher.HashPassword(this, password);
 }

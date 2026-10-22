@@ -340,8 +340,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
             .HasPrincipalKey(c => new { c.Id, c.SchoolId })
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Enrollment>().HasAlternateKey(e => new { e.Id, e.ClassId });
+        // One active enrolment per student, anywhere -- the rule EnrollmentService checks. Keyed on
+        // the student alone: keyed on (StudentId, ClassId) two concurrent requests could still
+        // enrol one student in two different classes, each passing the service's check.
         modelBuilder.Entity<Enrollment>()
-            .HasIndex(e => new { e.StudentId, e.ClassId })
+            .HasIndex(e => e.StudentId)
             .IsUnique()
             .HasFilter("\"LeftAt\" IS NULL");
         modelBuilder.Entity<Enrollment>().Property<uint>("Version").IsRowVersion();

@@ -1,3 +1,5 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using EduCore.Endpoints;
 using EduCore.Enums;
 using EduCore.Exceptions;
@@ -50,18 +52,26 @@ public class AccountStatusFilterTests
         public Task<bool> SaveChangesAsync(CancellationToken ct) => Task.FromResult(true);
     }
 
-    private static User Account(bool deactivated = false, bool mustChangePassword = false) => new()
+    private static User Account(
+        bool deactivated = false, bool mustChangePassword = false, DateTime? sessionsValidFrom = null) => new()
     {
         Id = UserId,
         DeactivatedAt = deactivated ? DateTime.UtcNow : null,
-        MustChangePassword = mustChangePassword
+        MustChangePassword = mustChangePassword,
+        SessionsValidFrom = sessionsValidFrom
     };
 
-    // Runs a filter and reports whether the endpoint behind it was actually reached.
-    private static async Task<bool> ReachedEndpointAsync(IEndpointFilter filter)
+    // Runs a filter and reports whether the endpoint behind it was actually reached. issuedAt
+    // becomes the token's iat claim; null sends a token without one.
+    private static async Task<bool> ReachedEndpointAsync(IEndpointFilter filter, DateTime? issuedAt = null)
     {
         var reached = false;
-        var context = EndpointFilterInvocationContext.Create(new DefaultHttpContext());
+        var http = new DefaultHttpContext();
+        if (issuedAt is { } iat)
+            http.User = new ClaimsPrincipal(new ClaimsIdentity(
+                [new Claim(JwtRegisteredClaimNames.Iat, new DateTimeOffset(iat).ToUnixTimeSeconds().ToString())],
+                "test"));
+        var context = EndpointFilterInvocationContext.Create(http);
 
         await filter.InvokeAsync(context, _ =>
         {
@@ -155,5 +165,36 @@ public class AccountStatusFilterTests
         var filter = Full(Account());
 
         Assert.True(await ReachedEndpointAsync(filter));
+    }
+
+    // -- ended sessions (sign-out, password change or reset) ------------------------
+
+    [Fact]
+    public async Task A_token_issued_before_the_sessions_ended_is_rejected()
+    {
+        var cutoff = DateTime.UtcNow;
+        var filter = Full(Account(sessionsValidFrom: cutoff));
+
+        await Assert.ThrowsAsync<UnauthorizedException>(
+            () => ReachedEndpointAsync(filter, issuedAt: cutoff.AddMinutes(-5)));
+    }
+
+    // A password change re-signs the caller in within the same request, in the same second as
+    // the cutoff it just set. That token must work.
+    [Fact]
+    public async Task A_token_issued_in_the_same_second_as_the_cutoff_is_admitted()
+    {
+        var cutoff = new DateTime(2026, 10, 22, 12, 0, 0, 700, DateTimeKind.Utc);
+        var filter = Full(Account(sessionsValidFrom: cutoff));
+
+        Assert.True(await ReachedEndpointAsync(filter, issuedAt: cutoff.AddMilliseconds(-500)));
+    }
+
+    [Fact]
+    public async Task A_token_without_an_issue_time_is_rejected_once_sessions_have_ended()
+    {
+        var filter = Revocation(Account(sessionsValidFrom: DateTime.UtcNow));
+
+        await Assert.ThrowsAsync<UnauthorizedException>(() => ReachedEndpointAsync(filter));
     }
 }

@@ -652,11 +652,11 @@ namespace EduCore.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClassId", "SchoolId");
-
-                    b.HasIndex("StudentId", "ClassId")
+                    b.HasIndex("StudentId")
                         .IsUnique()
                         .HasFilter("\"LeftAt\" IS NULL");
+
+                    b.HasIndex("ClassId", "SchoolId");
 
                     b.HasIndex("StudentId", "SchoolId");
 
@@ -1874,6 +1874,9 @@ namespace EduCore.Migrations
 
                     b.Property<int>("Role")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("SessionsValidFrom")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");

@@ -1,3 +1,5 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using EduCore.Configuration;
 using EduCore.Data;
 using EduCore.Repositories.Interfaces;
@@ -6,10 +8,25 @@ using Microsoft.Extensions.Options;
 
 namespace EduCore.Security;
 
-// The two account facts a token cannot carry, because both change during its hour of validity.
-public record AccountStatus(bool Exists, bool IsDeactivated, bool MustChangePassword)
+// The account facts a token cannot carry, because they change during its hour of validity.
+public record AccountStatus(
+    bool Exists, bool IsDeactivated, bool MustChangePassword, DateTime? SessionsValidFrom = null)
 {
     public static readonly AccountStatus Missing = new(false, false, false);
+
+    // Whether this token still speaks for the account: the account is live, and the token was
+    // issued no earlier than the last sign-out or password change. Compared in whole seconds,
+    // the precision of the iat claim, so the token issued in the same request as the cutoff
+    // (a password change re-signs the caller in) is admitted. A token without iat predates the
+    // claim and counts as issued at the epoch.
+    public bool Admits(ClaimsPrincipal token)
+    {
+        if (!Exists || IsDeactivated) return false;
+        if (SessionsValidFrom is not { } cutoff) return true;
+
+        long.TryParse(token.FindFirst(JwtRegisteredClaimNames.Iat)?.Value, out var issuedAt);
+        return issuedAt >= new DateTimeOffset(DateTime.SpecifyKind(cutoff, DateTimeKind.Utc)).ToUnixTimeSeconds();
+    }
 }
 
 public interface IAccountStatusCache
@@ -41,7 +58,8 @@ public class AccountStatusCache(
 
         var status = user is null
             ? AccountStatus.Missing
-            : new AccountStatus(true, user.DeactivatedAt is not null, user.MustChangePassword);
+            : new AccountStatus(
+                true, user.DeactivatedAt is not null, user.MustChangePassword, user.SessionsValidFrom);
 
         // Unknown users are cached too, or a stale token would read the database every request.
         cache.Set(Key(userId), status, new MemoryCacheEntryOptions

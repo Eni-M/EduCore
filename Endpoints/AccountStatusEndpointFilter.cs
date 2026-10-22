@@ -27,6 +27,9 @@ public class ActiveAccountEndpointFilter(IAccountStatusCache accounts, ICurrentU
         if (!status.Exists || status.IsDeactivated)
             throw new UnauthorizedException("This account has been deactivated.");
 
+        if (!status.Admits(context.HttpContext.User))
+            throw new UnauthorizedException("Your session has ended. Please sign in again.");
+
         return status;
     }
 }

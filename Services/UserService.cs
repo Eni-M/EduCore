@@ -109,10 +109,15 @@ public class UserService(
         return new TwoFactorStatusDto(required || user.TwoFactorEnabled, required);
     }
 
-    public async Task<TwoFactorStatusDto> SetTwoFactorAsync(Guid userId, bool enabled, CancellationToken ct)
+    public async Task<TwoFactorStatusDto> SetTwoFactorAsync(
+        Guid userId, bool enabled, string? currentPassword, CancellationToken ct)
     {
         var user = await userRepository.GetByIdAsync(userId, ct)
                    ?? throw new NotFoundException("User", userId);
+
+        // Switching the second step off weakens the account, so a borrowed session is not enough.
+        if (!enabled && user.TwoFactorEnabled)
+            RequireCurrentPassword(user, currentPassword);
 
         // The roles that manage accounts do not get to decline. Refused outright rather than
         // silently ignored, so the screen can say why instead of appearing to have worked.
@@ -151,6 +156,8 @@ public class UserService(
 
         user.SetPassword(dto.NewPassword, passwordHasher);
         user.MustChangePassword = false;
+        // Every other session ends with the old password; the caller is re-signed in below.
+        user.SessionsValidFrom = DateTime.UtcNow;
 
         userRepository.Update(user);
         await userRepository.SaveChangesAsync(ct);
@@ -159,13 +166,19 @@ public class UserService(
     }
 
     public async Task<AuthResultDto> UpdateOwnCredentialsAsync(
-        Guid userId, string firstName, string lastName, string email, CancellationToken ct)
+        Guid userId, string firstName, string lastName, string email, string? currentPassword,
+        CancellationToken ct)
     {
         var user = await userRepository.GetByIdAsync(userId, ct)
                    ?? throw new NotFoundException("User", userId);
 
         if (user.DeactivatedAt is not null)
             throw new UnauthorizedException("This account has been deactivated.");
+
+        // The email is where reset links and sign-in codes go. Moving it on the strength of a
+        // session alone would turn one stolen cookie into a permanent takeover.
+        if (!string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase))
+            RequireCurrentPassword(user, currentPassword);
 
         await ApplyLoginEditAsync(user, firstName, lastName, email, ct);
 
@@ -202,6 +215,7 @@ public class UserService(
 
         user.SetPassword(temporaryPassword, passwordHasher);
         user.MustChangePassword = true;
+        user.SessionsValidFrom = DateTime.UtcNow;
 
         userRepository.Update(user);
         await userRepository.SaveChangesAsync(ct);
@@ -209,6 +223,26 @@ public class UserService(
         return new ResetPasswordResponseDto("Password reset successfully.", temporaryPassword);
     }
 
+
+    public async Task EndSessionsAsync(Guid userId, CancellationToken ct)
+    {
+        var user = await userRepository.GetByIdAsync(userId, ct);
+        if (user is null) return;
+
+        user.SessionsValidFrom = DateTime.UtcNow;
+        userRepository.Update(user);
+        await userRepository.SaveChangesAsync(ct);
+    }
+
+    // Not UnauthorizedException: the client treats any 401 as an expired session and signs out,
+    // which is the wrong answer to a mistyped password.
+    private void RequireCurrentPassword(User user, string? currentPassword)
+    {
+        if (string.IsNullOrEmpty(currentPassword)
+            || passwordHasher.VerifyHashedPassword(user, user.PasswordHash, currentPassword)
+            == PasswordVerificationResult.Failed)
+            throw new BusinessException("Your current password is incorrect.");
+    }
 
     // The unsubscribe. A digest people cannot turn off is one they report as spam, which costs
     // the sending domain its reputation and takes the password-reset mail down with it.
@@ -329,12 +363,15 @@ public class UserService(
     {
         var scope = await ResolveProfileAsync(user, ct);
 
-        var expiresAt = DateTime.UtcNow.AddMinutes(config.GetValue("Jwt:ExpiryMinutes", 60));
+        var issuedAt = DateTime.UtcNow;
+        var expiresAt = issuedAt.AddMinutes(config.GetValue("Jwt:ExpiryMinutes", 60));
 
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            // Read by AccountStatus.Admits against the account's SessionsValidFrom.
+            new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(issuedAt).ToString(), ClaimValueTypes.Integer64),
             new(JwtRegisteredClaimNames.Email, user.Email),
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Role, user.Role.ToString())

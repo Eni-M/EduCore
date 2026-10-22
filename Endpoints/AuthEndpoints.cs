@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using EduCore.Dtos.User;
 using EduCore.Security;
 using EduCore.Services.Interfaces;
@@ -64,9 +65,17 @@ public static class AuthEndpoints
             })
             .RequireRateLimiting("PasswordResetPolicy");
 
-        group.MapPost("/logout", (ISessionCookies cookies, HttpResponse response) =>
+        // Ends the account's sessions on the server too, not just this browser's cookie: a copy
+        // of the cookie taken earlier stops working with it. That means signing out signs the
+        // account out on every device. Still answers 204 without a valid session, so a browser
+        // holding an expired cookie can always clear it.
+        group.MapPost("/logout", async (
+            ISessionCookies cookies, HttpContext http, IUserService users, CancellationToken ct) =>
         {
-            cookies.Clear(response);
+            if (Guid.TryParse(http.User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId))
+                await users.EndSessionsAsync(userId, ct);
+
+            cookies.Clear(http.Response);
             return Results.NoContent();
         });
 
@@ -120,7 +129,7 @@ public static class AuthEndpoints
         group.MapPut("/me/two-factor", async (
                 TwoFactorPreferenceDto dto, IUserService users, ICurrentUser currentUser,
                 CancellationToken ct) =>
-                Results.Ok(await users.SetTwoFactorAsync(currentUser.UserId, dto.Enabled, ct)))
+                Results.Ok(await users.SetTwoFactorAsync(currentUser.UserId, dto.Enabled, dto.CurrentPassword, ct)))
             .RequireAuthorization()
             .AddEndpointFilter<ActiveAccountEndpointFilter>();
 
@@ -144,7 +153,7 @@ public static class AuthEndpoints
                 CancellationToken ct) =>
             {
                 var result = await users.UpdateOwnCredentialsAsync(
-                    currentUser.UserId, dto.FirstName, dto.LastName, dto.Email, ct);
+                    currentUser.UserId, dto.FirstName, dto.LastName, dto.Email, dto.CurrentPassword, ct);
                 cookies.Issue(response, result.Token, result.User.ExpiresAt);
                 return Results.Ok(result.User);
             })
