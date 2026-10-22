@@ -22,7 +22,7 @@ two concerns: migrating is an explicit step, serving refuses a mismatched schema
 |---|---|---|
 | Local dev | `dotnet run -- --migrate` (only when the model changed), then `dotnet run` | One-shot migration, then normal server; forgetting prints the exact command |
 | Docker compose | `docker compose up -d --build` | `migrate` runs to completion first; `docker compose logs migrate` is the first place to look if the API won't boot |
-| Render (production) | Set `MigrateOnStart=true` in the service's environment | Render's Pre-Deploy Command is a paid feature, so the one-shot step has nowhere to live. Safe **only** because the service runs a single instance — two replicas would race. Turn it off and restore a separate migrate step before scaling past one |
+| Render (production) | Set `MigrateOnStart=true` in the service's environment | Render's Pre-Deploy Command is a paid feature, so the one-shot step has nowhere to live. EF Core 9+ holds a database-wide lock while migrating, so replicas no longer race; the remaining cost is that the app's own database role needs DDL rights. A separate migrate step with its own role is still the better shape |
 
 ## Rollback
 
