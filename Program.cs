@@ -121,7 +121,12 @@ builder.Services.AddDbContext<AppDbContext>((sp, options) =>
             sp.GetRequiredService<AccountStatusInvalidationInterceptor>(),
             sp.GetRequiredService<AccountMailInterceptor>()));
 
-builder.Services.AddAutoMapper(cfg => { }, typeof(Program).Assembly);
+// AutoMapper 15+ is commercially licensed. The key is a secret like the others: .env locally,
+// an environment variable (AutoMapper__LicenseKey) in deployment. Without it AutoMapper still
+// runs but logs a licence warning.
+builder.Services.AddAutoMapper(
+    cfg => cfg.LicenseKey = builder.Configuration["AutoMapper:LicenseKey"],
+    typeof(Program).Assembly);
 builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();

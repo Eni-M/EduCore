@@ -47,6 +47,7 @@ services:
       ConnectionStrings__Default: "Host=db;Port=5432;Database=${POSTGRES_DB:-EduCoreDB};Username=${POSTGRES_USER:-educore};Password=${POSTGRES_PASSWORD:-educore123}"
       Jwt__Key: ${Jwt__Key:?set Jwt__Key in .env — at least 32 bytes, e.g. openssl rand -base64 32}
       Encryption__Key: ${Encryption__Key:?set Encryption__Key in .env — exactly 32 bytes base64, e.g. openssl rand -base64 32}
+      AutoMapper__LicenseKey: ${AutoMapper__LicenseKey:-}
       # First run only: creates the initial super administrator, then leave blank.
       SuperAdmin__Email: ${SuperAdmin__Email:-}
       SuperAdmin__Password: ${SuperAdmin__Password:-}
