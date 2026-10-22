@@ -1,0 +1,15 @@
+# Weekly update pull requests, so a vulnerable package or a pinned action is not left to rot.
+# CI runs on each one; nothing merges without it.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      microsoft:
+        patterns: ["Microsoft.*", "System.*", "Npgsql*"]
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
