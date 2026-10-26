@@ -61,7 +61,21 @@ builder.WebHost.ConfigureKestrel(kestrel =>
 // Metrics and traces. Returns the resolved options so the metrics endpoint can be mapped below.
 var observability = builder.AddEduCoreObservability();
 
-builder.Services.AddOpenApi();
+// The document is the front end's contract (openapi.json, OpenApiContractTests). ASP.NET's web
+// JSON defaults also accept numbers sent as strings, which the generator reports as
+// "integer | string"; the API only ever sends numbers, so the schema says so, and the generated
+// TypeScript types read number, not number | string.
+builder.Services.AddOpenApi(openApi => openApi.AddSchemaTransformer((schema, _, _) =>
+{
+    if (schema.Type is { } type && type.HasFlag(Microsoft.OpenApi.JsonSchemaType.String)
+        && (type.HasFlag(Microsoft.OpenApi.JsonSchemaType.Integer) || type.HasFlag(Microsoft.OpenApi.JsonSchemaType.Number)))
+    {
+        schema.Type = type & ~Microsoft.OpenApi.JsonSchemaType.String;
+        schema.Pattern = null;
+    }
+
+    return Task.CompletedTask;
+}));
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
