@@ -317,6 +317,30 @@ public class TwoFactorServiceTests
         Assert.Single(results, signedIn => signedIn);
     }
 
+    // Without the phone, a sign-in held at the authenticator step can continue with an emailed
+    // code; the authenticator challenge it replaces stops working.
+    [Fact]
+    public async Task An_authenticator_sign_in_can_switch_to_an_emailed_code()
+    {
+        var (service, rows, mail) = Build();
+        var user = Admin();
+        user.TotpSecret = "JBSWY3DPEHPK3PXP";
+        user.TotpConfirmedAt = DateTime.UtcNow;
+        var ct = TestContext.Current.CancellationToken;
+
+        var appChallenge = await service.IssueAsync(user, TwoFactorPurpose.SignIn, ct);
+        rows.Rows[0].User = user;
+        Assert.Empty(mail.Sent);
+
+        var emailChallenge = await service.SwitchSignInToEmailAsync(appChallenge, ct);
+        rows.Rows[^1].User = user;
+
+        Assert.Single(mail.Sent);
+        Assert.False(rows.Rows[^1].ViaAuthenticator);
+        Assert.Equal(user.Id, (await service.CompleteAsync(emailChallenge, CodeFrom(mail), TwoFactorPurpose.SignIn, ct)).Id);
+        await Assert.ThrowsAsync<UnauthorizedException>(() => service.SwitchSignInToEmailAsync(appChallenge, ct));
+    }
+
     // Someone else's challenge is refused before anything is charged to its owner.
     [Fact]
     public async Task Another_users_challenge_is_refused_without_spending_its_attempts()

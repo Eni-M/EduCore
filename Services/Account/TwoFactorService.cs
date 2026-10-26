@@ -33,7 +33,7 @@ public class TwoFactorService(
     public bool SignInRequiresSecondStep(User user) =>
         _options.IsRequiredFor(user.Role) || user.TwoFactorEnabled;
 
-    public async Task<Guid> IssueAsync(User user, TwoFactorPurpose purpose, CancellationToken ct)
+    public async Task<Guid> IssueAsync(User user, TwoFactorPurpose purpose, CancellationToken ct, bool viaEmail = false)
     {
         var now = DateTime.UtcNow;
 
@@ -43,16 +43,17 @@ public class TwoFactorService(
 
         // With an authenticator app set up, the code is on the phone: nothing is emailed, and
         // the challenge holds no code of its own.
-        // So is a sign-in that a passkey can answer.
-        var noCode = user.HasAuthenticator
-                     || (purpose == TwoFactorPurpose.SignIn && await passkeys.HasPasskeysAsync(user.Id, ct));
+        // So is a sign-in that a passkey can answer. viaEmail overrides both.
+        var noCode = !viaEmail
+                     && (user.HasAuthenticator
+                         || (purpose == TwoFactorPurpose.SignIn && await passkeys.HasPasskeysAsync(user.Id, ct)));
         var code = noCode ? null : GenerateCode();
 
         var challenge = new TwoFactorChallenge
         {
             UserId = user.Id,
             CodeHash = code is null ? "" : Hash(code),
-            ViaAuthenticator = user.HasAuthenticator,
+            ViaAuthenticator = !viaEmail && user.HasAuthenticator,
             Purpose = purpose,
             CreatedAt = now,
             ExpiresAt = now.AddMinutes(_options.CodeLifetimeMinutes)
@@ -68,6 +69,20 @@ public class TwoFactorService(
         }
 
         return challenge.Id;
+    }
+
+    public async Task<Guid> SwitchSignInToEmailAsync(Guid challengeId, CancellationToken ct)
+    {
+        var challenge = await challenges.GetOpenAsync(challengeId, ct);
+
+        // Only a sign-in whose password was already accepted, and the same one message as
+        // CompleteAsync for every reason it is refused.
+        if (challenge is null || challenge.Purpose != TwoFactorPurpose.SignIn
+                              || !challenge.IsOpen(DateTime.UtcNow, _options.MaxAttempts))
+            throw new UnauthorizedException("That code is not valid. Ask for a new one.");
+
+        await audit.RecordAsync("Asked for an emailed sign-in code instead", ct, userId: challenge.UserId);
+        return await IssueAsync(challenge.User, TwoFactorPurpose.SignIn, ct, viaEmail: true);
     }
 
     public async Task<User> CompleteAsync(

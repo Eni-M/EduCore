@@ -24,6 +24,8 @@ public record PasskeySignInDto(Guid ChallengeId, Fido2NetLib.AuthenticatorAssert
 
 public record PasskeyChallengeDto(Guid ChallengeId);
 
+public record EmailCodeInsteadDto(Guid ChallengeId);
+
 public record AuthenticatorSetupDto(string Secret, string OtpAuthUri);
 
 public record AuthenticatorCodeDto(string Code);

@@ -139,6 +139,13 @@ public static class AuthEndpoints
             .RequireAuthorization()
             .AddEndpointFilter<ActiveAccountEndpointFilter>();
 
+        // No access to the authenticator app or passkey: the sign-in continues with an emailed
+        // code. Anonymous like /login/verify -- the open challenge proves the password was right.
+        group.MapPost("/login/email-code", async (
+                EmailCodeInsteadDto dto, ITwoFactorService twoFactor, CancellationToken ct) =>
+                TypedResults.Ok(new TwoFactorRequiredDto(await twoFactor.SwitchSignInToEmailAsync(dto.ChallengeId, ct))))
+            .RequireRateLimiting("LoginPolicy");
+
         // Passkeys as the second step of a sign-in: the options for the browser's prompt, then the
         // signed response. Anonymous like /login/verify -- the challenge id is the handle.
         group.MapPost("/login/passkey/options", async (

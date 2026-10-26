@@ -89,6 +89,10 @@ needs the current password, adding or removing one emails the account, and the o
 reset removes it (the recovery route for a lost phone). Wrong codes, app or emailed, are capped
 per user, five per 15 minutes (`AttemptThrottle`), not only per challenge; so is the current
 password asked for again on the account screens.
+Someone who cannot reach their app or passkey can switch an open sign-in to an emailed code
+(`/api/auth/login/email-code`), so for these accounts the mailbox stays a way in alongside the
+app: the trade is recovery without the office, at the cost of the protection an app alone gives
+against a compromised mailbox.
 
 **Passkeys.** WebAuthn through Fido2NetLib (`Services/Account/PasskeyService.cs`); only public keys
 are stored (`Passkeys` table). A passkey answers the sign-in's second step in place of a code, so
