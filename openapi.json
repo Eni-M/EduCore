@@ -269,6 +269,35 @@
         }
       }
     },
+    "/api/auth/login/email-code": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailCodeInsteadDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorRequiredDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/login/passkey/options": {
       "post": {
         "tags": [
@@ -6193,6 +6222,22 @@
         ],
         "parameters": [
           {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
             "name": "SchoolId",
             "in": "query",
             "schema": {
@@ -6307,17 +6352,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/CountByKeyDto"
-                  }
-                }
-              }
-            }
+            "description": "OK"
           }
         }
       }
@@ -12577,6 +12612,18 @@
       },
       "DocumentCategory": {
         "type": "integer"
+      },
+      "EmailCodeInsteadDto": {
+        "required": [
+          "challengeId"
+        ],
+        "type": "object",
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       },
       "EnrollmentCreateDto": {
         "required": [

@@ -1,3 +1,4 @@
+using EduCore.Helpers;
 using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
 using EduCore.Services.Statistics.Interfaces;
@@ -30,10 +31,15 @@ public static class StudentStatisticsEndpoints
                 : Results.Ok(await service.GetByClassPagedAsync(
                     filter, new PaginationQueryDto(page ?? 1, pageSize ?? 20), ct)));
 
-        // One row per distinct age — a handful. Bounded, so not paged.
+        // One row per distinct age — a handful, so paged in memory when asked; no paging
+        // params → full list, for chart and export callers.
         students.MapGet("/by-age", async (
+                int? page, int? pageSize,
                 [AsParameters] StatisticsFilter filter, IStudentStatisticsService service, CancellationToken ct) =>
-            TypedResults.Ok(await service.GetByAgeAsync(filter, ct)));
+            page is null && pageSize is null
+                ? Results.Ok(await service.GetByAgeAsync(filter, ct))
+                : Results.Ok((await service.GetByAgeAsync(filter, ct))
+                    .ToPagedResult(new PaginationQueryDto(page ?? 1, pageSize ?? 20))));
 
         // One point per month in the selected window. Bounded, so not paged.
         students.MapGet("/enrollment-trend", async (
