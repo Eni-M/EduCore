@@ -126,13 +126,15 @@ public class TeacherStatisticsRepository(
                    - periodMarks.Count(m => m.TeacherId == t.Id
                                             && m.FirstMark != null
                                             && m.SecondMark != null),
+                   // EF runs the zero check in C# but the division in SQL, so the divisor is
+                   // floored at 1 there too: a teacher with no marks would otherwise divide by zero.
                    periodMarks.Count(m => m.TeacherId == t.Id) == 0
                        ? 0
                        : Math.Round(
                            periodMarks.Count(m => m.TeacherId == t.Id
                                                   && m.FirstMark != null
                                                   && m.SecondMark != null) * 100.0
-                           / periodMarks.Count(m => m.TeacherId == t.Id), 2));
+                           / Math.Max(periodMarks.Count(m => m.TeacherId == t.Id), 1), 2));
     }
 
     public async Task<IReadOnlyList<TeacherCoverageDto>> GetCoverageAsync(

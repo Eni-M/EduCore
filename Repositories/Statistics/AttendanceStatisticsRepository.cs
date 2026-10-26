@@ -212,8 +212,10 @@ public class AttendanceStatisticsRepository(AppDbContext context)
                 Row = r,
                 Unexcused = r.Records - r.Present - r.Excused
             })
-            .Where(x => x.Row.Records > 0 && Rate(x.Unexcused, x.Row.Records) >= absenceRateThreshold)
-            .OrderByDescending(x => Rate(x.Unexcused, x.Row.Records))
+            .Where(x => x.Row.Records > 0 && x.Unexcused * 100.0 >= absenceRateThreshold * x.Row.Records)
+            .OrderByDescending(x => x.Unexcused * 100.0 / x.Row.Records)
+            .ThenBy(x => x.Row.StudentId)
+            .ThenBy(x => x.Row.ClassId)
             .Select(x => new ExcessiveAbsenceStudentDto(
                 x.Row.StudentId,
                 x.Row.Name,
@@ -237,21 +239,19 @@ public class AttendanceStatisticsRepository(AppDbContext context)
     {
         var (page, pageSize) = ListPagination.Normalize(pagination);
 
-        // Same per-student rows as GetExcessiveAbsencesAsync via the shared builder.
-        // The threshold and ordering use Math.Round exactly like the full-list path
-        // (EF translates it), so filtering and ordering match bit for bit; tie-broken
-        // by student then class so LIMIT/OFFSET pages are deterministic. Note the two
-        // different rates, preserved here: the filter uses the *unexcused* share while
-        // the DTO reports the overall absence share.
+        // Same per-student rows and rule as GetExcessiveAbsencesAsync via the shared builder,
+        // tie-broken by student then class so LIMIT/OFFSET pages are deterministic. PostgreSQL
+        // has no round(double, int), so the threshold is compared multiplied out rather than
+        // through Math.Round, in both paths. Note the two different rates, preserved here: the
+        // filter uses the *unexcused* share while the DTO reports the overall absence share.
         var matches = StudentAttendanceAggregates(ctx)
             .Where(s => s.Records > 0
-                && Math.Round((s.Records - s.Present - s.Excused) * 100.0 / s.Records, 2)
-                    >= absenceRateThreshold);
+                && (s.Records - s.Present - s.Excused) * 100.0 >= absenceRateThreshold * s.Records);
 
         var totalCount = await matches.CountAsync(ct);
 
         var items = await matches
-            .OrderByDescending(s => Math.Round((s.Records - s.Present - s.Excused) * 100.0 / s.Records, 2))
+            .OrderByDescending(s => (s.Records - s.Present - s.Excused) * 100.0 / s.Records)
             .ThenBy(s => s.StudentId)
             .ThenBy(s => s.ClassId)
             .Skip((page - 1) * pageSize)
@@ -286,14 +286,16 @@ public class AttendanceStatisticsRepository(AppDbContext context)
             ClassName = c.Name
         }
         into g
-        select new StudentAttendanceRow(
-            g.Key.Id,
-            g.Key.FirstName + " " + g.Key.LastName,
-            g.Key.ClassId,
-            g.Key.ClassName,
-            g.Count(),
-            g.Count(x => x.IsPresent),
-            g.Count(x => !x.IsPresent && x.IsExcused));
+        select new StudentAttendanceRow
+        {
+            StudentId = g.Key.Id,
+            Name = g.Key.FirstName + " " + g.Key.LastName,
+            ClassId = g.Key.ClassId,
+            ClassName = g.Key.ClassName,
+            Records = g.Count(),
+            Present = g.Count(x => x.IsPresent),
+            Excused = g.Count(x => !x.IsPresent && x.IsExcused)
+        };
 
     private static double Rate(int part, int total) =>
         total == 0 ? 0 : Math.Round(part * 100.0 / total, 2);
