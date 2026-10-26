@@ -24,7 +24,7 @@ public class TwoFactorService(
     IOptions<TwoFactorOptions> options,
     IOptions<PasswordResetOptions> passwordReset,
     IAuditTrail audit,
-    AuthenticatorThrottle throttle) : ITwoFactorService
+    AttemptThrottle throttle) : ITwoFactorService
 {
     private readonly TwoFactorOptions _options = options.Value;
     private readonly string _appUrl = AccountMailTemplates.AppUrlFrom(passwordReset.Value.ResetUrlTemplate);
@@ -70,40 +70,43 @@ public class TwoFactorService(
         Guid challengeId, string code, TwoFactorPurpose purpose, CancellationToken ct)
     {
         var challenge = await challenges.GetOpenAsync(challengeId, ct);
+        var now = DateTime.UtcNow;
 
         // One message for every failure below. Telling the caller which of "no such challenge",
         // "expired", "wrong purpose" and "wrong code" applied would let them map the state of
         // somebody else's sign-in.
         if (challenge is null
             || challenge.Purpose != purpose
-            || !challenge.IsOpen(DateTime.UtcNow, _options.MaxAttempts))
+            || !challenge.IsOpen(now, _options.MaxAttempts))
             throw new UnauthorizedException("That code is not valid. Ask for a new one.");
 
-        // App codes are capped per user as well as per challenge: a fresh challenge per sign-in
+        // Codes are capped per user as well as per challenge: a fresh challenge per sign-in
         // would otherwise mean fresh attempts for anyone holding the password.
-        if (challenge.ViaAuthenticator)
-            throttle.Reserve(challenge.UserId);
+        throttle.Reserve(AttemptKind.Code, challenge.UserId);
+
+        // The attempt is charged in the database before the code is compared. Reading the count,
+        // comparing and writing it back would let concurrent guesses all read the same count and
+        // none of them be charged.
+        if (!await challenges.TryTakeAttemptAsync(challenge.Id, _options.MaxAttempts, now, ct))
+            throw new UnauthorizedException("That code is not valid. Ask for a new one.");
 
         var matched = challenge.ViaAuthenticator
             ? MatchesAuthenticator(challenge.User, code)
             : Matches(challenge.CodeHash, code);
 
-        if (challenge.ViaAuthenticator && matched)
-            throttle.Succeeded(challenge.UserId);
-
         if (!matched)
         {
-            // Counted before the throw and saved, or the cap would never be reached.
-            challenge.FailedAttempts++;
-            challenges.Update(challenge);
-            await challenges.SaveChangesAsync(ct);
             await audit.RecordAsync($"Two-step code rejected ({challenge.Purpose})", ct, userId: challenge.UserId);
-
             throw new UnauthorizedException("That code is not valid. Ask for a new one.");
         }
 
-        challenge.CompletedAt = DateTime.UtcNow;
-        challenges.Update(challenge);
+        throttle.Succeeded(AttemptKind.Code, challenge.UserId);
+
+        // Claimed in one UPDATE as well, so of two requests with the right code only one signs in.
+        if (!await challenges.TryCompleteAsync(challenge.Id, now, ct))
+            throw new UnauthorizedException("That code is not valid. Ask for a new one.");
+
+        // Saves the authenticator step the code used (MatchesAuthenticator).
         await challenges.SaveChangesAsync(ct);
 
         return challenge.User;

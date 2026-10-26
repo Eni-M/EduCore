@@ -35,8 +35,9 @@ public class TwoFactorChallenge
     // Set the moment the challenge is answered, so a replay is rejected rather than accepted.
     public DateTime? CompletedAt { get; set; }
 
-    // Wrong codes so far. A challenge that runs out of attempts is dead even before it expires,
-    // which is what keeps a million-guess space out of reach.
+    // Attempts so far, charged before each code is compared, so the one that succeeds counts too.
+    // A challenge that runs out of attempts is dead even before it expires, which is what keeps a
+    // million-guess space out of reach.
     public int FailedAttempts { get; set; }
 
     // Answered with a code from the user's authenticator app rather than an emailed one; such a

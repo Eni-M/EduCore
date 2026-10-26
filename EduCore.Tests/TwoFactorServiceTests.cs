@@ -15,12 +15,59 @@ namespace EduCore.Tests;
 // housekeeping, so they are what these tests hold down.
 public class TwoFactorServiceTests
 {
+    // Reads hand back a copy, as a database would, so the only writes that stick are the atomic
+    // ones. HoldReads makes that many reads wait for each other: every request in a burst then
+    // sees the same row, which is the race a real database allows.
     private sealed class FakeChallenges : ITwoFactorChallengeRepository
     {
         public readonly List<TwoFactorChallenge> Rows = [];
+        public int HoldReads;
+        private int _reads;
+        private readonly TaskCompletionSource _allRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public Task<TwoFactorChallenge?> GetOpenAsync(Guid id, CancellationToken ct) =>
-            Task.FromResult(Rows.FirstOrDefault(c => c.Id == id && c.CompletedAt is null));
+        public async Task<TwoFactorChallenge?> GetOpenAsync(Guid id, CancellationToken ct)
+        {
+            TwoFactorChallenge? copy;
+            lock (Rows)
+            {
+                var row = Rows.FirstOrDefault(c => c.Id == id && c.CompletedAt is null);
+                copy = row is null ? null : new TwoFactorChallenge
+                {
+                    Id = row.Id, UserId = row.UserId, CodeHash = row.CodeHash, Purpose = row.Purpose,
+                    CreatedAt = row.CreatedAt, ExpiresAt = row.ExpiresAt, CompletedAt = row.CompletedAt,
+                    FailedAttempts = row.FailedAttempts, ViaAuthenticator = row.ViaAuthenticator, User = row.User
+                };
+            }
+
+            if (HoldReads > 0)
+            {
+                if (Interlocked.Increment(ref _reads) == HoldReads) _allRead.SetResult();
+                await _allRead.Task;
+            }
+
+            return copy;
+        }
+
+        public Task<bool> TryTakeAttemptAsync(Guid id, int maxAttempts, DateTime nowUtc, CancellationToken ct)
+        {
+            lock (Rows)
+            {
+                var row = Rows.FirstOrDefault(c => c.Id == id && c.CompletedAt is null
+                                                   && c.ExpiresAt > nowUtc && c.FailedAttempts < maxAttempts);
+                if (row is not null) row.FailedAttempts++;
+                return Task.FromResult(row is not null);
+            }
+        }
+
+        public Task<bool> TryCompleteAsync(Guid id, DateTime nowUtc, CancellationToken ct)
+        {
+            lock (Rows)
+            {
+                var row = Rows.FirstOrDefault(c => c.Id == id && c.CompletedAt is null);
+                if (row is not null) row.CompletedAt = nowUtc;
+                return Task.FromResult(row is not null);
+            }
+        }
 
         public Task InvalidateOutstandingAsync(
             Guid userId, TwoFactorPurpose purpose, DateTime nowUtc, CancellationToken ct)
@@ -80,7 +127,7 @@ public class TwoFactorServiceTests
             Options.Create(new TwoFactorOptions { MaxAttempts = maxAttempts, CodeLifetimeMinutes = lifetimeMinutes }),
             Options.Create(new PasswordResetOptions { ResetUrlTemplate = "https://educore.example/reset-password" }),
             new NullAuditTrail(),
-            new EduCore.Security.AuthenticatorThrottle(new Microsoft.Extensions.Caching.Memory.MemoryCache(
+            new EduCore.Security.AttemptThrottle(new Microsoft.Extensions.Caching.Memory.MemoryCache(
                 new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions())));
 
         return (service, rows, mail);
@@ -199,6 +246,74 @@ public class TwoFactorServiceTests
         // out of reach.
         await Assert.ThrowsAsync<UnauthorizedException>(() =>
             service.CompleteAsync(id, code, TwoFactorPurpose.SignIn, TestContext.Current.CancellationToken));
+    }
+
+    // Emailed codes are capped per user too: otherwise anyone holding the password gets five
+    // fresh guesses with every new sign-in.
+    [Fact]
+    public async Task Emailed_codes_are_capped_per_user_across_challenges()
+    {
+        var (service, rows, mail) = Build();
+        var user = Admin();
+        var ct = TestContext.Current.CancellationToken;
+
+        for (var i = 0; i < 5; i++)
+        {
+            var wrong = await service.IssueAsync(user, TwoFactorPurpose.SignIn, ct);
+            rows.Rows[^1].User = user;
+            await Assert.ThrowsAsync<UnauthorizedException>(() =>
+                service.CompleteAsync(wrong, "000000", TwoFactorPurpose.SignIn, ct));
+        }
+
+        var id = await service.IssueAsync(user, TwoFactorPurpose.SignIn, ct);
+        rows.Rows[^1].User = user;
+
+        // A fresh challenge, and even its right code, waits out the window.
+        await Assert.ThrowsAsync<TooManyRequestsException>(() =>
+            service.CompleteAsync(id, CodeFrom(mail), TwoFactorPurpose.SignIn, ct));
+    }
+
+    [Fact]
+    public async Task A_concurrent_burst_of_guesses_is_charged_every_attempt()
+    {
+        var (service, rows, mail) = Build(maxAttempts: 3);
+        var user = Admin();
+        var ct = TestContext.Current.CancellationToken;
+
+        var id = await service.IssueAsync(user, TwoFactorPurpose.SignIn, ct);
+        rows.Rows[0].User = user;
+        rows.HoldReads = 10;
+
+        // All ten read the challenge with no attempts used before any of them is charged.
+        await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => Task.Run(async () =>
+        {
+            try { await service.CompleteAsync(id, "000000", TwoFactorPurpose.SignIn, ct); }
+            catch (UnauthorizedException) { }
+            catch (TooManyRequestsException) { }
+        }, ct)));
+
+        Assert.Equal(3, rows.Rows[0].FailedAttempts);
+    }
+
+    [Fact]
+    public async Task Two_concurrent_requests_with_the_right_code_complete_it_once()
+    {
+        var (service, rows, mail) = Build();
+        var user = Admin();
+        var ct = TestContext.Current.CancellationToken;
+
+        var id = await service.IssueAsync(user, TwoFactorPurpose.SignIn, ct);
+        rows.Rows[0].User = user;
+        var code = CodeFrom(mail);
+        rows.HoldReads = 2;
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => Task.Run(async () =>
+        {
+            try { await service.CompleteAsync(id, code, TwoFactorPurpose.SignIn, ct); return true; }
+            catch (UnauthorizedException) { return false; }
+        }, ct)));
+
+        Assert.Single(results, signedIn => signedIn);
     }
 
     [Fact]

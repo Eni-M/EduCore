@@ -46,7 +46,7 @@ public class UserService(
     ICurrentUser currentUser,
     IMemoryCache cache,
     IAuditTrail audit,
-    AuthenticatorThrottle throttle,
+    AttemptThrottle throttle,
     IConfiguration config) : IUserService
 {
     // Per account, not per IP: behind a PaaS proxy many users can share one address, and an
@@ -177,10 +177,7 @@ public class UserService(
         var user = await userRepository.GetByIdAsync(userId, ct)
                    ?? throw new NotFoundException("User", userId);
 
-        var result = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.CurrentPassword);
-
-        if (result == PasswordVerificationResult.Failed)
-            throw new UnauthorizedException("Current password is incorrect.");
+        RequireCurrentPassword(user, dto.CurrentPassword);
 
         if (user.DeactivatedAt is not null)
             throw new UnauthorizedException("This account has been deactivated.");
@@ -303,11 +300,11 @@ public class UserService(
         if (user.TotpSecret is null || user.HasAuthenticator)
             throw new BusinessException("Start setting up an authenticator app first.");
 
-        throttle.Reserve(userId);
+        throttle.Reserve(AttemptKind.Code, userId);
         var step = Totp.Verify(Totp.FromBase32(user.TotpSecret), code.Trim(), DateTimeOffset.UtcNow, null)
                    ?? throw new BusinessException("That code does not match. Check the time on your phone and try again.");
 
-        throttle.Succeeded(userId);
+        throttle.Succeeded(AttemptKind.Code, userId);
 
         user.TotpConfirmedAt = DateTime.UtcNow;
         user.TotpLastStep = step;
@@ -358,12 +355,19 @@ public class UserService(
 
     // Not UnauthorizedException: the client treats any 401 as an expired session and signs out,
     // which is the wrong answer to a mistyped password.
+    // Counted per user before it is checked (AttemptThrottle), so a borrowed session cannot guess
+    // its way past it.
     private void RequireCurrentPassword(User user, string? currentPassword)
     {
-        if (string.IsNullOrEmpty(currentPassword)
-            || passwordHasher.VerifyHashedPassword(user, user.PasswordHash, currentPassword)
+        if (string.IsNullOrEmpty(currentPassword))
+            throw new BusinessException("Your current password is incorrect.");
+
+        throttle.Reserve(AttemptKind.Password, user.Id);
+        if (passwordHasher.VerifyHashedPassword(user, user.PasswordHash, currentPassword)
             == PasswordVerificationResult.Failed)
             throw new BusinessException("Your current password is incorrect.");
+
+        throttle.Succeeded(AttemptKind.Password, user.Id);
     }
 
     // The unsubscribe. A digest people cannot turn off is one they report as spam, which costs

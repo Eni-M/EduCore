@@ -374,7 +374,7 @@ builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IMarkService, MarkService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IAuditTrail, AuditTrail>();
-builder.Services.AddSingleton<AuthenticatorThrottle>();
+builder.Services.AddSingleton<AttemptThrottle>();
 builder.Services.AddScoped<ISchoolingHistoryService, SchoolingHistoryService>();
 builder.Services.AddScoped<IStudentDocumentService, StudentDocumentService>();
 builder.Services.AddScoped<IPlatformStatsService, PlatformStatsService>();

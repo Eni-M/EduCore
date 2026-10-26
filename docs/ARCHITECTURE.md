@@ -86,8 +86,9 @@ against common and predictable choices (`Validation/PasswordBlocklist.cs`). PBKD
 
 **Authenticator apps.** Optional TOTP (`Security/Totp.cs`) in place of emailed codes. Adding one
 needs the current password, adding or removing one emails the account, and the office's password
-reset removes it (the recovery route for a lost phone). Wrong app codes are capped per user,
-five per 15 minutes (`AuthenticatorThrottle`), not only per challenge.
+reset removes it (the recovery route for a lost phone). Wrong codes, app or emailed, are capped
+per user, five per 15 minutes (`AttemptThrottle`), not only per challenge; so is the current
+password asked for again on the account screens.
 
 **Audit.** Every save writes `AuditLog` rows with the school and the changed fields (old and new
 values for marks; names only for anything encrypted). `IAuditTrail` adds what a save cannot see:

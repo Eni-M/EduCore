@@ -11,4 +11,11 @@ public interface ITwoFactorChallengeRepository : IRepository<TwoFactorChallenge>
     // Retires a user's outstanding challenges for one purpose. Called when a new code is
     // issued, so exactly one is ever live and an older email stops working.
     Task InvalidateOutstandingAsync(Guid userId, TwoFactorPurpose purpose, DateTime nowUtc, CancellationToken ct);
+
+    // Charges one attempt in a single UPDATE, and only while the challenge is open with attempts
+    // left. False means it was not: closed, expired, or out of attempts.
+    Task<bool> TryTakeAttemptAsync(Guid challengeId, int maxAttempts, DateTime nowUtc, CancellationToken ct);
+
+    // Marks the challenge answered in a single UPDATE. False means another request got there first.
+    Task<bool> TryCompleteAsync(Guid challengeId, DateTime nowUtc, CancellationToken ct);
 }
