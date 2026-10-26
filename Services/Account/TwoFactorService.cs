@@ -82,17 +82,14 @@ public class TwoFactorService(
         // App codes are capped per user as well as per challenge: a fresh challenge per sign-in
         // would otherwise mean fresh attempts for anyone holding the password.
         if (challenge.ViaAuthenticator)
-            throttle.EnsureAllowed(challenge.UserId);
+            throttle.Reserve(challenge.UserId);
 
         var matched = challenge.ViaAuthenticator
             ? MatchesAuthenticator(challenge.User, code)
             : Matches(challenge.CodeHash, code);
 
-        if (challenge.ViaAuthenticator)
-        {
-            if (matched) throttle.Succeeded(challenge.UserId);
-            else throttle.Failed(challenge.UserId);
-        }
+        if (challenge.ViaAuthenticator && matched)
+            throttle.Succeeded(challenge.UserId);
 
         if (!matched)
         {

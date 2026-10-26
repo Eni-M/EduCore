@@ -303,13 +303,9 @@ public class UserService(
         if (user.TotpSecret is null || user.HasAuthenticator)
             throw new BusinessException("Start setting up an authenticator app first.");
 
-        throttle.EnsureAllowed(userId);
-        var step = Totp.Verify(Totp.FromBase32(user.TotpSecret), code.Trim(), DateTimeOffset.UtcNow, null);
-        if (step is null)
-        {
-            throttle.Failed(userId);
-            throw new BusinessException("That code does not match. Check the time on your phone and try again.");
-        }
+        throttle.Reserve(userId);
+        var step = Totp.Verify(Totp.FromBase32(user.TotpSecret), code.Trim(), DateTimeOffset.UtcNow, null)
+                   ?? throw new BusinessException("That code does not match. Check the time on your phone and try again.");
 
         throttle.Succeeded(userId);
 

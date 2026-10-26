@@ -64,15 +64,30 @@ public class TotpTests
         var user = Guid.NewGuid();
 
         for (var i = 0; i < 5; i++)
-        {
-            throttle.EnsureAllowed(user);
-            throttle.Failed(user);
-        }
+            throttle.Reserve(user);
 
-        Assert.Throws<EduCore.Exceptions.TooManyRequestsException>(() => throttle.EnsureAllowed(user));
-        throttle.EnsureAllowed(Guid.NewGuid());
+        Assert.Throws<EduCore.Exceptions.TooManyRequestsException>(() => throttle.Reserve(user));
+        throttle.Reserve(Guid.NewGuid());
 
         throttle.Succeeded(user);
-        throttle.EnsureAllowed(user);
+        throttle.Reserve(user);
+    }
+
+    // Attempts are counted before the code is checked, so a concurrent burst gets five, not more.
+    [Fact]
+    public async Task A_concurrent_burst_still_gets_only_five_attempts()
+    {
+        var throttle = new AuthenticatorThrottle(new Microsoft.Extensions.Caching.Memory.MemoryCache(
+            new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()));
+        var user = Guid.NewGuid();
+        var admitted = 0;
+
+        await Task.WhenAll(Enumerable.Range(0, 50).Select(_ => Task.Run(() =>
+        {
+            try { throttle.Reserve(user); Interlocked.Increment(ref admitted); }
+            catch (EduCore.Exceptions.TooManyRequestsException) { }
+        })));
+
+        Assert.Equal(5, admitted);
     }
 }
