@@ -317,6 +317,23 @@ public class TwoFactorServiceTests
         Assert.Single(results, signedIn => signedIn);
     }
 
+    // Someone else's challenge is refused before anything is charged to its owner.
+    [Fact]
+    public async Task Another_users_challenge_is_refused_without_spending_its_attempts()
+    {
+        var (service, rows, mail) = Build();
+        var user = Admin();
+        var ct = TestContext.Current.CancellationToken;
+
+        var id = await service.IssueAsync(user, TwoFactorPurpose.PasswordChange, ct);
+        rows.Rows[0].User = user;
+
+        await Assert.ThrowsAsync<UnauthorizedException>(() =>
+            service.CompleteAsync(id, CodeFrom(mail), TwoFactorPurpose.PasswordChange, ct, ownerId: Guid.NewGuid()));
+
+        Assert.Equal(0, rows.Rows[0].FailedAttempts);
+    }
+
     [Fact]
     public async Task An_expired_code_is_refused()
     {

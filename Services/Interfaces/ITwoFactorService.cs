@@ -13,6 +13,8 @@ public interface ITwoFactorService
     Task<Guid> IssueAsync(User user, TwoFactorPurpose purpose, CancellationToken ct);
 
     // Consumes a challenge. Throws if it is unknown, expired, out of attempts, already used,
-    // for a different purpose, or the code is wrong. Returns the user it belonged to.
-    Task<User> CompleteAsync(Guid challengeId, string code, TwoFactorPurpose purpose, CancellationToken ct);
+    // for a different purpose, not owned by ownerId (when given), or the code is wrong. Returns the
+    // user it belonged to.
+    Task<User> CompleteAsync(
+        Guid challengeId, string code, TwoFactorPurpose purpose, CancellationToken ct, Guid? ownerId = null);
 }

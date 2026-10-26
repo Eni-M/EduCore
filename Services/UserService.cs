@@ -228,11 +228,7 @@ public class UserService(
         // Emailed code, for every role. Checked after the current password so a caller who does
         // not know it cannot burn somebody else's challenge, and bound to this user so a code
         // issued for one account cannot be spent on another.
-        var confirmed = await twoFactor.CompleteAsync(
-            dto.ChallengeId, dto.Code, TwoFactorPurpose.PasswordChange, ct);
-
-        if (confirmed.Id != userId)
-            throw new UnauthorizedException("That code is not valid. Ask for a new one.");
+        await twoFactor.CompleteAsync(dto.ChallengeId, dto.Code, TwoFactorPurpose.PasswordChange, ct, ownerId: userId);
 
         user.SetPassword(dto.NewPassword, passwordHasher);
         user.MustChangePassword = false;

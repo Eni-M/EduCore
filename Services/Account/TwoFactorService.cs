@@ -71,16 +71,18 @@ public class TwoFactorService(
     }
 
     public async Task<User> CompleteAsync(
-        Guid challengeId, string code, TwoFactorPurpose purpose, CancellationToken ct)
+        Guid challengeId, string code, TwoFactorPurpose purpose, CancellationToken ct, Guid? ownerId = null)
     {
         var challenge = await challenges.GetOpenAsync(challengeId, ct);
         var now = DateTime.UtcNow;
 
         // One message for every failure below. Telling the caller which of "no such challenge",
         // "expired", "wrong purpose" and "wrong code" applied would let them map the state of
-        // somebody else's sign-in.
+        // somebody else's sign-in. Ownership is checked before anything is charged, so one account
+        // cannot spend another's attempts.
         if (challenge is null
             || challenge.Purpose != purpose
+            || (ownerId is { } owner && challenge.UserId != owner)
             || !challenge.IsOpen(now, _options.MaxAttempts))
             throw new UnauthorizedException("That code is not valid. Ask for a new one.");
 
