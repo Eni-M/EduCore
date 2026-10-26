@@ -3,17 +3,26 @@ namespace EduCore.Dtos.User;
 // The answer to POST /auth/login. Exactly one half is set: a session when the password was
 // enough, or a challenge id when a second step is owed. The code itself is never in here --
 // it goes to the account's mailbox and nowhere else.
-public record LoginResultDto(AuthResultDto? Session, Guid? TwoFactorChallengeId, bool ViaAuthenticator = false)
+public record LoginResultDto(
+    AuthResultDto? Session, Guid? TwoFactorChallengeId, bool ViaAuthenticator = false, bool Passkey = false)
 {
     public static LoginResultDto SignedIn(AuthResultDto session) => new(session, null);
-    public static LoginResultDto NeedsSecondStep(Guid challengeId, bool viaAuthenticator) =>
-        new(null, challengeId, viaAuthenticator);
+    public static LoginResultDto NeedsSecondStep(Guid challengeId, bool viaAuthenticator, bool passkey) =>
+        new(null, challengeId, viaAuthenticator, passkey);
 }
 
 // What the client gets when a second step is owed. The challenge id is a handle, not a secret;
 // it is useless without the code.
 // Authenticator: the code comes from the user's app, not their inbox, so the screen says so.
-public record TwoFactorRequiredDto(Guid ChallengeId, bool TwoFactorRequired = true, bool Authenticator = false);
+// Passkey: the account has one, so the screen can offer it (and no code was emailed).
+public record TwoFactorRequiredDto(
+    Guid ChallengeId, bool TwoFactorRequired = true, bool Authenticator = false, bool Passkey = false);
+
+public record PasskeyRegistrationDto(string Name, Fido2NetLib.AuthenticatorAttestationRawResponse Response);
+
+public record PasskeySignInDto(Guid ChallengeId, Fido2NetLib.AuthenticatorAssertionRawResponse Response);
+
+public record PasskeyChallengeDto(Guid ChallengeId);
 
 public record AuthenticatorSetupDto(string Secret, string OtpAuthUri);
 

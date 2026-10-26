@@ -128,7 +128,8 @@ public class TwoFactorServiceTests
             Options.Create(new PasswordResetOptions { ResetUrlTemplate = "https://educore.example/reset-password" }),
             new NullAuditTrail(),
             new EduCore.Security.AttemptThrottle(new Microsoft.Extensions.Caching.Memory.MemoryCache(
-                new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions())));
+                new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions())),
+            Stub.Of<EduCore.Services.Account.IPasskeyService>((_, _) => Task.FromResult(false)));
 
         return (service, rows, mail);
     }

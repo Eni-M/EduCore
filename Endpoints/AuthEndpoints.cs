@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using EduCore.Dtos.User;
 using EduCore.Security;
+using EduCore.Services.Account;
 using EduCore.Services.Interfaces;
 
 namespace EduCore.Endpoints;
@@ -26,7 +27,7 @@ public static class AuthEndpoints
             // is in the account's mailbox and never in this response.
             if (result.Session is null)
                 return Results.Ok(new TwoFactorRequiredDto(
-                    result.TwoFactorChallengeId!.Value, Authenticator: result.ViaAuthenticator));
+                    result.TwoFactorChallengeId!.Value, Authenticator: result.ViaAuthenticator, Passkey: result.Passkey));
 
             cookies.Issue(response, result.Session.Token, result.Session.User.ExpiresAt);
             return Results.Ok(result.Session.User);
@@ -135,6 +136,52 @@ public static class AuthEndpoints
                 TwoFactorPreferenceDto dto, IUserService users, ICurrentUser currentUser,
                 CancellationToken ct) =>
                 TypedResults.Ok(await users.SetTwoFactorAsync(currentUser.UserId, dto.Enabled, dto.CurrentPassword, ct)))
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
+
+        // Passkeys as the second step of a sign-in: the options for the browser's prompt, then the
+        // signed response. Anonymous like /login/verify -- the challenge id is the handle.
+        group.MapPost("/login/passkey/options", async (
+                PasskeyChallengeDto dto, IPasskeyService passkeys, CancellationToken ct) =>
+                Results.Text((await passkeys.BeginAssertionAsync(dto.ChallengeId, ct)).ToJson(), "application/json"))
+            .RequireRateLimiting("LoginPolicy");
+
+        group.MapPost("/login/passkey", async (
+                PasskeySignInDto dto, IUserService users, ISessionCookies cookies, HttpResponse response,
+                CancellationToken ct) =>
+            {
+                var result = await users.CompleteSignInWithPasskeyAsync(dto.ChallengeId, dto.Response, ct);
+                cookies.Issue(response, result.Token, result.User.ExpiresAt);
+                return TypedResults.Ok(result.User);
+            })
+            .RequireRateLimiting("LoginPolicy");
+
+        // Managing your own passkeys: list, add (password first), remove (password).
+        group.MapGet("/me/passkeys", async (IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
+                TypedResults.Ok(await users.ListPasskeysAsync(currentUser.UserId, ct)))
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
+
+        group.MapPost("/me/passkeys/options", async (
+                BeginAuthenticatorDto dto, IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
+                Results.Text((await users.BeginPasskeyRegistrationAsync(currentUser.UserId, dto.CurrentPassword, ct)).ToJson(),
+                    "application/json"))
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
+
+        group.MapPost("/me/passkeys", async (
+                PasskeyRegistrationDto dto, IUserService users, ICurrentUser currentUser, CancellationToken ct) =>
+                TypedResults.Ok(await users.CompletePasskeyRegistrationAsync(currentUser.UserId, dto, ct)))
+            .RequireAuthorization()
+            .AddEndpointFilter<ActiveAccountEndpointFilter>();
+
+        group.MapPost("/me/passkeys/{passkeyId:guid}/remove", async (
+                Guid passkeyId, RemoveAuthenticatorDto dto, IUserService users, ICurrentUser currentUser,
+                CancellationToken ct) =>
+            {
+                await users.RemovePasskeyAsync(currentUser.UserId, passkeyId, dto.CurrentPassword, ct);
+                return TypedResults.NoContent();
+            })
             .RequireAuthorization()
             .AddEndpointFilter<ActiveAccountEndpointFilter>();
 

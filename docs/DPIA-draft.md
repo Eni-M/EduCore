@@ -29,7 +29,7 @@ under 16), Art. 86(3) (linking filing systems through a connecting code such as 
 | Health (special category) | Blood type, allergies, conditions, medications, emergency contact, notes | AES-256-GCM per field; read limited to office and homeroom teacher; every read audited |
 | Education records | Marks (with change history and reasons), attendance, behaviour marks, lessons, assignments and submissions, schooling history, documents | School isolation; marks locked when a term closes; changes audited |
 | Communication | Teacher–guardian messages, notifications | Visible to the two participants only |
-| Credentials | Password hashes (PBKDF2-SHA512, 220k iterations), authenticator secrets (sealed), hashed sign-in codes and reset tokens | Never stored in plaintext |
+| Credentials | Password hashes (PBKDF2-SHA512, 220k iterations), authenticator secrets (sealed), passkey public keys, hashed sign-in codes and reset tokens | Never stored in plaintext |
 | Activity | Audit log: who changed what, sign-ins, failed sign-ins, reads of health data and identifiers | Retained `Retention:AuditLogDays` (default 730) |
 
 ## 3. Necessity and proportionality
@@ -50,7 +50,7 @@ under 16), Art. 86(3) (linking filing systems through a connecting code such as 
 | --- | --- | --- |
 | One school's staff reading another school's pupils | Three layers of school isolation; integration-tested | Admin tiers cross schools by design; their actions are audited |
 | Stolen session | 1-hour tokens in HttpOnly cookies; sign-out, password change and resets end every session; CSRF protection; security headers | — |
-| Account takeover | 15-character passwords with a blocklist; per-account lockout; email change and 2FA removal need the password; authenticator-app second factor | Email codes remain the fallback second factor; passkeys not yet offered |
+| Account takeover | 15-character passwords with a blocklist; per-account lockout; email change and 2FA removal need the password; authenticator-app or passkey second factor | Email codes remain the fallback for accounts with neither |
 | Leak of the database | Identifiers and health data encrypted; keys outside the database; password hashes slow | Names, marks and attendance are not encrypted (needed for search and statistics) |
 | Grade tampering | Closed terms lock marks; corrections need a reason; full change history | — |
 | Undetected breach | Audit of sign-ins, failures, health and identifier reads; OpenTelemetry traces and logs | No alerting on the audit stream yet — **[controller: who watches it, and how 72-hour notification is met]** |

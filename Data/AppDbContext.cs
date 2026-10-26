@@ -49,6 +49,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
     public DbSet<OriginCity> OriginCities => Set<OriginCity>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<MarkChange> MarkChanges => Set<MarkChange>();
+    public DbSet<PasskeyCredential> Passkeys => Set<PasskeyCredential>();
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<TeacherSubject> TeacherSubjects => Set<TeacherSubject>();
     public DbSet<ClassSubjectTeacher> ClassSubjectTeachers => Set<ClassSubjectTeacher>();
@@ -108,6 +109,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUser c
         modelBuilder.Entity<User>().Property(u => u.LastName).HasMaxLength(100);
         modelBuilder.Entity<User>().Property(u => u.Email).HasMaxLength(320);
         modelBuilder.Entity<User>().Property(u => u.PasswordHash).HasMaxLength(500);
+        // Passkeys hold public keys only. A credential id identifies one authenticator worldwide.
+        modelBuilder.Entity<PasskeyCredential>().HasIndex(p => p.CredentialId).IsUnique();
+        modelBuilder.Entity<PasskeyCredential>().HasIndex(p => p.UserId);
+        modelBuilder.Entity<PasskeyCredential>().Property(p => p.Name).HasMaxLength(100);
+        modelBuilder.Entity<PasskeyCredential>()
+            .HasOne<User>().WithMany()
+            .HasForeignKey(p => p.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // The authenticator secret is a credential: sealed at rest, never stored in the clear.
         modelBuilder.Entity<User>().Property(nameof(User.TotpSecret)).HasConversion(new ValueConverter<string, string>(
             v => encryptor.Seal(v),

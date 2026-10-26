@@ -19,7 +19,11 @@ public enum AccountMailKind
     // An authenticator app was added to or removed from the account. Sent either way: an app the
     // owner did not add is how a hijacked session would lock them out.
     AuthenticatorAdded,
-    AuthenticatorRemoved
+    AuthenticatorRemoved,
+
+    // The same, for passkeys.
+    PasskeyAdded,
+    PasskeyRemoved
 }
 
 // Copied at the moment of the write, never the User entity -- its DbContext is long disposed by
@@ -57,6 +61,8 @@ public static class AccountMailTemplates
             AccountMailKind.PasswordReset => PasswordReset(request, appUrl),
             AccountMailKind.AuthenticatorAdded => AuthenticatorChanged(request, appUrl, added: true),
             AccountMailKind.AuthenticatorRemoved => AuthenticatorChanged(request, appUrl, added: false),
+            AccountMailKind.PasskeyAdded => PasskeyChanged(request, appUrl, added: true),
+            AccountMailKind.PasskeyRemoved => PasskeyChanged(request, appUrl, added: false),
             _ => throw new ArgumentOutOfRangeException(nameof(request))
         };
 
@@ -103,6 +109,21 @@ public static class AccountMailTemplates
                     new EmailBlock.Paragraph("If you made this change, there is nothing to do."),
                     new EmailBlock.Paragraph(
                         "If you did not, contact your school office straight away. They can reset your account, which also removes any authenticator app."),
+                ],
+                appUrl));
+
+    private static (string, EmailBody) PasskeyChanged(AccountMailRequest request, string appUrl, bool added) =>
+        (added ? "A passkey was added to your EduCore account" : "A passkey was removed from your EduCore account",
+            EmailLayout.Render(
+                added ? "Passkey added" : "Passkey removed",
+                [
+                    new EmailBlock.Paragraph($"Hello {request.FirstName},"),
+                    new EmailBlock.Paragraph(added
+                        ? "A passkey was just added to your EduCore account. It can now finish your sign-in instead of a code."
+                        : "A passkey was just removed from your EduCore account."),
+                    new EmailBlock.Paragraph("If you made this change, there is nothing to do."),
+                    new EmailBlock.Paragraph(
+                        "If you did not, contact your school office straight away. They can reset your account, which also removes every passkey."),
                 ],
                 appUrl));
 

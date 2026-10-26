@@ -376,6 +376,19 @@ builder.Services.AddScoped<IMarkService, MarkService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IAuditTrail, AuditTrail>();
 builder.Services.AddSingleton<AttemptThrottle>();
+
+// Passkeys (WebAuthn). ServerDomain is the relying-party id: the site's registrable domain, which
+// a passkey is bound to for good -- e.g. educore.website, or localhost in development. Origins
+// are the exact origins the front end is served from.
+var passkeyOptions = builder.Configuration.GetSection("Passkeys");
+builder.Services.AddSingleton<Fido2NetLib.IFido2>(new Fido2NetLib.Fido2(new Fido2NetLib.Fido2Configuration
+{
+    RPID = passkeyOptions["ServerDomain"] ?? "localhost",
+    RPName = "EduCore",
+    Origins = (passkeyOptions.GetSection("Origins").Get<string[]>() ?? ["http://localhost:5173", "https://localhost:5173"])
+        .ToHashSet(),
+}));
+builder.Services.AddScoped<EduCore.Services.Account.IPasskeyService, EduCore.Services.Account.PasskeyService>();
 builder.Services.AddScoped<ISchoolingHistoryService, SchoolingHistoryService>();
 builder.Services.AddScoped<IStudentDocumentService, StudentDocumentService>();
 builder.Services.AddScoped<IPlatformStatsService, PlatformStatsService>();

@@ -39,7 +39,7 @@ public class CurrentPasswordThrottleTests
         var users = new UserService(
             new OneUser(user), null!, null!, null!, null!, null!, null!, null!, hasher, null!,
             Options.Create(new TwoFactorOptions()), null!, null!, null!,
-            new AttemptThrottle(new MemoryCache(new MemoryCacheOptions())), null!);
+            new AttemptThrottle(new MemoryCache(new MemoryCacheOptions())), null!, null!);
 
         for (var i = 0; i < 5; i++)
             await Assert.ThrowsAsync<BusinessException>(() => users.RemoveAuthenticatorAsync(user.Id, "a-guess", ct));

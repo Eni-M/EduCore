@@ -90,6 +90,14 @@ reset removes it (the recovery route for a lost phone). Wrong codes, app or emai
 per user, five per 15 minutes (`AttemptThrottle`), not only per challenge; so is the current
 password asked for again on the account screens.
 
+**Passkeys.** WebAuthn through Fido2NetLib (`Services/Account/PasskeyService.cs`); only public keys
+are stored (`Passkeys` table). A passkey answers the sign-in's second step in place of a code, so
+an account with one is emailed no code. Adding or removing one needs the password and emails the
+account, and the office's password reset removes them all. `Passkeys:ServerDomain` (the
+relying-party id) binds every passkey to the front end's domain for good; `Passkeys:Origins`
+lists the front end's exact origins. `PasskeyTests` drives the whole flow with a software
+authenticator.
+
 **Audit.** Every save writes `AuditLog` rows with the school and the changed fields (old and new
 values for marks; names only for anything encrypted). `IAuditTrail` adds what a save cannot see:
 sign-in successes and failures, rejected two-step codes, and every read of a medical record or of

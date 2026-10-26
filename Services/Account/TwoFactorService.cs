@@ -24,7 +24,8 @@ public class TwoFactorService(
     IOptions<TwoFactorOptions> options,
     IOptions<PasswordResetOptions> passwordReset,
     IAuditTrail audit,
-    AttemptThrottle throttle) : ITwoFactorService
+    AttemptThrottle throttle,
+    IPasskeyService passkeys) : ITwoFactorService
 {
     private readonly TwoFactorOptions _options = options.Value;
     private readonly string _appUrl = AccountMailTemplates.AppUrlFrom(passwordReset.Value.ResetUrlTemplate);
@@ -42,13 +43,16 @@ public class TwoFactorService(
 
         // With an authenticator app set up, the code is on the phone: nothing is emailed, and
         // the challenge holds no code of its own.
-        var code = user.HasAuthenticator ? null : GenerateCode();
+        // So is a sign-in that a passkey can answer.
+        var noCode = user.HasAuthenticator
+                     || (purpose == TwoFactorPurpose.SignIn && await passkeys.HasPasskeysAsync(user.Id, ct));
+        var code = noCode ? null : GenerateCode();
 
         var challenge = new TwoFactorChallenge
         {
             UserId = user.Id,
             CodeHash = code is null ? "" : Hash(code),
-            ViaAuthenticator = code is null,
+            ViaAuthenticator = user.HasAuthenticator,
             Purpose = purpose,
             CreatedAt = now,
             ExpiresAt = now.AddMinutes(_options.CodeLifetimeMinutes)

@@ -32,6 +32,15 @@ public interface IUserService
     Task<TwoFactorStatusDto> ConfirmAuthenticatorAsync(Guid userId, string code, CancellationToken ct);
     Task<TwoFactorStatusDto> RemoveAuthenticatorAsync(Guid userId, string currentPassword, CancellationToken ct);
 
+    Task<AuthResultDto> CompleteSignInWithPasskeyAsync(
+        Guid challengeId, Fido2NetLib.AuthenticatorAssertionRawResponse response, CancellationToken ct);
+    Task<Fido2NetLib.CredentialCreateOptions> BeginPasskeyRegistrationAsync(
+        Guid userId, string currentPassword, CancellationToken ct);
+    Task<Services.Account.PasskeyDto> CompletePasskeyRegistrationAsync(
+        Guid userId, PasskeyRegistrationDto dto, CancellationToken ct);
+    Task<IReadOnlyList<Services.Account.PasskeyDto>> ListPasskeysAsync(Guid userId, CancellationToken ct);
+    Task RemovePasskeyAsync(Guid userId, Guid passkeyId, string currentPassword, CancellationToken ct);
+
     // Signs the account out everywhere: every token issued before now stops being accepted.
     Task EndSessionsAsync(Guid userId, CancellationToken ct);
 

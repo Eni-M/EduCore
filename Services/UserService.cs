@@ -47,6 +47,7 @@ public class UserService(
     IMemoryCache cache,
     IAuditTrail audit,
     AttemptThrottle throttle,
+    IPasskeyService passkeys,
     IConfiguration config) : IUserService
 {
     // Per account, not per IP: behind a PaaS proxy many users can share one address, and an
@@ -107,9 +108,11 @@ public class UserService(
         // The password was right, but for these accounts it is not sufficient on its own. No
         // session cookie is issued here -- the caller gets a handle and has to prove they can
         // read the mailbox before anything is signed in.
-        if (twoFactor.SignInRequiresSecondStep(user))
+        if (twoFactor.SignInRequiresSecondStep(user) || await passkeys.HasPasskeysAsync(user.Id, ct))
             return LoginResultDto.NeedsSecondStep(
-                await twoFactor.IssueAsync(user, TwoFactorPurpose.SignIn, ct), user.HasAuthenticator);
+                await twoFactor.IssueAsync(user, TwoFactorPurpose.SignIn, ct),
+                user.HasAuthenticator,
+                await passkeys.HasPasskeysAsync(user.Id, ct));
 
         await audit.RecordAsync("Signed in", ct, userId: user.Id);
         return LoginResultDto.SignedIn(await BuildAuthResponseAsync(user, ct));
@@ -127,6 +130,46 @@ public class UserService(
 
         await audit.RecordAsync("Signed in with a two-step code", ct, userId: user.Id);
         return await BuildAuthResponseAsync(user, ct);
+    }
+
+    // The second step answered with a passkey instead of a code.
+    public async Task<AuthResultDto> CompleteSignInWithPasskeyAsync(
+        Guid challengeId, Fido2NetLib.AuthenticatorAssertionRawResponse response, CancellationToken ct)
+    {
+        var user = await passkeys.CompleteAssertionAsync(challengeId, response, ct);
+
+        if (user.DeactivatedAt is not null)
+            throw new UnauthorizedException("This account has been deactivated.");
+
+        await audit.RecordAsync("Signed in with a passkey", ct, userId: user.Id);
+        return await BuildAuthResponseAsync(user, ct);
+    }
+
+    // Adding a passkey needs the password, as adding an authenticator does: a borrowed session
+    // must not be able to attach its own way in.
+    public async Task<Fido2NetLib.CredentialCreateOptions> BeginPasskeyRegistrationAsync(
+        Guid userId, string currentPassword, CancellationToken ct)
+    {
+        var user = await userRepository.GetByIdAsync(userId, ct) ?? throw new NotFoundException("User", userId);
+        RequireCurrentPassword(user, currentPassword);
+        return await passkeys.BeginRegistrationAsync(user, ct);
+    }
+
+    public async Task<PasskeyDto> CompletePasskeyRegistrationAsync(
+        Guid userId, PasskeyRegistrationDto dto, CancellationToken ct)
+    {
+        var user = await userRepository.GetByIdAsync(userId, ct) ?? throw new NotFoundException("User", userId);
+        return await passkeys.CompleteRegistrationAsync(user, dto.Name, dto.Response, ct);
+    }
+
+    public async Task<IReadOnlyList<PasskeyDto>> ListPasskeysAsync(Guid userId, CancellationToken ct) =>
+        await passkeys.ListAsync(userId, ct);
+
+    public async Task RemovePasskeyAsync(Guid userId, Guid passkeyId, string currentPassword, CancellationToken ct)
+    {
+        var user = await userRepository.GetByIdAsync(userId, ct) ?? throw new NotFoundException("User", userId);
+        RequireCurrentPassword(user, currentPassword);
+        await passkeys.RemoveAsync(user, passkeyId, ct);
     }
 
     public async Task<Guid> RequestPasswordChangeCodeAsync(Guid userId, CancellationToken ct)
@@ -258,6 +301,7 @@ public class UserService(
         user.TotpSecret = null;
         user.TotpConfirmedAt = null;
         user.TotpLastStep = null;
+        await passkeys.StageRemoveAllAsync(user.Id, ct);
 
         userRepository.Update(user);
         await userRepository.SaveChangesAsync(ct);
