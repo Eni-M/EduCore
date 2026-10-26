@@ -17,6 +17,13 @@ public class SessionCookieOptions
     public bool Secure { get; set; } = true;
 
     public string? Domain { get; set; }
+
+    // The name a cookie is actually set under. Over https, __Host- (no Domain, path /, Secure --
+    // which browsers enforce) stops a sibling subdomain or a plain-http response from planting or
+    // overwriting it; with a Domain set, __Host- is not allowed, so __Secure-. Over plain http (the
+    // local dev loop) neither prefix is accepted by browsers, so the bare name.
+    public string Effective(string name) =>
+        !Secure ? name : Domain is null ? $"__Host-{name}" : $"__Secure-{name}";
 }
 
 public class SessionCookieOptionsValidator : IValidateOptions<SessionCookieOptions>

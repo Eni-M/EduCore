@@ -92,16 +92,28 @@ public sealed class SecurityBoundaryTests(ApiFixture api)
     {
         var office = await api.UserAsync(UserRole.Directorate, api.SchoolA);
         var client = api.App.CreateClient();
-        var cookies = $"educore.session={ApiFixture.Token(office, api.SchoolA)}; educore.csrf=abc123";
+        var session = ApiFixture.Token(office, api.SchoolA);
 
-        var withoutToken = new HttpRequestMessage(HttpMethod.Post, "/api/notifications/read-all");
-        withoutToken.Headers.Add("Cookie", cookies);
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.SendAsync(withoutToken, Ct)).StatusCode);
+        async Task<HttpStatusCode> PostAsync(string cookies, string? header)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "/api/notifications/read-all");
+            request.Headers.Add("Cookie", cookies);
+            if (header is not null)
+                request.Headers.Add("X-CSRF-Token", header);
+            return (await client.SendAsync(request, Ct)).StatusCode;
+        }
 
-        var withToken = new HttpRequestMessage(HttpMethod.Post, "/api/notifications/read-all");
-        withToken.Headers.Add("Cookie", cookies);
-        withToken.Headers.Add("X-CSRF-Token", "abc123");
-        Assert.Equal(HttpStatusCode.NoContent, (await client.SendAsync(withToken, Ct)).StatusCode);
+        // No header at all.
+        Assert.Equal(HttpStatusCode.Forbidden, await PostAsync($"educore.session={session}", null));
+
+        // The attack a plain double-submit token falls to: whoever can plant a cookie sets the CSRF
+        // cookie and the header to the same value of their choosing. Bound to the session, it fails.
+        Assert.Equal(HttpStatusCode.Forbidden,
+            await PostAsync($"educore.session={session}; educore.csrf=abc123", "abc123"));
+
+        // The token minted for this session passes.
+        var bound = api.App.Services.GetRequiredService<EduCore.Security.CsrfTokens>().For(session);
+        Assert.Equal(HttpStatusCode.NoContent, await PostAsync($"educore.session={session}", bound));
     }
 
     // Sign-out and password changes move SessionsValidFrom; a token from before it is dead.

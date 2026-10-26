@@ -1,10 +1,8 @@
-using System.Security.Cryptography;
-using System.Text;
 using EduCore.Exceptions;
 
 namespace EduCore.Security;
 
-public class CsrfProtectionMiddleware(RequestDelegate next, ISessionCookies cookies)
+public class CsrfProtectionMiddleware(RequestDelegate next, ISessionCookies cookies, CsrfTokens csrf)
 {
     private static readonly HashSet<string> SafeMethods =
         new(StringComparer.OrdinalIgnoreCase) { "GET", "HEAD", "OPTIONS", "TRACE" };
@@ -27,16 +25,13 @@ public class CsrfProtectionMiddleware(RequestDelegate next, ISessionCookies cook
         return context.Request.Cookies.ContainsKey(cookies.CookieName);
     }
 
+    // The header must carry the token bound to the session in the session cookie. The CSRF cookie
+    // is only how the page learns it; a cookie someone else planted does not match this session.
     private bool HasMatchingToken(HttpContext context)
     {
-        var fromCookie = context.Request.Cookies[cookies.CsrfCookieName];
+        var session = context.Request.Cookies[cookies.CookieName];
         var fromHeader = context.Request.Headers[cookies.CsrfHeaderName].ToString();
 
-        if (string.IsNullOrEmpty(fromCookie) || string.IsNullOrEmpty(fromHeader))
-            return false;
-
-        return CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(fromCookie),
-            Encoding.UTF8.GetBytes(fromHeader));
+        return !string.IsNullOrEmpty(session) && csrf.Matches(session, fromHeader);
     }
 }

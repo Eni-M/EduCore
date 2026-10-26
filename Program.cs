@@ -280,6 +280,7 @@ builder.Services.AddOptions<SessionCookieOptions>()
     .Bind(builder.Configuration.GetSection(SessionCookieOptions.SectionName))
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<SessionCookieOptions>, SessionCookieOptionsValidator>();
+builder.Services.AddSingleton(CsrfTokens.FromJwtKey(builder.Configuration["Jwt:Key"] ?? ""));
 builder.Services.AddSingleton<ISessionCookies, SessionCookies>();
 
 builder.Services.AddScoped<IElementaryAssignmentSync, ElementaryAssignmentSync>();
@@ -416,8 +417,10 @@ if (string.IsNullOrWhiteSpace(jwtKey) || Encoding.UTF8.GetByteCount(jwtKey) < 32
 // tokens nothing accepts, or a digest scheduled for an hour that never comes.
 FailStartupOn(StartupChecks.TokenAndScheduleSettings(builder.Configuration));
 
-var sessionCookieName =
-    builder.Configuration.GetSection(SessionCookieOptions.SectionName)["CookieName"] ?? "educore.session";
+// The name the session cookie is actually set under, prefix included (SessionCookieOptions.Effective).
+var sessionCookieName = (builder.Configuration.GetSection(SessionCookieOptions.SectionName)
+                             .Get<SessionCookieOptions>() ?? new SessionCookieOptions())
+    .Effective(builder.Configuration["Session:CookieName"] ?? "educore.session");
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

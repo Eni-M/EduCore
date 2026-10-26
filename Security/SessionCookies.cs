@@ -1,21 +1,20 @@
-using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
 
 namespace EduCore.Security;
 
-public class SessionCookies(IOptions<SessionCookieOptions> options) : ISessionCookies
+public class SessionCookies(IOptions<SessionCookieOptions> options, CsrfTokens csrf) : ISessionCookies
 {
     private readonly SessionCookieOptions settings = options.Value;
 
-    public string CookieName => settings.CookieName;
+    public string CookieName => settings.Effective(settings.CookieName);
 
-    public string CsrfCookieName => settings.CsrfCookieName;
+    public string CsrfCookieName => settings.Effective(settings.CsrfCookieName);
 
     public string CsrfHeaderName => settings.CsrfHeaderName;
 
     public void Issue(HttpResponse response, string token, DateTime expiresAtUtc)
     {
-        response.Cookies.Append(settings.CookieName, token, new CookieOptions
+        response.Cookies.Append(CookieName, token, new CookieOptions
         {
             HttpOnly = true,
             Secure = settings.Secure,
@@ -25,7 +24,8 @@ public class SessionCookies(IOptions<SessionCookieOptions> options) : ISessionCo
             Expires = new DateTimeOffset(DateTime.SpecifyKind(expiresAtUtc, DateTimeKind.Utc))
         });
 
-        response.Cookies.Append(settings.CsrfCookieName, NewCsrfToken(), new CookieOptions
+        // Bound to this session (see CsrfTokens); readable by the page, which echoes it in a header.
+        response.Cookies.Append(CsrfCookieName, csrf.For(token), new CookieOptions
         {
             HttpOnly = false,
             Secure = settings.Secure,
@@ -46,10 +46,7 @@ public class SessionCookies(IOptions<SessionCookieOptions> options) : ISessionCo
             Path = "/"
         };
 
-        response.Cookies.Delete(settings.CookieName, expired);
-        response.Cookies.Delete(settings.CsrfCookieName, expired);
+        response.Cookies.Delete(CookieName, expired);
+        response.Cookies.Delete(CsrfCookieName, expired);
     }
-
-    private static string NewCsrfToken() =>
-        Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 }
