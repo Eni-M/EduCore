@@ -263,8 +263,12 @@ only when the API itself is the TLS endpoint.
 
 **Migrations.** `dotnet EduCore.dll --migrate` is the separate one-shot path, which is what compose
 runs. `MigrateOnStart=true` migrates during start-up instead, for hosts with no separate step.
-EF Core 9+ takes a database-wide lock while migrating, so replicas no longer race; the cost of
-`MigrateOnStart` is that the app's database role needs DDL rights. Start-up otherwise refuses to
+EF Core 9+ takes a database-wide lock while migrating, so replicas no longer race. Both paths
+migrate through `ConnectionStrings:Migrations` when it is set -- the schema owner -- so the API's own
+login (`ConnectionStrings:Default`) can be the data-only `educore_app` role from
+`docs/db-roles.sql`: it reads and writes rows, and cannot create, alter or drop anything. Compose
+sets this up on a fresh volume (`docker/postgres/10-app-role.sh`); on Neon, run the script once
+as the owner. Start-up otherwise refuses to
 serve against a schema it does not match. On Neon, run migrations over the direct (non `-pooler`)
 endpoint; if the app connects through the pooler, add `No Reset On Close=true` to its connection
 string.

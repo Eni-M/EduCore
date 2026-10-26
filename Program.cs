@@ -555,8 +555,7 @@ var app = builder.Build();
 // to completion, before the API starts.
 if (args.Contains("--migrate"))
 {
-    await using var migrationScope = app.Services.CreateAsyncScope();
-    await migrationScope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+    await MigrateAsOwnerAsync();
     return;
 }
 
@@ -582,7 +581,7 @@ await using (var startupScope = app.Services.CreateAsyncScope())
         app.Logger.LogInformation(
             "MigrateOnStart is set; applying any pending migrations before serving traffic.");
 
-        await db.Database.MigrateAsync();
+        await MigrateAsOwnerAsync();
     }
 
     var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
@@ -733,6 +732,27 @@ static void FailStartupOn(IEnumerable<string> failures)
     if (list.Count > 0)
         throw new InvalidOperationException(
             "Invalid configuration:" + Environment.NewLine + "  " + string.Join(Environment.NewLine + "  ", list));
+}
+
+// Migrations change the schema, so they run as the role that owns it: ConnectionStrings:Migrations
+// when set, and the API's own connection otherwise. The API itself connects with data-only rights
+// (docs/db-roles.sql), so a compromised process cannot drop or alter a table.
+async Task MigrateAsOwnerAsync()
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var owner = app.Configuration.GetConnectionString("Migrations");
+
+    if (string.IsNullOrWhiteSpace(owner))
+    {
+        await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+        return;
+    }
+
+    await using var migrator = new AppDbContext(
+        new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(owner).Options,
+        scope.ServiceProvider.GetRequiredService<ICurrentUser>(),
+        scope.ServiceProvider.GetRequiredService<IFieldEncryptor>());
+    await migrator.Database.MigrateAsync();
 }
 
 // Lets the integration tests host the real app in memory (WebApplicationFactory<Program>).
