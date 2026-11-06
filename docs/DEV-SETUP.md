@@ -10,7 +10,7 @@ There are **two separate worlds**. Don't mix them up.
 |---|---|---|
 | Database | Neon | Postgres in Docker |
 | Backend | Render | `dotnet run` |
-| Frontend | Vercel (`edu-core-front.vercel.app`) | Vite dev server |
+| Frontend | Vercel (`educore.website`) | Vite dev server |
 | When it updates | when code is merged to `main` | instantly, as you edit |
 | Who touches it | **nobody directly** — only by merging to `main` | just you |
 
