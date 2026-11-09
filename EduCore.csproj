@@ -18,7 +18,7 @@
 
     <ItemGroup>
         <PackageReference Include="AutoMapper" Version="16.2.0" />
-        <PackageReference Include="AWSSDK.S3" Version="4.0.104.6" />
+        <PackageReference Include="AWSSDK.S3" Version="4.0.104.11" />
         <PackageReference Include="Fido2" Version="4.3.1" />
         <PackageReference Include="FluentValidation" Version="12.2.0" />
         <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.2.0" />
