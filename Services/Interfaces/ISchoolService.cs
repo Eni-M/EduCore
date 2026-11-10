@@ -9,6 +9,7 @@ public interface ISchoolService
     Task<PagedResultDto<SchoolListDto>> GetPagedAsync(
         bool activeOnly, PaginationQueryDto pagination, string? search, CancellationToken ct);
     Task<SchoolListDto> GetByIdAsync(Guid schoolId, CancellationToken ct);
+    Task<SchoolListDto> GetMineAsync(CancellationToken ct);
     Task<SchoolListDto> CreateAsync(SchoolCreateDto dto, CancellationToken ct);
     Task<SchoolListDto> UpdateAsync(Guid schoolId, SchoolEditDto dto, CancellationToken ct);
 

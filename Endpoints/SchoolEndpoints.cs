@@ -11,8 +11,8 @@ public static class SchoolEndpoints
     {
         var schools = api.MapGroup("/schools").WithTags("Schools");
 
-        schools.MapGet("/me", async (ISchoolService service, ICurrentUser currentUser, CancellationToken ct) =>
-                TypedResults.Ok(await service.GetByIdAsync(currentUser.RequireSchoolId(), ct)))
+        schools.MapGet("/me", async (ISchoolService service, CancellationToken ct) =>
+                TypedResults.Ok(await service.GetMineAsync(ct)))
             .RequireAuthorization(Policies.AnySchoolUser);
 
         // MapGroup("") makes this a real nested group. Calling RequireAuthorization on `schools`

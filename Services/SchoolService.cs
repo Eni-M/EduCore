@@ -55,6 +55,17 @@ public class SchoolService(
         return mapper.Map<SchoolListDto>(school);
     }
 
+    // The caller's own school: the id comes from their token, so no manage check applies.
+    public async Task<SchoolListDto> GetMineAsync(CancellationToken ct)
+    {
+        var schoolId = currentUser.RequireSchoolId();
+
+        var school = await schools.GetWithLocationAsync(schoolId, ct)
+                     ?? throw new NotFoundException("School", schoolId);
+
+        return mapper.Map<SchoolListDto>(school);
+    }
+
     public async Task<SchoolListDto> CreateAsync(SchoolCreateDto dto, CancellationToken ct)
     {
         if (await schools.NameExistsAsync(dto.Name, null, ct))
