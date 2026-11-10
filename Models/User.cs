@@ -41,6 +41,21 @@ public class User
 
     public bool HasAuthenticator => TotpConfirmedAt is not null && TotpSecret is not null;
 
-    public void SetPassword(string password, IPasswordHasher<User> hasher) =>
+    public void SetPassword(string password, IPasswordHasher<User> hasher)
+    {
         PasswordHash = hasher.HashPassword(this, password);
+        PasswordWasRehashed = false;
+    }
+
+    // The same password, stored again under stronger hashing parameters at sign-in. The hash
+    // moves but the password does not, so AccountMailInterceptor must not tell the owner it
+    // changed. Lives only on this instance; never saved.
+    public void RehashPassword(string password, IPasswordHasher<User> hasher)
+    {
+        PasswordHash = hasher.HashPassword(this, password);
+        PasswordWasRehashed = true;
+    }
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public bool PasswordWasRehashed { get; private set; }
 }

@@ -116,8 +116,14 @@ public class AccountMailInterceptor(IAccountMailQueue queue) : SaveChangesInterc
     // IsModified alone is not enough: DbSet.Update marks every property modified whether or not
     // its value moved, so any service that saves a user that way -- switching two-step sign-in
     // on, say -- would otherwise tell them their password had changed. Compare the values.
+    //
+    // A rehash at sign-in (stronger PBKDF2 parameters, same password) also moves the hash, and
+    // is not a change the owner made -- announcing it alongside the sign-in code reads as a breach.
     private static bool PasswordWasReplaced(EntityEntry<User> entry)
     {
+        if (entry.Entity.PasswordWasRehashed)
+            return false;
+
         var hash = entry.Property(nameof(User.PasswordHash));
 
         return hash.IsModified

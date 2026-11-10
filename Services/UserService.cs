@@ -100,7 +100,7 @@ public class UserService(
 
         if (result == PasswordVerificationResult.SuccessRehashNeeded)
         {
-            user.SetPassword(dto.Password, passwordHasher);
+            user.RehashPassword(dto.Password, passwordHasher);
             userRepository.Update(user);
             await userRepository.SaveChangesAsync(ct);
         }

@@ -136,6 +136,22 @@ public class AccountMailInterceptorTests
         Assert.Equal(user.Email, request.Email);
     }
 
+    // "I signed in and got my code plus an email saying my password had changed." Raising the
+    // PBKDF2 iteration count makes every older hash get rewritten on the next sign-in.
+    [Fact]
+    public void Rehashing_at_sign_in_does_not_announce_a_password_change()
+    {
+        using var context = Context();
+
+        var user = Existing();
+        context.Attach(user);
+
+        user.RehashPassword("stronger-parameters-same-password", new Hasher());
+        context.Users.Update(user);
+
+        Assert.Empty(Queued(context));
+    }
+
     [Fact]
     public void A_new_account_is_welcomed()
     {
