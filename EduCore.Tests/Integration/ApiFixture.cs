@@ -130,7 +130,7 @@ public sealed class ApiFixture : IAsyncLifetime
     }
 
     // A session as UserService would issue it -- same claims, key, issuer and audience.
-    public static string Token(User user, Guid? schoolId = null, DateTime? issuedAt = null)
+    public static string Token(User user, Guid? schoolId = null, DateTime? issuedAt = null, Guid? cityId = null)
     {
         var iat = issuedAt ?? DateTime.UtcNow;
         var claims = new List<Claim>
@@ -143,6 +143,8 @@ public sealed class ApiFixture : IAsyncLifetime
         };
         if (schoolId is { } id)
             claims.Add(new Claim(ClaimNames.SchoolId, id.ToString()));
+        if (cityId is { } city)
+            claims.Add(new Claim(ClaimNames.CityId, city.ToString()));
 
         var token = new JwtSecurityToken(
             issuer: "educore",

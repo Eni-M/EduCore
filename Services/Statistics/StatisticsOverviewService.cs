@@ -1,3 +1,4 @@
+using EduCore.Helpers;
 using EduCore.Repositories.Interfaces;
 using EduCore.Dtos.Pagination;
 using EduCore.Dtos.Statistics;
@@ -76,11 +77,26 @@ public class StatisticsOverviewService(
             allClasses, 1, allClasses.Count == 0 ? 1 : allClasses.Count, allClasses.Count);
     }
 
-    private async Task<PagedResultDto<Models.School>> FullSchoolListAsync(CancellationToken ct)
+    private async Task<PagedResultDto<Models.School>> FullSchoolListAsync(StatisticsQuery ctx, CancellationToken ct)
     {
-        var all = (await schools.GetAllOrderedAsync(activeOnly: false, ct)).ToList();
+        var all = (await schools.GetAllOrderedAsync(activeOnly: false, ct))
+            .Where(s => ctx.CityId is null || s.CityId == ctx.CityId)
+            .Where(s => ctx.SchoolStateId is null || s.City?.StateId == ctx.SchoolStateId)
+            .ToList();
 
         return new PagedResultDto<Models.School>(all, 1, all.Count == 0 ? 1 : all.Count, all.Count);
+    }
+
+    private async Task<PagedResultDto<Models.School>> ScopedSchoolPageAsync(
+        StatisticsQuery ctx, PaginationQueryDto pagination, CancellationToken ct)
+    {
+        if (ctx.CityId is null && ctx.SchoolStateId is null)
+            return await schools.GetOrderedPagedAsync(activeOnly: false, pagination, ct);
+
+        var (items, total) = await schools.GetPagedAsync(
+            activeOnly: false, ctx.CityId, ctx.SchoolStateId, pagination, search: null, ct);
+        var (page, pageSize) = ListPagination.Normalize(pagination);
+        return new PagedResultDto<Models.School>(items, page, pageSize, total);
     }
 
     public async Task<PlatformOverviewDto> GetPlatformOverviewAsync(
@@ -90,9 +106,11 @@ public class StatisticsOverviewService(
 
         // The comparison table is one row per school and the country has many, so it is paged
         // in the database rather than built for every school and then trimmed.
+        // The school list follows the same scope as the figures: a regional admin's city, or the
+        // region a ministry user narrowed to. Without it a region counted every school nationwide.
         var page = pagination is null
-            ? await FullSchoolListAsync(ct)
-            : await schools.GetOrderedPagedAsync(activeOnly: false, pagination, ct);
+            ? await FullSchoolListAsync(ctx, ct)
+            : await ScopedSchoolPageAsync(ctx, pagination, ct);
 
         var schoolIds = page.Items.Select(s => s.Id).ToList();
 
