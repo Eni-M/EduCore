@@ -1,6 +1,8 @@
 using EduCore.Dtos.Statistics;
 using EduCore.Enums;
 using EduCore.Exceptions;
+using EduCore.Models;
+using EduCore.Repositories.Interfaces;
 using EduCore.Security;
 using EduCore.Services.Statistics;
 using EduCore.Services.Statistics.Interfaces;
@@ -47,8 +49,19 @@ public class StatisticsScopeResolverTests
         }
     }
 
+    // SchoolB sits in CityId; any other school is somewhere else.
+    private static readonly ISchoolRepository Schools = Stub.Of<ISchoolRepository>((method, args) =>
+        method.Name == nameof(ISchoolRepository.GetWithLocationAsync)
+            ? Task.FromResult<School?>(new School
+            {
+                Id = (Guid)args![0]!,
+                Name = "School",
+                CityId = (Guid)args[0]! == SchoolB ? CityId : Guid.NewGuid(),
+            })
+            : null);
+
     private static StatisticsScopeResolver Resolver(ICurrentUser user, StubPeriodResolver periods) =>
-        new(user, periods);
+        new(user, periods, Schools);
 
     private static StatisticsScopeResolver Directorate(Guid schoolId, StubPeriodResolver periods) =>
         Resolver(new FakeCurrentUser(UserRole.Directorate, schoolId: schoolId), periods);
@@ -83,13 +96,30 @@ public class StatisticsScopeResolverTests
     {
         var context = await Resolver(
                 new FakeCurrentUser(UserRole.RegionalAdmin, cityId: CityId), new StubPeriodResolver())
-            .ResolveAsync(new StatisticsFilter { SchoolId = SchoolB, CityId = Guid.NewGuid() },
-                CancellationToken.None);
+            .ResolveAsync(new StatisticsFilter { CityId = Guid.NewGuid() }, CancellationToken.None);
 
         Assert.Null(context.SchoolId);
         Assert.True(context.CrossSchool);
         Assert.Equal(CityId, context.CityId);
     }
+
+    [Fact]
+    public async Task RegionalAdmin_CanNarrowToOneSchoolInTheirCity()
+    {
+        var context = await Resolver(
+                new FakeCurrentUser(UserRole.RegionalAdmin, cityId: CityId), new StubPeriodResolver())
+            .ResolveAsync(new StatisticsFilter { SchoolId = SchoolB }, CancellationToken.None);
+
+        Assert.Equal(SchoolB, context.SchoolId);
+        Assert.False(context.CrossSchool);
+        Assert.Equal(CityId, context.CityId);
+    }
+
+    [Fact]
+    public async Task RegionalAdmin_CannotPickASchoolOutsideTheirCity() =>
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            Resolver(new FakeCurrentUser(UserRole.RegionalAdmin, cityId: CityId), new StubPeriodResolver())
+                .ResolveAsync(new StatisticsFilter { SchoolId = SchoolA }, CancellationToken.None));
 
     [Fact]
     public async Task StateAdmin_SeesEverySchoolNationwide_ByDefault()

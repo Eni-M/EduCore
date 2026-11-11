@@ -1,5 +1,6 @@
 using EduCore.Dtos.Statistics;
 using EduCore.Exceptions;
+using EduCore.Repositories.Interfaces;
 using EduCore.Security;
 using EduCore.Services.Statistics.Interfaces;
 
@@ -7,11 +8,20 @@ namespace EduCore.Services.Statistics;
 
 public class StatisticsScopeResolver(
     ICurrentUser currentUser,
-    IStatisticsPeriodResolver periods) : IStatisticsScopeResolver
+    IStatisticsPeriodResolver periods,
+    ISchoolRepository schools) : IStatisticsScopeResolver
 {
     public async Task<StatisticsQuery> ResolveAsync(StatisticsFilter filter, CancellationToken ct)
     {
         filter = ApplyTierScope(filter);
+
+        // A regional admin may narrow to one school, but only one in their own city.
+        if (currentUser.IsRegionalAdmin && filter.SchoolId is { } chosen)
+        {
+            var school = await schools.GetWithLocationAsync(chosen, ct);
+            if (school?.CityId != currentUser.RequireCityId())
+                throw new ForbiddenException("This school is not in your city.");
+        }
 
         var (schoolId, crossSchool) = ResolveSchool(filter);
         var (from, to) = await periods.ResolveAsync(filter, schoolId, ct);
@@ -40,9 +50,10 @@ public class StatisticsScopeResolver(
     private StatisticsFilter ApplyTierScope(StatisticsFilter filter) =>
         currentUser switch
         {
+            // The chosen school is kept (and checked against the city above); before, it was
+            // dropped, so picking a school on the statistics page changed nothing.
             { IsRegionalAdmin: true } => filter with
             {
-                SchoolId = null,
                 CityId = currentUser.RequireCityId(),
                 ZoneId = null,
                 StateId = null

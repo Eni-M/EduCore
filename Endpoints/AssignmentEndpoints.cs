@@ -1,4 +1,4 @@
-﻿using EduCore.Dtos.Assignment;
+using EduCore.Dtos.Assignment;
 using EduCore.Security;
 using EduCore.Services.Assignments;
 using EduCore.Services.Interfaces;
@@ -18,7 +18,9 @@ public static class AssignmentEndpoints
                     IAssignmentService service,
                     CancellationToken ct) =>
                     TypedResults.Ok(await service.GetByClassAsync(classId, ct)))
-            .RequireAuthorization(Policies.AnySchoolUser);
+            // Guardians read their children's work too; EnsureCanViewClassAsync limits them to
+            // classes a child of theirs is in.
+            .RequireAuthorization(Policies.StudentReadable);
 
         group.MapGet("/teacher/{teacherId:guid}",
                 async (
@@ -34,7 +36,9 @@ public static class AssignmentEndpoints
                     IAssignmentService service,
                     CancellationToken ct) =>
                     TypedResults.Ok(await service.GetDetailsAsync(assignmentId, ct)))
-            .RequireAuthorization(Policies.AnySchoolUser);
+            // Guardians read their children's work too; EnsureCanViewClassAsync limits them to
+            // classes a child of theirs is in.
+            .RequireAuthorization(Policies.StudentReadable);
 
         group.MapPost("/",
                 async (
