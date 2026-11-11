@@ -1,3 +1,4 @@
+using EduCore.Localization;
 using EduCore.Services.Interfaces;
 
 namespace EduCore.Endpoints;
@@ -12,7 +13,8 @@ public static class DashboardEndpoints
         //
         // No policy beyond authentication for the same reason: every role has a dashboard, and the
         // data inside it is already scoped by the services this composes.
-        group.MapGet("/dashboard", async (IDashboardService service, CancellationToken ct) =>
-            TypedResults.Ok(await service.GetAsync(ct)));
+        // Built in English, then translated into the request's language on the way out.
+        group.MapGet("/dashboard", async (IDashboardService service, IMessageLocalizer localizer, CancellationToken ct) =>
+            TypedResults.Ok(DashboardText.Translate(await service.GetAsync(ct), localizer.Translate)));
     }
 }
